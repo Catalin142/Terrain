@@ -4,11 +4,7 @@
 #include <optional>
 #include <array>
 
-#include "Graphics/VulkanDevice.h"
-#include "Graphics/VulkanSwapchain.h"
-#include "Core/Window.h"
-#include "vulkan/vulkan.h"
-#include "glm/glm.hpp"
+#include "Core/Application.h"
 #include "Graphics/VulkanUniformBuffer.h"
 #include "Graphics/VulkanTexture.h"
 #include "Graphics/VulkanBuffer.h"
@@ -36,41 +32,34 @@ struct Vertex
 	}
 };
 
-class VulkanApp
+class VulkanApp : public Application
 {
 public:
-	VulkanApp();
-	~VulkanApp();
+	VulkanApp(const std::string& title, uint32_t width, uint32_t height);
+	~VulkanApp() = default;
 
-	void Run();
+	void onCreate() override;
+	void onUpdate() override;
+	void onResize() override;
+	void onDestroy() override;
+	void postFrame() override;
 
 private:
-	void initVulkan();
-
-	void mainLoop();
-
 	void createGeometryPass();
 	void createFinalPass();
 
-	void drawFrame();
 	void updateUniformBuffer(uint32_t currentImage);
-
-	void recreateSwapChain();
 
 	void loadModel(const std::string& filepath);
 
 private:
-	std::shared_ptr<Window> window;
-	std::shared_ptr<VulkanDevice> m_Device;
-	std::shared_ptr<VulkanSwapchain> m_SwapChain;
-
 	std::shared_ptr<VulkanRenderCommandBuffer> CommandBuffer;
 	std::shared_ptr<VulkanUniformBufferSet> m_UniformBufferSet;
 
 	std::shared_ptr<VulkanRenderPass> m_GeometryPass;
 	std::shared_ptr<VulkanRenderPass> m_FinalPass;
 
-	std::vector<Vertex> vertices;
+	std::vector<glm::vec3> vertices;
 	std::vector<uint32_t> indices;
 	std::shared_ptr<VulkanBuffer> m_VertexBuffer;
 	std::shared_ptr<VulkanBuffer> m_IndexBuffer;
@@ -80,5 +69,5 @@ private:
 
 	std::shared_ptr<VulkanTexture> m_TextureImage = nullptr;
 
-	VulkanImgui imguiLayer;
+	glm::vec3 eye{ 0.0f };
 };
