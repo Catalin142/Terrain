@@ -79,6 +79,39 @@ void VulkanApp::onCreate()
 
 void VulkanApp::onUpdate()
 {
+	glm::vec3 camVelocity{ 0.0f };
+	glm::vec2 rotation{ 0.0f };
+	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_W))
+		camVelocity.z -= 1.0f * Time::deltaTime;
+	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_S))
+		camVelocity.z += 1.0f * Time::deltaTime;
+	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_D))
+		camVelocity.x += 1.0f * Time::deltaTime;
+	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_A))
+		camVelocity.x -= 1.0f * Time::deltaTime;
+	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_E))
+		camVelocity.y += 1.0f * Time::deltaTime;
+	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_Q))
+		camVelocity.y -= 1.0f * Time::deltaTime;
+
+
+	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_UP))
+		rotation.x += 1.0f * Time::deltaTime;
+	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_DOWN))
+		rotation.x -= 1.0f * Time::deltaTime;
+	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_RIGHT))
+		rotation.y += 1.0f * Time::deltaTime;
+	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_LEFT))
+		rotation.y -= 1.0f * Time::deltaTime;
+
+	if (camVelocity != glm::vec3(0.0f, 0.0f, 0.0f))
+		cam.Move(glm::normalize(camVelocity) * 0.25f);
+
+	if (rotation != glm::vec2(0.0f, 0.0f))
+	{
+		cam.Rotate(rotation);
+	}
+
 	CommandBuffer->Begin();
 	VkCommandBuffer commandBuffer = CommandBuffer->getCurrentCommandBuffer();
 
@@ -122,16 +155,14 @@ void VulkanApp::onUpdate()
 		ImGui::Text("Geometry Pass = %f ms", CommandBuffer->getTime("GeometryPass"));
 		ImGui::Text("Present Pass = %f ms", CommandBuffer->getTime("PresentPass"));
 		ImGui::Text("Imgui = %f ms", CommandBuffer->getTime("Imgui"));
-
-		ImGui::Separator();
-		ImGui::DragFloat("EyeX", &eye.x);
-		ImGui::DragFloat("EyeY", &eye.y);
-		ImGui::DragFloat("EyeZ", &eye.z);
+		ImGui::Text("pp = %f ms", CommandBuffer->getTime("Pipeline"));
 		ImGui::End();
 		endImGuiFrame();
 		CommandBuffer->endQuery("Imgui");
 
+		CommandBuffer->beginQuery("Pipeline");
 		VulkanRenderer::endRenderPass(CommandBuffer);
+		CommandBuffer->endQuery("Pipeline");
 		CommandBuffer->endQuery("PresentPass");
 	}
 
@@ -184,10 +215,7 @@ void VulkanApp::createGeometryPass()
 		FramebufferAttachment color1{};
 		color1.Format = VK_FORMAT_R8G8B8A8_SRGB;
 		color1.Sample = true;
-		FramebufferAttachment color2{};
-		color2.Format = VK_FORMAT_R8G8B8A8_SRGB;
 		fbSpec.Attachments.push_back(color1);
-		fbSpec.Attachments.push_back(color2);
 
 		std::shared_ptr<VulkanFramebuffer> Framebuffer;
 		Framebuffer = std::make_shared<VulkanFramebuffer>(fbSpec);
@@ -245,16 +273,15 @@ void VulkanApp::updateUniformBuffer(uint32_t currentImage)
 
 	UniformBufferObject ubo{};
 	ubo.model = glm::mat4(1.0f);
-	ubo.view = glm::lookAt(eye, glm::vec3(0.0f, 0.0f, -10.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-	ubo.proj = glm::perspective(glm::radians(45.0f), extent.width / (float)extent.height, 0.1f, 100.0f);
-	ubo.proj[1][1] *= -1;
+	ubo.view = cam.getView();
+	ubo.proj = cam.getProjection();
 
 	m_UniformBufferSet->setData(&ubo, sizeof(ubo), currentImage);
 }
 
 void VulkanApp::loadModel(const std::string& filepath)
 {
-	uint32_t gridSize = 64;
+	uint32_t gridSize = 64 * 2;
 	for (int x = 0; x < gridSize + 1; ++x)
 		for (int y = 0; y < gridSize + 1; ++y)
 			vertices.push_back(glm::vec3(x * 0.2f, 0.0f, y * 0.2f));

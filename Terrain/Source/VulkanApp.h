@@ -13,6 +13,8 @@
 #include "Graphics/VulkanRenderer.h"
 #include "Graphics/VulkanImgui.h"
 
+#include "Scene/Camera.h"
+
 #define MAX_FRAMES_IN_FLIGHT 2
 
 struct UniformBufferObject {
@@ -69,5 +71,5 @@ private:
 
 	std::shared_ptr<VulkanTexture> m_TextureImage = nullptr;
 
-	glm::vec3 eye{ 0.0f };
+	Camera cam{45.0f, 1600.0f / 900.0f, 0.1f, 1000.0f};
 };

@@ -12,7 +12,7 @@ project "imgui"
 	{
 		"%{IncludeDir.GLFW}",
 		"%{IncludeDir.imgui}",
-		"D:/Programs/VulkanSDK/Include",
+		"%{wks.location}/Terrain/External",
 	}
 
 	files

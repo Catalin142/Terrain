@@ -23,10 +23,10 @@ struct FramebufferAttachment
 
 struct FramebufferSpecification
 {
-	uint32_t Width;
-	uint32_t Height;
+	uint32_t Width = 0;
+	uint32_t Height = 0;
 
-	uint32_t Samples;
+	uint32_t Samples = 1;
 
 	glm::vec4 colorClear = { 0.0f, 0.0f, 0.0f, 1.0f };
 	float depthClear = 1.0f;
