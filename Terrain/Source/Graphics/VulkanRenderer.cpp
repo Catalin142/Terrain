@@ -120,12 +120,6 @@ void VulkanRenderer::beginSwapchainRenderPass(const std::shared_ptr<VulkanRender
 	renderPassInfo.framebuffer = m_Swapchain->getCurrentFramebuffer();
 	renderPassInfo.renderArea.offset = { 0, 0 };
 	renderPassInfo.renderArea.extent = extent;
-
-	std::vector<VkClearValue> clearValues(1);
-	clearValues[0].color = {0.0f, 0.0f, 0.0f, 1.0f};
-	renderPassInfo.clearValueCount = (uint32_t)clearValues.size();
-	renderPassInfo.pClearValues = clearValues.data();
-
 	vkCmdBeginRenderPass(VulkanCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 	VkViewport viewport{};
@@ -133,8 +127,6 @@ void VulkanRenderer::beginSwapchainRenderPass(const std::shared_ptr<VulkanRender
 	viewport.y = 0.0f;
 	viewport.width = float(extent.width);
 	viewport.height = float(extent.height);
-	viewport.minDepth = 0.0f;
-	viewport.maxDepth = 1.0f;
 	vkCmdSetViewport(VulkanCommandBuffer, 0, 1, &viewport);
 
 	VkRect2D scissor{};

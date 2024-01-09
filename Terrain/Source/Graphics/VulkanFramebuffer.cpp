@@ -109,6 +109,7 @@ VulkanFramebuffer::VulkanFramebuffer(const FramebufferSpecification& spec) : m_S
 	renderPassInfo.attachmentCount = static_cast<uint32_t>(attachmentDescriptions.size());
 	renderPassInfo.subpassCount = 1;
 	renderPassInfo.pSubpasses = &subpass;
+
 	vkCreateRenderPass(VulkanDevice::getVulkanDevice(), &renderPassInfo, nullptr, &m_RenderPass);
 
 	/////////////////////////////////////////////////////////////////////////////

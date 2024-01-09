@@ -34,7 +34,7 @@ void VulkanSwapchain::Initialize()
 	VkAttachmentDescription colorAttachment{};
 	colorAttachment.format = VK_FORMAT_B8G8R8A8_SRGB;
 	colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-	colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -113,7 +113,7 @@ void VulkanSwapchain::Create(uint32_t width, uint32_t height)
 
 	VkSurfaceFormatKHR surfaceFormat;
 	surfaceFormat.format = VK_FORMAT_B8G8R8A8_SRGB;
-	surfaceFormat.colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
+	surfaceFormat.colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
 	m_Extent = VkExtent2D{ m_Width, m_Height };
 
 	VkSwapchainCreateInfoKHR swapChainInfo{};
@@ -174,6 +174,7 @@ void VulkanSwapchain::Create(uint32_t width, uint32_t height)
 
 	m_ColorImages.resize(imageCount);
 	m_Semaphores.resize(imageCount);
+
 	for (uint32_t i = 0; i < imageCount; i++)
 	{
 		m_ColorImages[i].Image = images[i];

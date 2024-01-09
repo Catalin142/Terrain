@@ -155,14 +155,11 @@ void VulkanApp::onUpdate()
 		ImGui::Text("Geometry Pass = %f ms", CommandBuffer->getTime("GeometryPass"));
 		ImGui::Text("Present Pass = %f ms", CommandBuffer->getTime("PresentPass"));
 		ImGui::Text("Imgui = %f ms", CommandBuffer->getTime("Imgui"));
-		ImGui::Text("pp = %f ms", CommandBuffer->getTime("Pipeline"));
 		ImGui::End();
 		endImGuiFrame();
 		CommandBuffer->endQuery("Imgui");
 
-		CommandBuffer->beginQuery("Pipeline");
 		VulkanRenderer::endRenderPass(CommandBuffer);
-		CommandBuffer->endQuery("Pipeline");
 		CommandBuffer->endQuery("PresentPass");
 	}
 
@@ -261,6 +258,8 @@ void VulkanApp::createFinalPass()
 
 		PipelineSpecification spec;
 		spec.Framebuffer = nullptr;
+		spec.depthTest = false;
+		spec.depthWrite = false;
 		spec.Shader = ShaderManager::getShader("FinalShader");
 		spec.vertexBufferLayout = VBOLayout;
 		m_FinalPass->setPipeline(std::make_shared<VulkanPipeline>(spec));
@@ -281,7 +280,7 @@ void VulkanApp::updateUniformBuffer(uint32_t currentImage)
 
 void VulkanApp::loadModel(const std::string& filepath)
 {
-	uint32_t gridSize = 64 * 2;
+	uint32_t gridSize = 64;
 	for (int x = 0; x < gridSize + 1; ++x)
 		for (int y = 0; y < gridSize + 1; ++y)
 			vertices.push_back(glm::vec3(x * 0.2f, 0.0f, y * 0.2f));
