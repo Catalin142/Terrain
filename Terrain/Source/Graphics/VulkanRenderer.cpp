@@ -120,6 +120,12 @@ void VulkanRenderer::beginSwapchainRenderPass(const std::shared_ptr<VulkanRender
 	renderPassInfo.framebuffer = m_Swapchain->getCurrentFramebuffer();
 	renderPassInfo.renderArea.offset = { 0, 0 };
 	renderPassInfo.renderArea.extent = extent;
+
+	VkClearValue clearValue;
+	clearValue.color = { 0.0f, 0.0f, 0.0f, 1.0f };
+	renderPassInfo.pClearValues = &clearValue;
+	renderPassInfo.clearValueCount = 1;
+
 	vkCmdBeginRenderPass(VulkanCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 	VkViewport viewport{};

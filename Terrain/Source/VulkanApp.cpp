@@ -15,16 +15,6 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
 
-namespace std {
-	template<> struct hash<Vertex> {
-		size_t operator()(Vertex const& vertex) const {
-			return ((hash<glm::vec3>()(vertex.position) ^
-				(hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^
-				(hash<glm::vec2>()(vertex.texCoord) << 1);
-		}
-	};
-}
-
 #include <chrono>
 
 #define GLFW_INCLUDE_VULKAN
@@ -40,7 +30,7 @@ void VulkanApp::onCreate()
 {
 	CommandBuffer = std::make_shared<VulkanRenderCommandBuffer>(true);
 
-	m_TextureImage = std::make_shared<VulkanTexture>("Resources/model/viking_room/viking_room.png", false);
+	m_TextureImage = std::make_shared<VulkanTexture>("Resources/Img/heightmapR.png", false);
 
 	{
 		loadModel("Resources/model/viking_room/viking_room.obj");
@@ -200,6 +190,7 @@ void VulkanApp::createGeometryPass()
 		std::shared_ptr<VulkanDescriptorSet> DescriptorSet;
 		DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("GeometryShader"));
 		DescriptorSet->bindInput(0, 0, m_UniformBufferSet);
+		DescriptorSet->bindInput(1, 0, m_TextureImage);
 		DescriptorSet->Create();
 		m_GeometryPass->setDescriptorSet(DescriptorSet);
 	}
@@ -219,6 +210,7 @@ void VulkanApp::createGeometryPass()
 
 		VulkanVertexBufferLayout VBOLayout = VulkanVertexBufferLayout({
 			VertexType::FLOAT_3,
+			VertexType::FLOAT_2,
 			});
 
 		PipelineSpecification spec;
@@ -258,8 +250,6 @@ void VulkanApp::createFinalPass()
 
 		PipelineSpecification spec;
 		spec.Framebuffer = nullptr;
-		spec.depthTest = false;
-		spec.depthWrite = false;
 		spec.Shader = ShaderManager::getShader("FinalShader");
 		spec.vertexBufferLayout = VBOLayout;
 		m_FinalPass->setPipeline(std::make_shared<VulkanPipeline>(spec));
@@ -280,13 +270,13 @@ void VulkanApp::updateUniformBuffer(uint32_t currentImage)
 
 void VulkanApp::loadModel(const std::string& filepath)
 {
-	uint32_t gridSize = 64;
-	for (int x = 0; x < gridSize + 1; ++x)
-		for (int y = 0; y < gridSize + 1; ++y)
-			vertices.push_back(glm::vec3(x * 0.2f, 0.0f, y * 0.2f));
+	uint32_t gridSize = 200;
+	for (int x = 0; x <= gridSize; x++)
+		for (int y = 0; y <= gridSize; y++)
+			vertices.push_back(Vertex{ glm::vec3(x * 0.2f, 0.0f, y * 0.2f), glm::vec2((float)x / 200.0f, (float)y / 200.0f) });
 
 	uint32_t vertCount = gridSize + 1;
-	for (int i = 0; i < vertCount * vertCount - vertCount; ++i)
+	for (int i = 0; i < vertCount * vertCount - vertCount; i++)
 	{
 		if ((i + 1) % vertCount == 0)
 		{

@@ -5,12 +5,26 @@
 #include "VulkanBuffer.h"
 
 #include "stb_image/std_image.h"
+#include <cassert>
+
+VkFormat getFormat(uint32_t channels)
+{
+	switch (channels)
+	{
+	case 1: return VK_FORMAT_R8_SRGB;
+	case 2: return VK_FORMAT_R8G8_SRGB;
+	case 3: return VK_FORMAT_R8G8B8_SRGB;
+	case 4: return VK_FORMAT_R8G8B8A8_SRGB;
+	default: assert(false);
+	}
+	return VK_FORMAT_UNDEFINED;
+}
 
 VulkanTexture::VulkanTexture(const std::string& filepath, bool generateMips)
 {
-	stbi_uc* pixels = stbi_load("Resources/model/viking_room/viking_room.png", &m_Info.Width, &m_Info.Height,
-		&m_Info.Channels, STBI_rgb_alpha);
-	VkDeviceSize imageSize = m_Info.Width * m_Info.Width * 4;
+	stbi_uc* pixels = stbi_load(filepath.c_str(), &m_Info.Width, &m_Info.Height,
+		&m_Info.Channels, 0);
+	VkDeviceSize imageSize = m_Info.Width * m_Info.Width * m_Info.Channels;
 
 	m_Info.mipCount = generateMips ? VkUtils::calculateNumberOfMips(m_Info.Width, m_Info.Height) : 1;
 
@@ -34,7 +48,7 @@ VulkanTexture::VulkanTexture(const std::string& filepath, bool generateMips)
 	ImageSpecification imgSpec;
 	imgSpec.Width = m_Info.Width;
 	imgSpec.Height = m_Info.Height;
-	imgSpec.Format = VK_FORMAT_R8G8B8A8_SRGB;
+	imgSpec.Format = getFormat(m_Info.Channels);
 	imgSpec.Mips = m_Info.mipCount;
 	imgSpec.Tiling = VK_IMAGE_TILING_OPTIMAL;
 	imgSpec.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;

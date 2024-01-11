@@ -27,11 +27,6 @@ struct Vertex
 {
 	glm::vec3 position;
 	glm::vec2 texCoord;
-	glm::vec3 color;
-
-	bool operator==(const Vertex& other) const {
-		return position == other.position && color == other.color && texCoord == other.texCoord;
-	}
 };
 
 class VulkanApp : public Application
@@ -61,7 +56,7 @@ private:
 	std::shared_ptr<VulkanRenderPass> m_GeometryPass;
 	std::shared_ptr<VulkanRenderPass> m_FinalPass;
 
-	std::vector<glm::vec3> vertices;
+	std::vector<Vertex> vertices;
 	std::vector<uint32_t> indices;
 	std::shared_ptr<VulkanBuffer> m_VertexBuffer;
 	std::shared_ptr<VulkanBuffer> m_IndexBuffer;
