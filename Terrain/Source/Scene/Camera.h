@@ -21,6 +21,8 @@ public:
 	void setAspectRatio(float ar);
 	void setPlanes(float nearPlane, float farPlane);
 
+	const glm::vec3& getPosition() { return m_Position; }
+
 private:
 	glm::vec3 Right() const;
 	glm::vec3 Up() const;

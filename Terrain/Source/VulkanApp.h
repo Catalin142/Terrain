@@ -29,6 +29,14 @@ struct Vertex
 	glm::vec2 texCoord;
 };
 
+#define CHUNK_SIZE 16
+struct TerrainChunk
+{
+	std::shared_ptr<VulkanBuffer> VertexBuffer;
+	uint32_t xOffset = 0;
+	uint32_t yOffset = 0;
+};
+
 class VulkanApp : public Application
 {
 public:
@@ -58,8 +66,17 @@ private:
 
 	std::vector<Vertex> vertices;
 	std::vector<uint32_t> indices;
-	std::shared_ptr<VulkanBuffer> m_VertexBuffer;
+
+	std::vector<TerrainChunk> m_Chunks;
+	
+	uint32_t index = 0;
 	std::shared_ptr<VulkanBuffer> m_IndexBuffer;
+	uint32_t index1 = 0;
+	std::shared_ptr<VulkanBuffer> m_IndexBuffer1;
+	uint32_t index2 = 0;
+	std::shared_ptr<VulkanBuffer> m_IndexBuffer2;
+	uint32_t index3 = 0;
+	std::shared_ptr<VulkanBuffer> m_IndexBuffer3;
 
 	std::shared_ptr<VulkanBuffer> m_FullscreenVertexBuffer;
 	std::shared_ptr<VulkanBuffer> m_FullscreenIndexBuffer;

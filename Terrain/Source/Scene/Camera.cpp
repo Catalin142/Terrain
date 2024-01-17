@@ -19,7 +19,7 @@ void Camera::Rotate(const glm::vec2& axis)
 	const float yawSign = Up().y < 0.0f ? -1.0f : 1.0f;
 	m_Yaw += axis.y * yawSign;
 
-	if (glm::abs(m_Pitch + axis.x) < 0.8f)
+	if (glm::abs(m_Pitch + axis.x) < 2.0f)
 		m_Pitch += axis.x;
 }
 

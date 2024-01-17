@@ -35,11 +35,6 @@ void VulkanApp::onCreate()
 	{
 		loadModel("Resources/model/viking_room/viking_room.obj");
 
-		m_VertexBuffer = std::make_shared<VulkanBuffer>(vertices.data(), (uint32_t)(sizeof(vertices[0]) * (uint32_t)vertices.size()),
-			BufferType::VERTEX, BufferUsage::STATIC);
-
-		m_IndexBuffer = std::make_shared<VulkanBuffer>(indices.data(), (uint32_t)(sizeof(indices[0]) * (uint32_t)indices.size()),
-			BufferType::INDEX, BufferUsage::STATIC);
 	}
 	{
 		float FullscreenVertices[] = {
@@ -113,12 +108,43 @@ void VulkanApp::onUpdate()
 
 		updateUniformBuffer(VulkanRenderer::getCurrentFrame());
 
-		VkBuffer vertexBuffers[] = { m_VertexBuffer->getBuffer() };
-		VkDeviceSize offsets[] = { 0 };
-		vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-		vkCmdBindIndexBuffer(commandBuffer, m_IndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+		for (auto& chunk : m_Chunks)
+		{
+			VkBuffer vertexBuffers[] = { chunk.VertexBuffer->getBuffer() };
+			VkDeviceSize offsets[] = { 0 };
+			vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
-		vkCmdDrawIndexed(commandBuffer, uint32_t(indices.size()), 1, 0, 0, 0);
+			float distance = glm::distance(cam.getPosition(), glm::vec3(chunk.xOffset, 0.0f, chunk.yOffset));
+
+			uint32_t indicesSize = 0;
+
+			if (distance < 50.0f)
+			{
+				vkCmdBindIndexBuffer(commandBuffer, m_IndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+				indicesSize = index;
+			}
+
+			if (distance >= 50.0f && distance < 100.0f)
+			{
+				vkCmdBindIndexBuffer(commandBuffer, m_IndexBuffer1->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+				indicesSize = index1;
+			}
+
+			if (distance >= 100.0f && distance < 150.0f)
+			{
+				vkCmdBindIndexBuffer(commandBuffer, m_IndexBuffer2->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+				indicesSize = index2;
+			}
+			
+			if (distance >= 150.0f)
+			{
+				vkCmdBindIndexBuffer(commandBuffer, m_IndexBuffer3->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+				indicesSize = index3;
+			}
+
+			vkCmdDrawIndexed(commandBuffer, uint32_t(indicesSize), 1, 0, 0, 0);
+		}
+
 
 		VulkanRenderer::endRenderPass(CommandBuffer);
 
@@ -270,23 +296,110 @@ void VulkanApp::updateUniformBuffer(uint32_t currentImage)
 
 void VulkanApp::loadModel(const std::string& filepath)
 {
-	uint32_t gridSize = 200;
-	for (int x = 0; x <= gridSize; x++)
-		for (int y = 0; y <= gridSize; y++)
-			vertices.push_back(Vertex{ glm::vec3(x * 0.2f, 0.0f, y * 0.2f), glm::vec2((float)x / 200.0f, (float)y / 200.0f) });
-
-	uint32_t vertCount = gridSize + 1;
-	for (int i = 0; i < vertCount * vertCount - vertCount; i++)
 	{
-		if ((i + 1) % vertCount == 0)
+		uint32_t gridSize = 128;
+		for (uint32_t xOffset = 0; xOffset < gridSize / CHUNK_SIZE; xOffset++)
+			for (uint32_t yOffset = 0; yOffset < gridSize / CHUNK_SIZE; yOffset++)
+			{
+				vertices.clear();
+				TerrainChunk& chunk = m_Chunks.emplace_back();
+
+				for (int x = xOffset * CHUNK_SIZE; x <= (xOffset + 1) * CHUNK_SIZE; x++)
+					for (int y = yOffset * CHUNK_SIZE; y <= (yOffset + 1) * CHUNK_SIZE; y++)
+						vertices.push_back(Vertex{ glm::vec3(x * 1.0f, 0.0f, y * 1.0f), glm::vec2((float)x / gridSize, (float)y / gridSize) });
+
+				chunk.VertexBuffer = std::make_shared<VulkanBuffer>(vertices.data(), (uint32_t)(sizeof(vertices[0]) * (uint32_t)vertices.size()),
+					BufferType::VERTEX, BufferUsage::STATIC);
+				chunk.xOffset = xOffset * CHUNK_SIZE;
+				chunk.yOffset = yOffset * CHUNK_SIZE;
+			}
+
 		{
-			continue;
+			indices.clear();
+			uint32_t lod = 1;
+			uint32_t vertCount = CHUNK_SIZE + 1;
+			for (int x = 0; x < vertCount - 1; x += lod) {
+				for (int y = 0; y < vertCount - 1; y += lod) {
+					uint32_t index = x * vertCount + y;
+					indices.push_back(index);
+					indices.push_back(index + lod);
+					indices.push_back(index + vertCount * lod + lod);
+
+					indices.push_back(index);
+					indices.push_back(index + vertCount * lod + lod);
+					indices.push_back(index + vertCount * lod);
+				}
+			}
+
+			index = indices.size();
+			m_IndexBuffer = std::make_shared<VulkanBuffer>(indices.data(), (uint32_t)(sizeof(indices[0]) * (uint32_t)indices.size()),
+				BufferType::INDEX, BufferUsage::STATIC);
+		} 
+		
+		{
+			indices.clear();
+			uint32_t lod = 2;
+			uint32_t vertCount = CHUNK_SIZE + 1;
+			for (int x = 0; x < vertCount - 1; x += lod) {
+				for (int y = 0; y < vertCount - 1; y += lod) {
+					uint32_t index = x * vertCount + y;
+					indices.push_back(index);
+					indices.push_back(index + lod);
+					indices.push_back(index + vertCount * lod + lod);
+
+					indices.push_back(index);
+					indices.push_back(index + vertCount * lod + lod);
+					indices.push_back(index + vertCount * lod);
+				}
+			}
+
+			index1 = indices.size();
+			m_IndexBuffer1 = std::make_shared<VulkanBuffer>(indices.data(), (uint32_t)(sizeof(indices[0]) * (uint32_t)indices.size()),
+				BufferType::INDEX, BufferUsage::STATIC);
 		}
-		indices.push_back(i + 1 + vertCount);
-		indices.push_back(i + vertCount);
-		indices.push_back(i);
-		indices.push_back(i);
-		indices.push_back(i + 1);
-		indices.push_back(i + 1 + vertCount);
+
+		{
+			indices.clear();
+			uint32_t lod = 4;
+			uint32_t vertCount = CHUNK_SIZE + 1;
+			for (int x = 0; x < vertCount - 1; x += lod) {
+				for (int y = 0; y < vertCount - 1; y += lod) {
+					uint32_t index = x * vertCount + y;
+					indices.push_back(index);
+					indices.push_back(index + lod);
+					indices.push_back(index + vertCount * lod + lod);
+
+					indices.push_back(index);
+					indices.push_back(index + vertCount * lod + lod);
+					indices.push_back(index + vertCount * lod);
+				}
+			}
+
+			index2 = indices.size();
+			m_IndexBuffer2 = std::make_shared<VulkanBuffer>(indices.data(), (uint32_t)(sizeof(indices[0]) * (uint32_t)indices.size()),
+				BufferType::INDEX, BufferUsage::STATIC);
+		}
+
+		{
+			indices.clear();
+			uint32_t lod = 8;
+			uint32_t vertCount = CHUNK_SIZE + 1;
+			for (int x = 0; x < vertCount - 1; x += lod) {
+				for (int y = 0; y < vertCount - 1; y += lod) {
+					uint32_t index = x * vertCount + y;
+					indices.push_back(index);
+					indices.push_back(index + lod);
+					indices.push_back(index + vertCount * lod + lod);
+
+					indices.push_back(index);
+					indices.push_back(index + vertCount * lod + lod);
+					indices.push_back(index + vertCount * lod);
+				}
+			}
+
+			index3 = indices.size();
+			m_IndexBuffer3 = std::make_shared<VulkanBuffer>(indices.data(), (uint32_t)(sizeof(indices[0]) * (uint32_t)indices.size()),
+				BufferType::INDEX, BufferUsage::STATIC);
+		}
 	}
 }

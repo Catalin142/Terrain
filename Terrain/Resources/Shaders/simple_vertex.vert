@@ -15,6 +15,6 @@ layout (set = 1, binding = 0) uniform sampler2D heightMap;
 void main() 
 {
     vec3 position = inPosition;
-    position.y = texture(heightMap, inTexCoord).r * 10.0f;
+    position.y = (1.0 - texture(heightMap, inTexCoord).r) * 20.0;
     gl_Position = ubo.proj * ubo.view * ubo.model * vec4(position, 1.0);
 }
