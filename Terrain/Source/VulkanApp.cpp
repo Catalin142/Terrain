@@ -30,9 +30,13 @@ void VulkanApp::onCreate()
 {
 	CommandBuffer = std::make_shared<VulkanRenderCommandBuffer>(true);
 
-	m_TextureImage = std::make_shared<VulkanTexture>("Resources/Img/heightmapR.png", false);
+	m_TextureImage = std::make_shared<VulkanTexture>("Resources/Img/world1.png", false);
+	m_TextureImage2 = std::make_shared<VulkanTexture>("Resources/Img/image4.png", 4, false); 
+	m_Grass = std::make_shared<VulkanTexture>("Resources/Img/grass.png", 4, true);
+	m_Slope = std::make_shared<VulkanTexture>("Resources/Img/slope.png", 4, true);
+	m_Rock = std::make_shared<VulkanTexture>("Resources/Img/rock.png", 4, true);
 
-	{
+	{																						
 		loadModel("Resources/model/viking_room/viking_room.obj");
 
 	}
@@ -90,7 +94,12 @@ void VulkanApp::onUpdate()
 		rotation.y -= 1.0f * Time::deltaTime;
 
 	if (camVelocity != glm::vec3(0.0f, 0.0f, 0.0f))
-		cam.Move(glm::normalize(camVelocity) * 0.25f);
+	{
+		if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_SPACE))
+			cam.Move(glm::normalize(camVelocity) * 5.75f);
+		else
+			cam.Move(glm::normalize(camVelocity) * 0.75f);
+	}
 
 	if (rotation != glm::vec2(0.0f, 0.0f))
 	{
@@ -118,25 +127,25 @@ void VulkanApp::onUpdate()
 
 			uint32_t indicesSize = 0;
 
-			if (distance < 50.0f)
+			if (distance < 150.0f)
 			{
 				vkCmdBindIndexBuffer(commandBuffer, m_IndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
 				indicesSize = index;
 			}
 
-			if (distance >= 50.0f && distance < 100.0f)
+			if (distance >= 150.0f && distance < 200.0f)
 			{
 				vkCmdBindIndexBuffer(commandBuffer, m_IndexBuffer1->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
 				indicesSize = index1;
 			}
 
-			if (distance >= 100.0f && distance < 150.0f)
+			if (distance >= 200.0f && distance < 250.0f)
 			{
 				vkCmdBindIndexBuffer(commandBuffer, m_IndexBuffer2->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
 				indicesSize = index2;
 			}
 			
-			if (distance >= 150.0f)
+			if (distance >= 250.0f)
 			{
 				vkCmdBindIndexBuffer(commandBuffer, m_IndexBuffer3->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
 				indicesSize = index3;
@@ -217,6 +226,10 @@ void VulkanApp::createGeometryPass()
 		DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("GeometryShader"));
 		DescriptorSet->bindInput(0, 0, m_UniformBufferSet);
 		DescriptorSet->bindInput(1, 0, m_TextureImage);
+		DescriptorSet->bindInput(1, 1, m_TextureImage2);
+		DescriptorSet->bindInput(2, 0, m_Grass);
+		DescriptorSet->bindInput(2, 1, m_Slope);
+		DescriptorSet->bindInput(2, 2, m_Rock);
 		DescriptorSet->Create();
 		m_GeometryPass->setDescriptorSet(DescriptorSet);
 	}
@@ -237,13 +250,14 @@ void VulkanApp::createGeometryPass()
 		VulkanVertexBufferLayout VBOLayout = VulkanVertexBufferLayout({
 			VertexType::FLOAT_3,
 			VertexType::FLOAT_2,
+			VertexType::FLOAT_2,
 			});
 
 		PipelineSpecification spec;
 		spec.Framebuffer = Framebuffer;
 		spec.depthTest = true;
 		spec.depthWrite = true;
-		spec.Wireframe = true;
+		spec.Wireframe = false;
 		spec.Culling = true;
 		spec.Shader = ShaderManager::getShader("GeometryShader");
 		spec.vertexBufferLayout = VBOLayout;
@@ -297,7 +311,7 @@ void VulkanApp::updateUniformBuffer(uint32_t currentImage)
 void VulkanApp::loadModel(const std::string& filepath)
 {
 	{
-		uint32_t gridSize = 128;
+		uint32_t gridSize = 513;
 		for (uint32_t xOffset = 0; xOffset < gridSize / CHUNK_SIZE; xOffset++)
 			for (uint32_t yOffset = 0; yOffset < gridSize / CHUNK_SIZE; yOffset++)
 			{
@@ -306,7 +320,15 @@ void VulkanApp::loadModel(const std::string& filepath)
 
 				for (int x = xOffset * CHUNK_SIZE; x <= (xOffset + 1) * CHUNK_SIZE; x++)
 					for (int y = yOffset * CHUNK_SIZE; y <= (yOffset + 1) * CHUNK_SIZE; y++)
-						vertices.push_back(Vertex{ glm::vec3(x * 1.0f, 0.0f, y * 1.0f), glm::vec2((float)x / gridSize, (float)y / gridSize) });
+					{
+						glm::vec2 UV;
+						UV.x = glm::clamp((float)x / (float)gridSize, 0.0f, 1.0f);
+						UV.y = glm::clamp((float)y / (float)gridSize, 0.0f, 1.0f);
+						glm::vec2 UV2;
+						UV2.x = (float)(x - xOffset * CHUNK_SIZE) / (float)CHUNK_SIZE;
+						UV2.y = (float)(y - yOffset * CHUNK_SIZE) / (float)CHUNK_SIZE;
+						vertices.push_back(Vertex{ glm::vec3(x * 1.0f, 0.0f, y * 1.0f), UV, UV2 });
+					}
 
 				chunk.VertexBuffer = std::make_shared<VulkanBuffer>(vertices.data(), (uint32_t)(sizeof(vertices[0]) * (uint32_t)vertices.size()),
 					BufferType::VERTEX, BufferUsage::STATIC);

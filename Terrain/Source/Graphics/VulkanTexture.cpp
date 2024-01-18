@@ -12,19 +12,23 @@ VkFormat getFormat(uint32_t channels)
 	switch (channels)
 	{
 	case 1: return VK_FORMAT_R8_SRGB;
-	case 2: return VK_FORMAT_R8G8_SRGB;
-	case 3: return VK_FORMAT_R8G8B8_SRGB;
+	case 2: 
+	case 3: 
 	case 4: return VK_FORMAT_R8G8B8A8_SRGB;
 	default: assert(false);
 	}
 	return VK_FORMAT_UNDEFINED;
 }
 
-VulkanTexture::VulkanTexture(const std::string& filepath, bool generateMips)
+VulkanTexture::VulkanTexture(const std::string& filepath, uint32_t channels, bool generateMips)
 {
 	stbi_uc* pixels = stbi_load(filepath.c_str(), &m_Info.Width, &m_Info.Height,
-		&m_Info.Channels, 0);
-	VkDeviceSize imageSize = m_Info.Width * m_Info.Width * m_Info.Channels;
+		&m_Info.Channels, channels);
+
+	if (channels != 0)
+		m_Info.Channels = channels;
+
+	VkDeviceSize imageSize = m_Info.Width * m_Info.Height * m_Info.Channels;
 
 	m_Info.mipCount = generateMips ? VkUtils::calculateNumberOfMips(m_Info.Width, m_Info.Height) : 1;
 
@@ -49,6 +53,7 @@ VulkanTexture::VulkanTexture(const std::string& filepath, bool generateMips)
 	imgSpec.Width = m_Info.Width;
 	imgSpec.Height = m_Info.Height;
 	imgSpec.Format = getFormat(m_Info.Channels);
+
 	imgSpec.Mips = m_Info.mipCount;
 	imgSpec.Tiling = VK_IMAGE_TILING_OPTIMAL;
 	imgSpec.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;

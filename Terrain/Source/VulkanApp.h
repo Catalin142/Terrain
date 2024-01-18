@@ -27,9 +27,10 @@ struct Vertex
 {
 	glm::vec3 position;
 	glm::vec2 texCoord;
+	glm::vec2 texCoord2;
 };
 
-#define CHUNK_SIZE 16
+#define CHUNK_SIZE 64
 struct TerrainChunk
 {
 	std::shared_ptr<VulkanBuffer> VertexBuffer;
@@ -82,6 +83,10 @@ private:
 	std::shared_ptr<VulkanBuffer> m_FullscreenIndexBuffer;
 
 	std::shared_ptr<VulkanTexture> m_TextureImage = nullptr;
+	std::shared_ptr<VulkanTexture> m_TextureImage2 = nullptr;
+	std::shared_ptr<VulkanTexture> m_Grass = nullptr;
+	std::shared_ptr<VulkanTexture> m_Slope = nullptr;
+	std::shared_ptr<VulkanTexture> m_Rock = nullptr;
 
-	Camera cam{45.0f, 1600.0f / 900.0f, 0.1f, 1000.0f};
+	Camera cam{45.0f, 1600.0f / 900.0f, 0.1f, 10000.0f};
 };

@@ -17,7 +17,7 @@ struct TextureInformation
 class VulkanTexture
 {
 public:
-	VulkanTexture(const std::string& filepath, bool generateMips = false);
+	VulkanTexture(const std::string& filepath, uint32_t channels = 0, bool generateMips = false);
 	~VulkanTexture();
 
 	VkImage getVkImage() { return m_VulkanImage->getVkImage(); }

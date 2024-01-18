@@ -95,6 +95,7 @@ public:
 	inline uint32_t getPresentFamilyIndex() const	{ return m_presentQueue.familyIndex; }
 
 	VkPhysicalDeviceLimits getPhysicalDeviceLimits() const { return m_physicalDeviceProperties.limits; }
+	VkPhysicalDeviceProperties getPhysicalDeviceProperties() const { return m_physicalDeviceProperties; }
 
 	inline SwapchainSupportDetails getSwapchainCapabilities() { return getSwapchainDetails(m_VulkanPlatform.GPU); }
 
