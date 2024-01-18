@@ -127,25 +127,25 @@ void VulkanApp::onUpdate()
 
 			uint32_t indicesSize = 0;
 
-			if (distance < 150.0f)
+			if (distance < 250.0f)
 			{
 				vkCmdBindIndexBuffer(commandBuffer, m_IndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
 				indicesSize = index;
 			}
 
-			if (distance >= 150.0f && distance < 200.0f)
+			if (distance >= 250.0f && distance < 350.0f)
 			{
 				vkCmdBindIndexBuffer(commandBuffer, m_IndexBuffer1->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
 				indicesSize = index1;
 			}
 
-			if (distance >= 200.0f && distance < 250.0f)
+			if (distance >= 350.0f && distance < 450.0f)
 			{
 				vkCmdBindIndexBuffer(commandBuffer, m_IndexBuffer2->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
 				indicesSize = index2;
 			}
 			
-			if (distance >= 250.0f)
+			if (distance >= 450.0f)
 			{
 				vkCmdBindIndexBuffer(commandBuffer, m_IndexBuffer3->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
 				indicesSize = index3;
@@ -175,7 +175,7 @@ void VulkanApp::onUpdate()
 
 		CommandBuffer->beginQuery("Imgui");
 		beginImGuiFrame();
-		ImGui::Begin("Render time");
+		ImGui::Begin("GPU Rendering Time");
 		ImGui::Text("Total time = %f ms", CommandBuffer->getCommandBufferTime());
 		ImGui::Text("Geometry Pass = %f ms", CommandBuffer->getTime("GeometryPass"));
 		ImGui::Text("Present Pass = %f ms", CommandBuffer->getTime("PresentPass"));

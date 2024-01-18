@@ -1,0 +1,12 @@
+11.01.2024 - Simple heightmap rendering, no lod no nothing.
+
+18.01.2024 - Changed the map, divided the heightmap into chunks of 64x64 triangles and added different lods.
+		   - To generate different lods I created multiple index buffers for the chunks.
+		   - Added terrain texturing using a map to blend between textures.
+		   - Needs lots of optimizations:
+				- Generate position, uv, on the shader directly to decrease the data transfer overhead
+				- Use a single vertex buffer for every chunk
+
+		   - TODO:
+				- Add CPU timing
+				- Fix terrain cracks
