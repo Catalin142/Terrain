@@ -258,7 +258,11 @@ std::vector<ShaderInput> VulkanShaderCompiler::Reflect(ShaderStage stage, const 
 		uniformBufferInput.DebugName = uniformBuffer.name;
 		uniformBufferInput.Set = compiler.get_decoration(uniformBuffer.id, spv::DecorationDescriptorSet);
 		uniformBufferInput.Binding = compiler.get_decoration(uniformBuffer.id, spv::DecorationBinding);
-		uniformBufferInput.Type = ShaderInputType::UNIFORM_BUFFER_SET;
+
+		if (uniformBuffer.name.find("Set") != std::string::npos)
+			uniformBufferInput.Type = ShaderInputType::UNIFORM_BUFFER_SET;
+		else 
+			uniformBufferInput.Type = ShaderInputType::UNIFORM_BUFFER;
 
 		shaderInput.push_back(uniformBufferInput);
 	}

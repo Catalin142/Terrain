@@ -18,22 +18,18 @@
 #define MAX_FRAMES_IN_FLIGHT 2
 
 struct UniformBufferObject {
-	glm::mat4 model;
 	glm::mat4 view;
 	glm::mat4 proj;
 };
 
 struct Vertex
 {
-	glm::vec3 position;
-	glm::vec2 texCoord;
 	glm::vec2 texCoord2;
 };
 
 #define CHUNK_SIZE 64
 struct TerrainChunk
 {
-	std::shared_ptr<VulkanBuffer> VertexBuffer;
 	uint32_t xOffset = 0;
 	uint32_t yOffset = 0;
 };
@@ -61,6 +57,7 @@ private:
 private:
 	std::shared_ptr<VulkanRenderCommandBuffer> CommandBuffer;
 	std::shared_ptr<VulkanUniformBufferSet> m_UniformBufferSet;
+	std::shared_ptr<VulkanUniformBuffer> m_OffsetBuffer;
 
 	std::shared_ptr<VulkanRenderPass> m_GeometryPass;
 	std::shared_ptr<VulkanRenderPass> m_FinalPass;
@@ -69,7 +66,7 @@ private:
 	std::vector<uint32_t> indices;
 
 	std::vector<TerrainChunk> m_Chunks;
-	
+
 	uint32_t index = 0;
 	std::shared_ptr<VulkanBuffer> m_IndexBuffer;
 	uint32_t index1 = 0;

@@ -15,10 +15,12 @@ void main()
 {
     vec4 composition = texture(Tex, fragTexCoord);
 
-    vec3 grassColor = texture(Grass, texCoord).rgb * composition.g;
-    vec3 slopeColor = texture(Slope, texCoord).rgb * composition.b;
-    vec3 rockColor = texture(Rock, texCoord).rgb  * composition.r;
+    vec3 finalColor = vec3(0.0, 0.0, 0.0);
 
-    outColor.rgb = grassColor + slopeColor + rockColor;
+    finalColor += texture(Grass, texCoord).rgb * composition.g;
+    finalColor += texture(Slope, texCoord).rgb * composition.b;
+    finalColor += texture(Rock, texCoord).rgb  * composition.r;
+
+    outColor.rgb = finalColor;
     outColor.a = 1.0;
 }

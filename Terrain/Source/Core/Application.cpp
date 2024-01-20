@@ -2,6 +2,8 @@
 
 #include "Graphics/VulkanRenderer.h"
 
+#include "Benchmark.h"
+
 float Time::deltaTime = 0;
 Application* Application::m_Instance;
 
@@ -61,10 +63,13 @@ void Application::Run()
 
 		preFrame();
 		m_Swapchain->beginFrame();
+
 		onUpdate();
-		
-		m_Swapchain->endFrame();
-		postFrame();
+		{
+			START_SCOPE_PROFILE("endFrame");
+			m_Swapchain->endFrame();
+			postFrame();
+		}
 	}
 
 	onDestroy();

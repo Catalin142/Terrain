@@ -25,7 +25,7 @@ void VulkanSwapchain::Initialize()
 
 	m_SurfaceFormat.format = VK_FORMAT_B8G8R8A8_SRGB;
 	m_SurfaceFormat.colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
-	m_PresentMode = m_vSync ? VK_PRESENT_MODE_FIFO_KHR : VK_PRESENT_MODE_IMMEDIATE_KHR;
+	m_PresentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
 
 	////////////////////////////////////////////////////////////////////////////////////////
 	// Render pass
@@ -64,7 +64,7 @@ void VulkanSwapchain::Initialize()
 	// Command buffer
 	////////////////////////////////////////////////////////////////////////////////////////
 
-	m_FramesInFlight = m_vSync ? 2 : 1;
+	m_FramesInFlight = 1;
 
 	m_CommandBuffers.resize(m_FramesInFlight);
 

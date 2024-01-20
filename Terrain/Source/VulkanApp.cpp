@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <fstream>
 
+#include "Core/Benchmark.h"
+
 #include "Graphics/VulkanUtils.h"
 #include "tiny_obj_loader.h"
 #include <imgui.h>
@@ -36,9 +38,10 @@ void VulkanApp::onCreate()
 	m_Slope = std::make_shared<VulkanTexture>("Resources/Img/slope.png", 4, true);
 	m_Rock = std::make_shared<VulkanTexture>("Resources/Img/rock.png", 4, true);
 
-	{																						
+	{
+		// need to store chunks offsets
+		m_OffsetBuffer = std::make_shared<VulkanUniformBuffer>(64 * sizeof(glm::vec4));
 		loadModel("Resources/model/viking_room/viking_room.obj");
-
 	}
 	{
 		float FullscreenVertices[] = {
@@ -83,7 +86,6 @@ void VulkanApp::onUpdate()
 	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_Q))
 		camVelocity.y -= 1.0f * Time::deltaTime;
 
-
 	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_UP))
 		rotation.x += 1.0f * Time::deltaTime;
 	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_DOWN))
@@ -111,49 +113,106 @@ void VulkanApp::onUpdate()
 
 	// Geometry pass
 	{
+		START_SCOPE_PROFILE("GeometryPass");
 		CommandBuffer->beginQuery("GeometryPass");
 
 		VulkanRenderer::beginRenderPass(CommandBuffer, m_GeometryPass);
 
 		updateUniformBuffer(VulkanRenderer::getCurrentFrame());
 
-		for (auto& chunk : m_Chunks)
+		//VkBuffer vertexBuffers[] = { VertexBuffer->getBuffer() };
+		//VkDeviceSize offsets[] = { 0 };
+		//vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
+		std::vector<glm::vec4> offsets;
+		uint32_t firstInstance = 0;
 		{
-			VkBuffer vertexBuffers[] = { chunk.VertexBuffer->getBuffer() };
-			VkDeviceSize offsets[] = { 0 };
-			vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+			START_SCOPE_PROFILE("Lod0Render");
 
-			float distance = glm::distance(cam.getPosition(), glm::vec3(chunk.xOffset, 0.0f, chunk.yOffset));
 
-			uint32_t indicesSize = 0;
-
-			if (distance < 250.0f)
+			uint32_t lod0Count = 0;
+			for (auto& currentChunk : m_Chunks)
+			{
+				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
+				if (distance < 350.0f)
+				{
+					lod0Count++;
+					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 0.0, 0.0f });
+				}
+			}
+			if (lod0Count)
 			{
 				vkCmdBindIndexBuffer(commandBuffer, m_IndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
-				indicesSize = index;
+				vkCmdDrawIndexed(commandBuffer, uint32_t(index), lod0Count, 0, 0, firstInstance);
+				firstInstance += lod0Count;
+			}
+		}
+		{
+			START_SCOPE_PROFILE("Lod1Render");
+
+			uint32_t lod1Count = 0;
+			for (auto& currentChunk : m_Chunks)
+			{
+				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
+				if (distance >= 350.0f && distance < 450.0f)
+				{
+					lod1Count++;
+					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 0.0, 0.0f });
+				}
 			}
 
-			if (distance >= 250.0f && distance < 350.0f)
+			if (lod1Count)
 			{
 				vkCmdBindIndexBuffer(commandBuffer, m_IndexBuffer1->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
-				indicesSize = index1;
+				vkCmdDrawIndexed(commandBuffer, uint32_t(index1), lod1Count, 0, 0, firstInstance);
+				firstInstance += lod1Count;
+			}
+		}
+		{
+			START_SCOPE_PROFILE("Lod2Render");
+
+			uint32_t lod2Count = 0;
+			for (auto& currentChunk : m_Chunks)
+			{
+				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
+				if (distance >= 450.0f && distance < 550.0f)
+				{
+					lod2Count++;
+					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 0.0, 0.0f });
+				}
 			}
 
-			if (distance >= 350.0f && distance < 450.0f)
+			if (lod2Count)
 			{
 				vkCmdBindIndexBuffer(commandBuffer, m_IndexBuffer2->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
-				indicesSize = index2;
+				vkCmdDrawIndexed(commandBuffer, uint32_t(index2), lod2Count, 0, 0, firstInstance);
+				firstInstance += lod2Count;
 			}
-			
-			if (distance >= 450.0f)
-			{
-				vkCmdBindIndexBuffer(commandBuffer, m_IndexBuffer3->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
-				indicesSize = index3;
-			}
-
-			vkCmdDrawIndexed(commandBuffer, uint32_t(indicesSize), 1, 0, 0, 0);
 		}
 
+		{
+			START_SCOPE_PROFILE("Lod3Render");
+
+			uint32_t lod3Count = 0;
+			for (auto& currentChunk : m_Chunks)
+			{
+				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
+				if (distance > 550.0f)
+				{
+					lod3Count++;
+					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 0.0, 0.0f });
+				}
+			}
+
+			if (lod3Count)
+			{
+				vkCmdBindIndexBuffer(commandBuffer, m_IndexBuffer3->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+				vkCmdDrawIndexed(commandBuffer, uint32_t(index3), lod3Count, 0, 0, firstInstance);
+				firstInstance += lod3Count;
+			}
+		}
+
+		m_OffsetBuffer->setData(offsets.data(), offsets.size() * sizeof(glm::vec4));
 
 		VulkanRenderer::endRenderPass(CommandBuffer);
 
@@ -162,6 +221,7 @@ void VulkanApp::onUpdate()
 
 	// Present, fullscreen quad
 	{
+		START_SCOPE_PROFILE("PresentPass");
 		CommandBuffer->beginQuery("PresentPass");
 
 		VulkanRenderer::beginSwapchainRenderPass(CommandBuffer, m_FinalPass);
@@ -175,12 +235,23 @@ void VulkanApp::onUpdate()
 
 		CommandBuffer->beginQuery("Imgui");
 		beginImGuiFrame();
-		ImGui::Begin("GPU Rendering Time");
+		ImGui::Begin("GPU Time");
 		ImGui::Text("Total time = %f ms", CommandBuffer->getCommandBufferTime());
 		ImGui::Text("Geometry Pass = %f ms", CommandBuffer->getTime("GeometryPass"));
 		ImGui::Text("Present Pass = %f ms", CommandBuffer->getTime("PresentPass"));
 		ImGui::Text("Imgui = %f ms", CommandBuffer->getTime("Imgui"));
 		ImGui::End();
+
+		ImGui::Begin("CPU Time");
+		ImGui::Text("Lod 0 = %f ms", Instrumentor::Get().getTime("Lod0Render"));
+		ImGui::Text("Lod 1 = %f ms", Instrumentor::Get().getTime("Lod1Render"));
+		ImGui::Text("Lod 2 = %f ms", Instrumentor::Get().getTime("Lod2Render"));
+		ImGui::Text("Lod 3 = %f ms", Instrumentor::Get().getTime("Lod3Render"));
+		ImGui::Text("endFrame = %f ms", Instrumentor::Get().getTime("endFrame"));
+		ImGui::Text("Geometry Pass = %f ms", Instrumentor::Get().getTime("GeometryPass"));
+		ImGui::Text("Present Pass = %f ms", Instrumentor::Get().getTime("PresentPass"));
+		ImGui::End();
+
 		endImGuiFrame();
 		CommandBuffer->endQuery("Imgui");
 
@@ -225,6 +296,7 @@ void VulkanApp::createGeometryPass()
 		std::shared_ptr<VulkanDescriptorSet> DescriptorSet;
 		DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("GeometryShader"));
 		DescriptorSet->bindInput(0, 0, m_UniformBufferSet);
+		DescriptorSet->bindInput(0, 1, m_OffsetBuffer);
 		DescriptorSet->bindInput(1, 0, m_TextureImage);
 		DescriptorSet->bindInput(1, 1, m_TextureImage2);
 		DescriptorSet->bindInput(2, 0, m_Grass);
@@ -247,20 +319,14 @@ void VulkanApp::createGeometryPass()
 		std::shared_ptr<VulkanFramebuffer> Framebuffer;
 		Framebuffer = std::make_shared<VulkanFramebuffer>(fbSpec);
 
-		VulkanVertexBufferLayout VBOLayout = VulkanVertexBufferLayout({
-			VertexType::FLOAT_3,
-			VertexType::FLOAT_2,
-			VertexType::FLOAT_2,
-			});
-
 		PipelineSpecification spec;
 		spec.Framebuffer = Framebuffer;
 		spec.depthTest = true;
 		spec.depthWrite = true;
-		spec.Wireframe = false;
+		spec.Wireframe = true;
 		spec.Culling = true;
 		spec.Shader = ShaderManager::getShader("GeometryShader");
-		spec.vertexBufferLayout = VBOLayout;
+		spec.vertexBufferLayout = VulkanVertexBufferLayout({});
 		spec.depthCompareFunction = DepthCompare::LESS;
 		m_GeometryPass->setPipeline(std::make_shared<VulkanPipeline>(spec));
 	}
@@ -301,7 +367,6 @@ void VulkanApp::updateUniformBuffer(uint32_t currentImage)
 	VkExtent2D extent = getExtent();
 
 	UniformBufferObject ubo{};
-	ubo.model = glm::mat4(1.0f);
 	ubo.view = cam.getView();
 	ubo.proj = cam.getProjection();
 
@@ -311,30 +376,20 @@ void VulkanApp::updateUniformBuffer(uint32_t currentImage)
 void VulkanApp::loadModel(const std::string& filepath)
 {
 	{
-		uint32_t gridSize = 513;
+		std::vector<glm::vec4> offsets;
+		uint32_t gridSize = 512;
 		for (uint32_t xOffset = 0; xOffset < gridSize / CHUNK_SIZE; xOffset++)
 			for (uint32_t yOffset = 0; yOffset < gridSize / CHUNK_SIZE; yOffset++)
 			{
 				vertices.clear();
 				TerrainChunk& chunk = m_Chunks.emplace_back();
 
-				for (int x = xOffset * CHUNK_SIZE; x <= (xOffset + 1) * CHUNK_SIZE; x++)
-					for (int y = yOffset * CHUNK_SIZE; y <= (yOffset + 1) * CHUNK_SIZE; y++)
-					{
-						glm::vec2 UV;
-						UV.x = glm::clamp((float)x / (float)gridSize, 0.0f, 1.0f);
-						UV.y = glm::clamp((float)y / (float)gridSize, 0.0f, 1.0f);
-						glm::vec2 UV2;
-						UV2.x = (float)(x - xOffset * CHUNK_SIZE) / (float)CHUNK_SIZE;
-						UV2.y = (float)(y - yOffset * CHUNK_SIZE) / (float)CHUNK_SIZE;
-						vertices.push_back(Vertex{ glm::vec3(x * 1.0f, 0.0f, y * 1.0f), UV, UV2 });
-					}
-
-				chunk.VertexBuffer = std::make_shared<VulkanBuffer>(vertices.data(), (uint32_t)(sizeof(vertices[0]) * (uint32_t)vertices.size()),
-					BufferType::VERTEX, BufferUsage::STATIC);
 				chunk.xOffset = xOffset * CHUNK_SIZE;
 				chunk.yOffset = yOffset * CHUNK_SIZE;
+				offsets.push_back({ chunk.xOffset, chunk.yOffset, 0.0f, 0.0f });
 			}
+
+		m_OffsetBuffer->setData(offsets.data(), offsets.size() * sizeof(glm::vec4));
 
 		{
 			indices.clear();
@@ -345,9 +400,9 @@ void VulkanApp::loadModel(const std::string& filepath)
 					uint32_t index = x * vertCount + y;
 					indices.push_back(index);
 					indices.push_back(index + lod);
-					indices.push_back(index + vertCount * lod + lod);
+					indices.push_back(index + vertCount * lod);
 
-					indices.push_back(index);
+					indices.push_back(index + lod);
 					indices.push_back(index + vertCount * lod + lod);
 					indices.push_back(index + vertCount * lod);
 				}
@@ -367,9 +422,9 @@ void VulkanApp::loadModel(const std::string& filepath)
 					uint32_t index = x * vertCount + y;
 					indices.push_back(index);
 					indices.push_back(index + lod);
-					indices.push_back(index + vertCount * lod + lod);
+					indices.push_back(index + vertCount * lod);
 
-					indices.push_back(index);
+					indices.push_back(index + lod);
 					indices.push_back(index + vertCount * lod + lod);
 					indices.push_back(index + vertCount * lod);
 				}
@@ -389,9 +444,9 @@ void VulkanApp::loadModel(const std::string& filepath)
 					uint32_t index = x * vertCount + y;
 					indices.push_back(index);
 					indices.push_back(index + lod);
-					indices.push_back(index + vertCount * lod + lod);
+					indices.push_back(index + vertCount * lod);
 
-					indices.push_back(index);
+					indices.push_back(index + lod);
 					indices.push_back(index + vertCount * lod + lod);
 					indices.push_back(index + vertCount * lod);
 				}
@@ -411,9 +466,9 @@ void VulkanApp::loadModel(const std::string& filepath)
 					uint32_t index = x * vertCount + y;
 					indices.push_back(index);
 					indices.push_back(index + lod);
-					indices.push_back(index + vertCount * lod + lod);
+					indices.push_back(index + vertCount * lod);
 
-					indices.push_back(index);
+					indices.push_back(index + lod);
 					indices.push_back(index + vertCount * lod + lod);
 					indices.push_back(index + vertCount * lod);
 				}

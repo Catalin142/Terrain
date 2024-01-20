@@ -1,15 +1,15 @@
 #version 450
 
-layout(location = 0) in vec3 inPosition;
-layout(location = 1) in vec2 inTexCoord;
-layout(location = 2) in vec2 inCoord;
-
-layout(set = 0, binding = 0) uniform UniformBufferObject 
+layout(set = 0, binding = 0) uniform UniformBufferObjectSet
 {
-    mat4 model;
     mat4 view;
     mat4 proj;
 } ubo;
+
+layout(set = 0, binding = 1) uniform OffsetsUniformBuffer
+{
+    vec2 offset[64];
+} offsets;
 
 layout (set = 1, binding = 0) uniform sampler2D heightMap;
 
@@ -18,10 +18,21 @@ layout(location = 1) out vec2 texCoord;
 
 void main() 
 {
-    vec3 position = inPosition;
-    position.y = (1.0 - texture(heightMap, inTexCoord).r) * 150.0;
-    gl_Position = ubo.proj * ubo.view * ubo.model * vec4(position, 1.0);
+    vec3 position = vec3(0.0, 0.0, 0.0);
+    vec2 offset = offsets.offset[gl_InstanceIndex];
 
-    fragTexCoord = inTexCoord;
-    texCoord = inCoord;
+    position.x = floor(gl_VertexIndex / (64.0 + 1));
+    position.z = mod(gl_VertexIndex, (64.0 + 1));
+    
+    texCoord = vec2(position.x / 128.0, position.z / 128.0);
+
+    position.x += offset.x;
+    position.z += offset.y;
+
+    vec2 dynamicTexCoord = vec2(position.x / 512.0, position.z / 512.0);
+
+    position.y = (1.0 - texture(heightMap, dynamicTexCoord).r) * 150.0;
+    gl_Position = ubo.proj * ubo.view * vec4(position, 1.0);
+
+    fragTexCoord = dynamicTexCoord;
 }

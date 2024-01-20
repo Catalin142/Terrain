@@ -82,6 +82,7 @@ VkBufferUsageFlags VulkanBuffer::getUsage()
 	{
 	case BufferType::VERTEX: return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 	case BufferType::INDEX: return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+	case BufferType::INDIRECT: return VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
 	default: return VK_BUFFER_USAGE_FLAG_BITS_MAX_ENUM;
 
 	}

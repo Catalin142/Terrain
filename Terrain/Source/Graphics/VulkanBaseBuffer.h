@@ -11,6 +11,7 @@ enum class BufferType
 {
 	VERTEX,
 	INDEX,
+	INDIRECT,
 };
 
 struct BufferProperties
