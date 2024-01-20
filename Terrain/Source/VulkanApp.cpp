@@ -129,7 +129,6 @@ void VulkanApp::onUpdate()
 		{
 			START_SCOPE_PROFILE("Lod0Render");
 
-
 			uint32_t lod0Count = 0;
 			for (auto& currentChunk : m_Chunks)
 			{
@@ -247,6 +246,7 @@ void VulkanApp::onUpdate()
 		ImGui::Text("Lod 1 = %f ms", Instrumentor::Get().getTime("Lod1Render"));
 		ImGui::Text("Lod 2 = %f ms", Instrumentor::Get().getTime("Lod2Render"));
 		ImGui::Text("Lod 3 = %f ms", Instrumentor::Get().getTime("Lod3Render"));
+		ImGui::Text("mainLoop = %f ms", Instrumentor::Get().getTime("mainLoop"));
 		ImGui::Text("endFrame = %f ms", Instrumentor::Get().getTime("endFrame"));
 		ImGui::Text("Geometry Pass = %f ms", Instrumentor::Get().getTime("GeometryPass"));
 		ImGui::Text("Present Pass = %f ms", Instrumentor::Get().getTime("PresentPass"));

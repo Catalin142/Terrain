@@ -40,6 +40,7 @@ void Application::Run()
 
 	while (m_Window->isOpened())
 	{
+		START_SCOPE_PROFILE("mainLoop");
 		if (m_Window->Resized)
 		{
 			int width = 0, height = 0;

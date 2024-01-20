@@ -10,3 +10,10 @@
 		   - TODO:
 				- Add CPU timing
 				- Fix terrain cracks
+
+20.01.2024 - Added instanced LOD
+		   - Added CPU benchmark
+		   - No more vertex buffer, pass offsets
+
+		   - TODO:
+				- Fix terrain cracks
