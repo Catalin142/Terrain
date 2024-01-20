@@ -57,7 +57,7 @@ private:
 private:
 	std::shared_ptr<VulkanRenderCommandBuffer> CommandBuffer;
 	std::shared_ptr<VulkanUniformBufferSet> m_UniformBufferSet;
-	std::shared_ptr<VulkanUniformBuffer> m_OffsetBuffer;
+	std::shared_ptr<VulkanUniformBufferSet> m_OffsetBuffer;
 
 	std::shared_ptr<VulkanRenderPass> m_GeometryPass;
 	std::shared_ptr<VulkanRenderPass> m_FinalPass;

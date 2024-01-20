@@ -34,13 +34,13 @@ void VulkanApp::onCreate()
 
 	m_TextureImage = std::make_shared<VulkanTexture>("Resources/Img/world1.png", false);
 	m_TextureImage2 = std::make_shared<VulkanTexture>("Resources/Img/image4.png", 4, false); 
-	m_Grass = std::make_shared<VulkanTexture>("Resources/Img/grass.png", 4, true);
-	m_Slope = std::make_shared<VulkanTexture>("Resources/Img/slope.png", 4, true);
-	m_Rock = std::make_shared<VulkanTexture>("Resources/Img/rock.png", 4, true);
+	m_Grass = std::make_shared<VulkanTexture>("Resources/Img/grass.png", 4, false);
+	m_Slope = std::make_shared<VulkanTexture>("Resources/Img/slope.png", 4, false);
+	m_Rock = std::make_shared<VulkanTexture>("Resources/Img/rock.png", 4, false);
 
 	{
 		// need to store chunks offsets
-		m_OffsetBuffer = std::make_shared<VulkanUniformBuffer>(64 * sizeof(glm::vec4));
+		m_OffsetBuffer = std::make_shared<VulkanUniformBufferSet>(64 * sizeof(glm::vec4), MAX_FRAMES_IN_FLIGHT);
 		loadModel("Resources/model/viking_room/viking_room.obj");
 	}
 	{
@@ -125,6 +125,62 @@ void VulkanApp::onUpdate()
 		//vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
 		std::vector<glm::vec4> offsets;
+		{
+
+			uint32_t lod0Count = 0;
+			for (auto& currentChunk : m_Chunks)
+			{
+				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
+				if (distance < 350.0f)
+				{
+					lod0Count++;
+					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 0.0, 0.0f });
+				}
+			}
+		}
+		{
+
+			uint32_t lod1Count = 0;
+			for (auto& currentChunk : m_Chunks)
+			{
+				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
+				if (distance >= 350.0f && distance < 450.0f)
+				{
+					lod1Count++;
+					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 0.0, 0.0f });
+				}
+			}
+		}
+		{
+
+			uint32_t lod2Count = 0;
+			for (auto& currentChunk : m_Chunks)
+			{
+				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
+				if (distance >= 450.0f && distance < 550.0f)
+				{
+					lod2Count++;
+					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 0.0, 0.0f });
+				}
+			}
+		}
+
+		{
+
+			uint32_t lod3Count = 0;
+			for (auto& currentChunk : m_Chunks)
+			{
+				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
+				if (distance >= 550.0f)
+				{
+					lod3Count++;
+					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 0.0, 0.0f });
+				}
+			}
+		}
+
+		m_OffsetBuffer->setData(offsets.data(), offsets.size() * sizeof(glm::vec4), VulkanRenderer::getCurrentFrame());
+
 		uint32_t firstInstance = 0;
 		{
 			START_SCOPE_PROFILE("Lod0Render");
@@ -136,7 +192,6 @@ void VulkanApp::onUpdate()
 				if (distance < 350.0f)
 				{
 					lod0Count++;
-					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 0.0, 0.0f });
 				}
 			}
 			if (lod0Count)
@@ -156,7 +211,6 @@ void VulkanApp::onUpdate()
 				if (distance >= 350.0f && distance < 450.0f)
 				{
 					lod1Count++;
-					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 0.0, 0.0f });
 				}
 			}
 
@@ -177,7 +231,6 @@ void VulkanApp::onUpdate()
 				if (distance >= 450.0f && distance < 550.0f)
 				{
 					lod2Count++;
-					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 0.0, 0.0f });
 				}
 			}
 
@@ -196,10 +249,9 @@ void VulkanApp::onUpdate()
 			for (auto& currentChunk : m_Chunks)
 			{
 				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
-				if (distance > 550.0f)
+				if (distance >= 550.0f)
 				{
 					lod3Count++;
-					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 0.0, 0.0f });
 				}
 			}
 
@@ -210,9 +262,6 @@ void VulkanApp::onUpdate()
 				firstInstance += lod3Count;
 			}
 		}
-
-		m_OffsetBuffer->setData(offsets.data(), offsets.size() * sizeof(glm::vec4));
-
 		VulkanRenderer::endRenderPass(CommandBuffer);
 
 		CommandBuffer->endQuery("GeometryPass");
@@ -389,7 +438,7 @@ void VulkanApp::loadModel(const std::string& filepath)
 				offsets.push_back({ chunk.xOffset, chunk.yOffset, 0.0f, 0.0f });
 			}
 
-		m_OffsetBuffer->setData(offsets.data(), offsets.size() * sizeof(glm::vec4));
+		m_OffsetBuffer->setData(offsets.data(), offsets.size() * sizeof(glm::vec4), VulkanRenderer::getCurrentFrame());
 
 		{
 			indices.clear();

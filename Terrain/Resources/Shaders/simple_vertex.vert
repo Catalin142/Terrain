@@ -6,7 +6,7 @@ layout(set = 0, binding = 0) uniform UniformBufferObjectSet
     mat4 proj;
 } ubo;
 
-layout(set = 0, binding = 1) uniform OffsetsUniformBuffer
+layout(set = 0, binding = 1) uniform OffsetsUniformBufferSet
 {
     vec2 offset[64];
 } offsets;
