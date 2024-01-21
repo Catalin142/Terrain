@@ -12,13 +12,13 @@ static uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags memFla
 	vkGetPhysicalDeviceMemoryProperties(VulkanDevice::getVulkanContext()->getGPU(), &memProperties);
 
 	for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
-		if (typeFilter & (1 << i) && (memProperties.memoryTypes[i].propertyFlags & memFlags) == memFlags) {
+		if ((typeFilter & 1) == 1 && (memProperties.memoryTypes[i].propertyFlags & memFlags) == memFlags) {
 			return i;
 		}
 	}
 
 	std::cerr << "Nu s a gasit memorie\n";
-	throw (false);
+	assert(false);
 }
 
 VulkanImage::VulkanImage(const ImageSpecification& spec) : m_Specification(spec)
@@ -113,10 +113,10 @@ void VulkanImage::createImage()
 	if (vkCreateImage(device, &imageInfo, nullptr, &m_Image) != VK_SUCCESS)
 	{
 		std::cerr << "failed to create texture image!\n";
-		throw(false);
+		assert(false);
 	}
 
-	VkMemoryRequirements memRequirements;
+	VkMemoryRequirements memRequirements{};
 	vkGetImageMemoryRequirements(device, m_Image, &memRequirements);
 
 	VkMemoryAllocateInfo allocInfo{};
@@ -127,10 +127,13 @@ void VulkanImage::createImage()
 	if (vkAllocateMemory(device, &allocInfo, nullptr, &m_DeviceMemory) != VK_SUCCESS)
 	{
 		std::cerr << "failed to allocate image memory!\n";
-		throw(false);
+		assert(false);
 	}
 
-	vkBindImageMemory(device, m_Image, m_DeviceMemory, 0);
+	if (vkBindImageMemory(device, m_Image, m_DeviceMemory, 0) != VK_SUCCESS)
+	{
+		assert(false);
+	}
 }
 
 void VulkanImage::createSampler()
@@ -147,10 +150,7 @@ void VulkanImage::createSampler()
 
 	VulkanDevice* device = VulkanDevice::getVulkanContext();
 
-	VkPhysicalDeviceProperties properties{};
-	vkGetPhysicalDeviceProperties(device->getGPU(), &properties);
-	samplerInfo.anisotropyEnable = VK_TRUE;
-	samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+	samplerInfo.anisotropyEnable = VK_FALSE;
 	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
 	samplerInfo.unnormalizedCoordinates = VK_FALSE;
 	samplerInfo.compareEnable = VK_FALSE;
@@ -161,7 +161,7 @@ void VulkanImage::createSampler()
 	samplerInfo.maxLod = 0.0f;
 
 	if (vkCreateSampler(device->getLogicalDevice(), &samplerInfo, nullptr, &m_Sampler) != VK_SUCCESS)
-		throw(false);
+		assert(false);
 }
 
 void VulkanImage::createView()
@@ -181,7 +181,7 @@ void VulkanImage::createView()
 	if (vkCreateImageView(device, &viewInfo, nullptr, &m_ImageView) != VK_SUCCESS)
 	{
 		std::cerr << "failed to create image view!\n";
-		throw(false);
+		assert(false);
 	}
 }
 
@@ -211,7 +211,7 @@ VulkanImageView::VulkanImageView(const ImageViewSpecification& spec) : m_Specifi
 	if (vkCreateImageView(VulkanDevice::getVulkanDevice(), &viewInfo, nullptr, &m_ImageView) != VK_SUCCESS)
 	{
 		std::cerr << "failed to create image view!\n";
-		throw(false);
+		assert(false);
 	}
 }
 

@@ -20,20 +20,21 @@ VkFormat getFormat(uint32_t channels)
 	return VK_FORMAT_UNDEFINED;
 }
 
-VulkanTexture::VulkanTexture(const std::string& filepath, uint32_t channels, bool generateMips)
+VulkanTexture::VulkanTexture(const std::string& filepath, const TextureSpecification& spec)
 {
+	m_Specification = spec;
 	stbi_uc* pixels = stbi_load(filepath.c_str(), &m_Info.Width, &m_Info.Height,
-		&m_Info.Channels, channels);
+		&m_Info.Channels, m_Specification.Channles);
 
-	if (channels != 0)
-		m_Info.Channels = channels;
+	if (m_Specification.Channles != 0)
+		m_Info.Channels = m_Specification.Channles;
 
 	VkDeviceSize imageSize = m_Info.Width * m_Info.Height * m_Info.Channels;
 
-	m_Info.mipCount = generateMips ? VkUtils::calculateNumberOfMips(m_Info.Width, m_Info.Height) : 1;
+	m_Info.mipCount = m_Specification.generateMips ? VkUtils::calculateNumberOfMips(m_Info.Width, m_Info.Height) : 1;
 
 	if (!pixels)
-		throw(false);
+		assert(false);
 
 	BufferProperties stagingBufferProps;
 	stagingBufferProps.bufferSize = (uint32_t)imageSize;
@@ -58,7 +59,7 @@ VulkanTexture::VulkanTexture(const std::string& filepath, uint32_t channels, boo
 	imgSpec.Tiling = VK_IMAGE_TILING_OPTIMAL;
 	imgSpec.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
 	imgSpec.UsageFlags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-	imgSpec.CreateSampler = true;
+	imgSpec.CreateSampler = m_Specification.createSampler;
 
 	m_VulkanImage = std::make_shared<VulkanImage>(imgSpec);
 	m_VulkanImage->Create();
@@ -88,7 +89,7 @@ void VulkanTexture::generateMips()
 	VkFormatProperties formatProperties;
 	vkGetPhysicalDeviceFormatProperties(VulkanDevice::getVulkanContext()->getGPU(), VK_FORMAT_R8G8B8A8_SRGB, &formatProperties);
 	if (!(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT)) {
-		throw(false); // nu suporta linear filtering
+		assert(false); // nu suporta linear filtering
 	}
 
 	VkCommandBuffer commandBuffer = VkUtils::beginSingleTimeCommand();
@@ -168,4 +169,37 @@ void VulkanTexture::generateMips()
 		1, &barrier);
 
 	VkUtils::endSingleTimeCommand(commandBuffer);
+}
+
+VulkanSampler::VulkanSampler(SamplerSpecification spec)
+{
+	m_Specification = spec;
+	 
+	VkSamplerCreateInfo samplerInfo{};
+	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	samplerInfo.magFilter = m_Specification.magFilter;
+	samplerInfo.minFilter = m_Specification.minFilter;
+	samplerInfo.addressModeU = m_Specification.addresMode;
+	samplerInfo.addressModeV = m_Specification.addresMode;
+	samplerInfo.addressModeW = m_Specification.addresMode;
+	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	samplerInfo.maxLod = float(m_Specification.Mips);
+
+	samplerInfo.anisotropyEnable = VK_FALSE;
+	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+	samplerInfo.unnormalizedCoordinates = VK_FALSE;
+	samplerInfo.compareEnable = VK_FALSE;
+	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	samplerInfo.mipLodBias = 0.0f;
+	samplerInfo.minLod = 0.0f;
+	samplerInfo.maxLod = 0.0f;
+
+	if (vkCreateSampler(VulkanDevice::getVulkanDevice(), &samplerInfo, nullptr, &m_Sampler) != VK_SUCCESS)
+		assert(false);
+}
+
+VulkanSampler::~VulkanSampler()
+{
+	vkDestroySampler(VulkanDevice::getVulkanDevice(), m_Sampler, nullptr);
 }

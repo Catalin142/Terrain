@@ -17,3 +17,10 @@
 
 		   - TODO:
 				- Fix terrain cracks
+
+21.01.2024 - Decrease lod level triangles count
+		   - Added vulkan sampler object, one sample for multiple textures
+		   - Increase map size
+		   
+		   - TODO:
+				- Fix terrain cracks

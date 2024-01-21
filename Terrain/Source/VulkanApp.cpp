@@ -7,7 +7,6 @@
 #include "Core/Benchmark.h"
 
 #include "Graphics/VulkanUtils.h"
-#include "tiny_obj_loader.h"
 #include <imgui.h>
 
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -32,15 +31,30 @@ void VulkanApp::onCreate()
 {
 	CommandBuffer = std::make_shared<VulkanRenderCommandBuffer>(true);
 
-	m_TextureImage = std::make_shared<VulkanTexture>("Resources/Img/world1.png", false);
-	m_TextureImage2 = std::make_shared<VulkanTexture>("Resources/Img/image4.png", 4, false); 
-	m_Grass = std::make_shared<VulkanTexture>("Resources/Img/grass.png", 4, false);
-	m_Slope = std::make_shared<VulkanTexture>("Resources/Img/slope.png", 4, false);
-	m_Rock = std::make_shared<VulkanTexture>("Resources/Img/rock.png", 4, false);
+	TextureSpecification texSpec{};
+	texSpec.createSampler = true;
+	{
+		m_TextureImage = std::make_shared<VulkanTexture>("Resources/Img/heightmap2.png", texSpec);
+	}
+	{
+		texSpec.Channles = 4;
+		m_TextureImage2 = std::make_shared<VulkanTexture>("Resources/Img/image4.png", texSpec);
+	}
+	{
+		texSpec.generateMips = true;
+		texSpec.createSampler = false;
+		m_Grass = std::make_shared<VulkanTexture>("Resources/Img/grass.png", texSpec);
+		m_Slope = std::make_shared<VulkanTexture>("Resources/Img/slope.png", texSpec);
+		m_Rock = std::make_shared<VulkanTexture>("Resources/Img/rock.png", texSpec);
+
+		SamplerSpecification spec{};
+		spec.Mips = m_Rock->getInfo().mipCount;
+		m_Sampler = std::make_shared<VulkanSampler>(spec);
+	}
 
 	{
 		// need to store chunks offsets
-		m_OffsetBuffer = std::make_shared<VulkanUniformBufferSet>(64 * sizeof(glm::vec4), MAX_FRAMES_IN_FLIGHT);
+		m_OffsetBuffer = std::make_shared<VulkanUniformBufferSet>(256 * sizeof(glm::vec4), MAX_FRAMES_IN_FLIGHT);
 		loadModel("Resources/model/viking_room/viking_room.obj");
 	}
 	{
@@ -108,6 +122,16 @@ void VulkanApp::onUpdate()
 		cam.Rotate(rotation);
 	}
 
+	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_TAB))
+	{
+		Wireframe = !Wireframe;
+		if (Wireframe)
+			m_GeometryPass->setPipeline(terrainWireframePipeline);
+		else
+			m_GeometryPass->setPipeline(terrainPipeline);
+
+	}
+
 	CommandBuffer->Begin();
 	VkCommandBuffer commandBuffer = CommandBuffer->getCurrentCommandBuffer();
 
@@ -131,7 +155,7 @@ void VulkanApp::onUpdate()
 			for (auto& currentChunk : m_Chunks)
 			{
 				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
-				if (distance < 350.0f)
+				if (distance < 150.0f)
 				{
 					lod0Count++;
 					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 0.0, 0.0f });
@@ -144,7 +168,7 @@ void VulkanApp::onUpdate()
 			for (auto& currentChunk : m_Chunks)
 			{
 				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
-				if (distance >= 350.0f && distance < 450.0f)
+				if (distance >= 150.0f && distance < 550.0f)
 				{
 					lod1Count++;
 					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 0.0, 0.0f });
@@ -157,7 +181,7 @@ void VulkanApp::onUpdate()
 			for (auto& currentChunk : m_Chunks)
 			{
 				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
-				if (distance >= 450.0f && distance < 550.0f)
+				if (distance >= 550.0f && distance < 750.0f)
 				{
 					lod2Count++;
 					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 0.0, 0.0f });
@@ -171,7 +195,7 @@ void VulkanApp::onUpdate()
 			for (auto& currentChunk : m_Chunks)
 			{
 				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
-				if (distance >= 550.0f)
+				if (distance >= 750.0f)
 				{
 					lod3Count++;
 					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 0.0, 0.0f });
@@ -189,7 +213,7 @@ void VulkanApp::onUpdate()
 			for (auto& currentChunk : m_Chunks)
 			{
 				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
-				if (distance < 350.0f)
+				if (distance < 150.0f)
 				{
 					lod0Count++;
 				}
@@ -208,7 +232,7 @@ void VulkanApp::onUpdate()
 			for (auto& currentChunk : m_Chunks)
 			{
 				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
-				if (distance >= 350.0f && distance < 450.0f)
+				if (distance >= 150.0f && distance < 550.0f)
 				{
 					lod1Count++;
 				}
@@ -228,7 +252,7 @@ void VulkanApp::onUpdate()
 			for (auto& currentChunk : m_Chunks)
 			{
 				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
-				if (distance >= 450.0f && distance < 550.0f)
+				if (distance >= 550.0f && distance < 750.0f)
 				{
 					lod2Count++;
 				}
@@ -249,7 +273,7 @@ void VulkanApp::onUpdate()
 			for (auto& currentChunk : m_Chunks)
 			{
 				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
-				if (distance >= 550.0f)
+				if (distance >= 750.0f)
 				{
 					lod3Count++;
 				}
@@ -347,10 +371,12 @@ void VulkanApp::createGeometryPass()
 		DescriptorSet->bindInput(0, 0, m_UniformBufferSet);
 		DescriptorSet->bindInput(0, 1, m_OffsetBuffer);
 		DescriptorSet->bindInput(1, 0, m_TextureImage);
-		DescriptorSet->bindInput(1, 1, m_TextureImage2);
-		DescriptorSet->bindInput(2, 0, m_Grass);
-		DescriptorSet->bindInput(2, 1, m_Slope);
-		DescriptorSet->bindInput(2, 2, m_Rock);
+		//DescriptorSet->bindInput(2, 0, m_TextureImage2);
+		//DescriptorSet->bindInput(2, 1, m_Grass);
+		//DescriptorSet->bindInput(2, 2, m_Slope);
+		//DescriptorSet->bindInput(2, 3, m_Rock);
+		//DescriptorSet->bindInput(2, 4, m_Sampler);
+		
 		DescriptorSet->Create();
 		m_GeometryPass->setDescriptorSet(DescriptorSet);
 	}
@@ -360,6 +386,7 @@ void VulkanApp::createGeometryPass()
 		fbSpec.Height = 900;
 		fbSpec.Samples = 1;
 		fbSpec.DepthAttachment.Format = VK_FORMAT_D32_SFLOAT;
+		fbSpec.DepthAttachment.Blend = false;
 		FramebufferAttachment color1{};
 		color1.Format = VK_FORMAT_R8G8B8A8_SRGB;
 		color1.Sample = true;
@@ -372,12 +399,17 @@ void VulkanApp::createGeometryPass()
 		spec.Framebuffer = Framebuffer;
 		spec.depthTest = true;
 		spec.depthWrite = true;
-		spec.Wireframe = true;
+		spec.Wireframe = false;
 		spec.Culling = true;
 		spec.Shader = ShaderManager::getShader("GeometryShader");
 		spec.vertexBufferLayout = VulkanVertexBufferLayout({});
 		spec.depthCompareFunction = DepthCompare::LESS;
-		m_GeometryPass->setPipeline(std::make_shared<VulkanPipeline>(spec));
+		terrainPipeline = std::make_shared<VulkanPipeline>(spec);
+
+		spec.Wireframe = true;
+		terrainWireframePipeline = std::make_shared<VulkanPipeline>(spec);
+
+		m_GeometryPass->setPipeline(terrainPipeline);
 	}
 }
 
@@ -426,7 +458,7 @@ void VulkanApp::loadModel(const std::string& filepath)
 {
 	{
 		std::vector<glm::vec4> offsets;
-		uint32_t gridSize = 512;
+		uint32_t gridSize = 1024;
 		for (uint32_t xOffset = 0; xOffset < gridSize / CHUNK_SIZE; xOffset++)
 			for (uint32_t yOffset = 0; yOffset < gridSize / CHUNK_SIZE; yOffset++)
 			{
@@ -442,7 +474,7 @@ void VulkanApp::loadModel(const std::string& filepath)
 
 		{
 			indices.clear();
-			uint32_t lod = 1;
+			uint32_t lod = 4;
 			uint32_t vertCount = CHUNK_SIZE + 1;
 			for (int x = 0; x < vertCount - 1; x += lod) {
 				for (int y = 0; y < vertCount - 1; y += lod) {
@@ -464,7 +496,7 @@ void VulkanApp::loadModel(const std::string& filepath)
 		
 		{
 			indices.clear();
-			uint32_t lod = 2;
+			uint32_t lod = 8;
 			uint32_t vertCount = CHUNK_SIZE + 1;
 			for (int x = 0; x < vertCount - 1; x += lod) {
 				for (int y = 0; y < vertCount - 1; y += lod) {
@@ -486,7 +518,7 @@ void VulkanApp::loadModel(const std::string& filepath)
 
 		{
 			indices.clear();
-			uint32_t lod = 4;
+			uint32_t lod = 16;
 			uint32_t vertCount = CHUNK_SIZE + 1;
 			for (int x = 0; x < vertCount - 1; x += lod) {
 				for (int y = 0; y < vertCount - 1; y += lod) {
@@ -508,7 +540,7 @@ void VulkanApp::loadModel(const std::string& filepath)
 
 		{
 			indices.clear();
-			uint32_t lod = 8;
+			uint32_t lod = 32;
 			uint32_t vertCount = CHUNK_SIZE + 1;
 			for (int x = 0; x < vertCount - 1; x += lod) {
 				for (int y = 0; y < vertCount - 1; y += lod) {

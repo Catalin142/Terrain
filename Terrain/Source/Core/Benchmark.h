@@ -69,10 +69,7 @@ private:
 		//m_jsonFile << json.str();
 		//
 		//m_jsonFile.flush();
-		if (m_BenchmarkTime.find(name) == m_BenchmarkTime.end())
-			m_BenchmarkTime[name] = duration / 1000.0f;
-		m_BenchmarkTime[name] += duration / 1000.0f;
-		m_BenchmarkTime[name] /= 2.0;
+		m_BenchmarkTime[name] = duration / 1000.0f;
 	}
 
 private:

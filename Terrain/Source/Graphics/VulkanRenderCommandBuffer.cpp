@@ -14,7 +14,7 @@ VulkanRenderCommandBuffer::VulkanRenderCommandBuffer(uint32_t count)
 	poolInfo.queueFamilyIndex = VulkanDevice::getVulkanContext()->getGraphicsFamilyIndex();
 
 	if (vkCreateCommandPool(VulkanDevice::getVulkanDevice(), &poolInfo, nullptr, &m_CommandPool) != VK_SUCCESS)
-		throw(false);
+		assert(false);
 
 	m_CommandBuffers.resize(count);
 	VkCommandBufferAllocateInfo bufferInfo{};
@@ -25,7 +25,7 @@ VulkanRenderCommandBuffer::VulkanRenderCommandBuffer(uint32_t count)
 
 	m_CommandBuffers.resize(count);
 	if (vkAllocateCommandBuffers(VulkanDevice::getVulkanDevice(), &bufferInfo, m_CommandBuffers.data()) != VK_SUCCESS)
-		throw(false);
+		assert(false);
 
 	// TODO: Get actual frames in flight from a static renderer confing
 	uint32_t framesInFlight = VulkanRenderer::getFramesInFlight();
@@ -36,7 +36,7 @@ VulkanRenderCommandBuffer::VulkanRenderCommandBuffer(uint32_t count)
 	fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT; // l face in signaled state
 
 	for (uint32_t i = 0; i < framesInFlight; i++)
-		if (vkCreateFence(VulkanDevice::getVulkanDevice(), &fenceInfo, nullptr, &m_inFlightFences[i])) throw(false);
+		if (vkCreateFence(VulkanDevice::getVulkanDevice(), &fenceInfo, nullptr, &m_inFlightFences[i])) assert(false);
 }
 
 VulkanRenderCommandBuffer::VulkanRenderCommandBuffer(bool swapchain) : m_OwnedBySwapchain(swapchain)
@@ -85,7 +85,7 @@ void VulkanRenderCommandBuffer::Begin()
 	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
 	if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
-		throw(false);
+		assert(false);
 
 	vkCmdResetQueryPool(commandBuffer, m_QueryPools[currentFrameIndex], 0, MAX_NUMBER_OF_QUERIES);
 	m_CurrentAvailableQuery = 2;
@@ -97,16 +97,14 @@ void VulkanRenderCommandBuffer::Begin()
 
 void VulkanRenderCommandBuffer::End()
 {
-	uint32_t currentFrameIndex = VulkanRenderer::getCurrentFrame();
-
 	VkCommandBuffer commandBuffer;
 	if (m_OwnedBySwapchain) commandBuffer = VulkanRenderer::getSwapchainCurrentCommandBuffer();
-	else commandBuffer = m_CommandBuffers[currentFrameIndex];
+	else commandBuffer = m_CommandBuffers[m_QueryFrame];
 
-	vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_QueryPools[currentFrameIndex], 1);
+	vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_QueryPools[m_QueryFrame], 1);
 	
 	if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
-		throw(false);
+		assert(false);
 }
 
 void VulkanRenderCommandBuffer::Submit()
@@ -115,25 +113,23 @@ void VulkanRenderCommandBuffer::Submit()
 		return;
 
 	VkDevice device = VulkanDevice::getVulkanDevice();
-	uint32_t currentFrameIndex = VulkanRenderer::getCurrentFrame();
 
-	vkWaitForFences(device, 1, &m_inFlightFences[currentFrameIndex], VK_TRUE, UINT64_MAX);
-	vkResetFences(device, 1, &m_inFlightFences[currentFrameIndex]);
+	vkWaitForFences(device, 1, &m_inFlightFences[m_QueryFrame], VK_TRUE, UINT64_MAX);
+	vkResetFences(device, 1, &m_inFlightFences[m_QueryFrame]);
 	VkSubmitInfo submitInfo{};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submitInfo.commandBufferCount = 1;
-	VkCommandBuffer commandBuffer = m_CommandBuffers[currentFrameIndex];
+	VkCommandBuffer commandBuffer = m_CommandBuffers[m_QueryFrame];
 	submitInfo.pCommandBuffers = &commandBuffer;
 
 	if (vkQueueSubmit(VulkanDevice::getVulkanContext()->getGraphicsQueue(), 1, &submitInfo,
-		m_inFlightFences[currentFrameIndex]) != VK_SUCCESS)
+		m_inFlightFences[m_QueryFrame]) != VK_SUCCESS)
 		assert(false);
 }
 
 void VulkanRenderCommandBuffer::beginQuery(const std::string& name)
 {
-	uint32_t currentFrameIndex = VulkanRenderer::getCurrentFrame();
-	vkCmdWriteTimestamp(m_CurrentCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_QueryPools[currentFrameIndex], m_CurrentAvailableQuery);
+	vkCmdWriteTimestamp(m_CurrentCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_QueryPools[m_QueryFrame], m_CurrentAvailableQuery);
 	m_QueryStart[name] = m_CurrentAvailableQuery;
 	m_CurrentAvailableQuery += 2;
 }
@@ -143,24 +139,26 @@ void VulkanRenderCommandBuffer::endQuery(const std::string& name)
 	if (m_QueryStart.find(name) == m_QueryStart.end())
 		return;
 
-	uint32_t currentFrameIndex = VulkanRenderer::getCurrentFrame();
 	uint32_t startIndex = m_QueryStart[name];
-	vkCmdWriteTimestamp(m_CurrentCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_QueryPools[currentFrameIndex], startIndex + 1);
+	vkCmdWriteTimestamp(m_CurrentCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_QueryPools[m_QueryFrame], startIndex + 1);
 }
 
 void VulkanRenderCommandBuffer::queryResults()
 {
-	uint32_t currentFrameIndex = m_QueryFrame;
-	vkGetQueryPoolResults(VulkanDevice::getVulkanDevice(), m_QueryPools[currentFrameIndex], 0, MAX_NUMBER_OF_QUERIES,
-		MAX_NUMBER_OF_QUERIES * 2 * sizeof(uint64_t), m_TimeStamps[currentFrameIndex].data(), sizeof(uint64_t), 
+	vkGetQueryPoolResults(VulkanDevice::getVulkanDevice(), m_QueryPools[m_QueryFrame], 0, MAX_NUMBER_OF_QUERIES,
+		MAX_NUMBER_OF_QUERIES * 2 * sizeof(uint64_t), m_TimeStamps[m_QueryFrame].data(), sizeof(uint64_t),
 		VK_QUERY_RESULT_64_BIT);
 	
 	for (uint32_t i = 0; i < m_CurrentAvailableQuery; i += 2)
 	{
-		uint64_t startTime = m_TimeStamps[currentFrameIndex][i];
-		uint64_t endTime = m_TimeStamps[currentFrameIndex][i + 1];
+		uint64_t startTime = m_TimeStamps[m_QueryFrame][i];
+		uint64_t endTime = m_TimeStamps[m_QueryFrame][i + 1];
 		float nsTime = endTime > startTime ? (endTime - startTime) * VulkanDevice::getVulkanContext()->getPhysicalDeviceLimits().timestampPeriod : 0.0f;
 		nsTime /= 1000000.0f;
+		if (nsTime == 0)
+		{
+			int r = 5;
+		}
 		m_QueryResults[i / 2] = nsTime;
 	}
 }

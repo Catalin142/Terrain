@@ -16,7 +16,7 @@ uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags memFlags)
 		}
 	}
 
-	throw (false);
+	assert(false);
 }
 
 VulkanBaseBuffer::VulkanBaseBuffer(const BufferProperties& props) : m_Properties(props)
@@ -30,7 +30,7 @@ VulkanBaseBuffer::VulkanBaseBuffer(const BufferProperties& props) : m_Properties
 	VkDevice vulkanDevice = VulkanDevice::getVulkanDevice();
 
 	if (vkCreateBuffer(vulkanDevice, &bufferInfo, nullptr, &m_Buffer) != VK_SUCCESS)
-		throw(false);
+		assert(false);
 
 	VkMemoryRequirements memRequirements;
 	vkGetBufferMemoryRequirements(vulkanDevice, m_Buffer, &memRequirements);
@@ -41,7 +41,7 @@ VulkanBaseBuffer::VulkanBaseBuffer(const BufferProperties& props) : m_Properties
 	allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, m_Properties.MemProperties);
 
 	if (vkAllocateMemory(vulkanDevice, &allocInfo, nullptr, &m_DeviceMemory) != VK_SUCCESS)
-		throw(false);
+		assert(false);
 
 	vkBindBufferMemory(vulkanDevice, m_Buffer, m_DeviceMemory, 0);
 }

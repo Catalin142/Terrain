@@ -1,6 +1,7 @@
 #include "VulkanDevice.h"
 
 #include <iostream>
+#include <cassert>
 
 #include "GLFW/glfw3.h"
 
@@ -114,7 +115,7 @@ void VulkanDevice::createInstance(InstanceProperties instanceProps)
 	if (res != VK_SUCCESS)
 	{
 		std::cerr << "Eroare la instance\n";
-		throw(false);
+		assert(false);
 	}
 
 #if DEBUG
@@ -134,7 +135,7 @@ void VulkanDevice::createWindowSurface(const std::shared_ptr<Window>& window)
 	if (glfwCreateWindowSurface(m_VulkanPlatform.Instance, window->getHandle(), nullptr, &m_VulkanPlatform.WindowSurface) != VK_SUCCESS)
 	{
 		std::cout << "Eroare createWindowSurface\n";
-		throw(false);
+		assert(false);
 	}
 }
 
@@ -288,7 +289,7 @@ void VulkanDevice::createLogicalDevice(const InstanceProperties& instanceProps)
 	if (vkCreateDevice(m_VulkanPlatform.GPU, &deviceCreateInfo, nullptr, &m_VulkanPlatform.logicalDevice) != VK_SUCCESS)
 	{
 		std::cerr << "Eraore creare device\n";
-		throw(false);
+		assert(false);
 	}
 
 	vkGetDeviceQueue(m_VulkanPlatform.logicalDevice, m_graphicsQueue.familyIndex, 0, &m_graphicsQueue.handle);
@@ -306,7 +307,7 @@ VulkanCommandPool::VulkanCommandPool()
 	if (vkCreateCommandPool(VulkanDevice::getVulkanDevice(), &poolInfo, nullptr, &m_GraphicsCommandPool) != VK_SUCCESS)
 	{
 		std::cout << "eroare CommandPool\n";
-		throw(false);
+		assert(false);
 	}
 }
 

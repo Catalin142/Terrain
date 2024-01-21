@@ -80,11 +80,11 @@ void VulkanSwapchain::Initialize()
 	for (SwapchainCommandBuffer& commandBuffer : m_CommandBuffers)
 	{
 		if (vkCreateCommandPool(logicalDevice, &cmdPoolInfo, nullptr, &commandBuffer.commandPool))
-			throw(false);
+			assert(false);
 
 		commandBufferAllocateInfo.commandPool = commandBuffer.commandPool;
 		if (vkAllocateCommandBuffers(logicalDevice, &commandBufferAllocateInfo, &commandBuffer.commandBuffer) != VK_SUCCESS)
-			throw(false);
+			assert(false);
 	}
 	////////////////////////////////////////////////////////////////////////////////////////
 	// Sync objects
@@ -96,11 +96,14 @@ void VulkanSwapchain::Initialize()
 
 	m_inFlightFences.resize(m_FramesInFlight);
 	for (uint32_t i = 0; i < m_FramesInFlight; i++)
-		if (vkCreateFence(logicalDevice, &fenceInfo, nullptr, &m_inFlightFences[i])) throw(false);
+		if (vkCreateFence(logicalDevice, &fenceInfo, nullptr, &m_inFlightFences[i])) assert(false);
 }
 
 void VulkanSwapchain::Create(uint32_t width, uint32_t height)
 {
+	if (width == 0 || height == 0)
+		return;
+
 	VkSwapchainKHR oldSwapchain = m_SwapChain;
 
 	VulkanDevice* Device = VulkanDevice::getVulkanContext();
@@ -109,7 +112,10 @@ void VulkanSwapchain::Create(uint32_t width, uint32_t height)
 	SwapchainSupportDetails swapChainSupport = Device->getSwapchainCapabilities();
 
 	m_Width	= std::clamp(width, swapChainSupport.capabilities.minImageExtent.width, swapChainSupport.capabilities.maxImageExtent.width);
-	m_Height= std::clamp(height, swapChainSupport.capabilities.minImageExtent.height, swapChainSupport.capabilities.maxImageExtent.height);
+	m_Height = std::clamp(height, swapChainSupport.capabilities.minImageExtent.height, swapChainSupport.capabilities.maxImageExtent.height);
+
+	if (m_Width == 0 || m_Height == 0)
+		return;
 
 	VkSurfaceFormatKHR surfaceFormat;
 	surfaceFormat.format = VK_FORMAT_B8G8R8A8_SRGB;
@@ -147,7 +153,7 @@ void VulkanSwapchain::Create(uint32_t width, uint32_t height)
 	swapChainInfo.oldSwapchain = oldSwapchain;
 
 	if (vkCreateSwapchainKHR(logicalDevice, &swapChainInfo, nullptr, &m_SwapChain) != VK_SUCCESS)
-		throw (false);
+		assert(false);
 
 	if (oldSwapchain)
 		vkDestroySwapchainKHR(logicalDevice, oldSwapchain, nullptr);
@@ -191,7 +197,7 @@ void VulkanSwapchain::Create(uint32_t width, uint32_t height)
 		viewInfo.subresourceRange.layerCount = 1;
 
 		if (vkCreateImageView(logicalDevice, &viewInfo, nullptr, &m_ColorImages[i].ImageView) != VK_SUCCESS)
-			throw(false);
+			assert(false);
 
 		VkSemaphoreCreateInfo semaphoreInfo{};
 		semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -274,7 +280,7 @@ void VulkanSwapchain::beginFrame()
 		return;
 	}
 	else if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
-		throw(false);
+		assert(false);
 }
 
 void VulkanSwapchain::endFrame()
@@ -299,7 +305,7 @@ void VulkanSwapchain::endFrame()
 	
 	vkResetFences(device, 1, &m_inFlightFences[m_currentFrameIndex]);
 	if (vkQueueSubmit(VulkanDevice::getVulkanContext()->getGraphicsQueue(), 1, &submitInfo, m_inFlightFences[m_currentFrameIndex]) != VK_SUCCESS)
-		throw(false);
+		assert(false);
 
 	VkPresentInfoKHR presentInfo{};
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -317,7 +323,7 @@ void VulkanSwapchain::endFrame()
 		onResize(m_Width, m_Height);
 	}
 	else if (res != VK_SUCCESS)
-		throw(false);
+		assert(false);
 
 	m_currentFrameIndex = (m_currentFrameIndex + 1) % m_FramesInFlight;
 

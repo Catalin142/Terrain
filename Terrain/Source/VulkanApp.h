@@ -80,10 +80,16 @@ private:
 	std::shared_ptr<VulkanBuffer> m_FullscreenIndexBuffer;
 
 	std::shared_ptr<VulkanTexture> m_TextureImage = nullptr;
+	std::shared_ptr<VulkanSampler> m_Sampler = nullptr;
 	std::shared_ptr<VulkanTexture> m_TextureImage2 = nullptr;
 	std::shared_ptr<VulkanTexture> m_Grass = nullptr;
 	std::shared_ptr<VulkanTexture> m_Slope = nullptr;
 	std::shared_ptr<VulkanTexture> m_Rock = nullptr;
 
+	std::shared_ptr<VulkanPipeline> terrainWireframePipeline;
+	std::shared_ptr<VulkanPipeline> terrainPipeline;
+
 	Camera cam{45.0f, 1600.0f / 900.0f, 0.1f, 10000.0f};
+
+	bool Wireframe = false;
 };

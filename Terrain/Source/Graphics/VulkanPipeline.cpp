@@ -173,7 +173,7 @@ VulkanPipeline::VulkanPipeline(const PipelineSpecification& spec) : m_Specificat
 	pipelineLayoutInfo.pSetLayouts = descSetLayout.data();
 
 	if (vkCreatePipelineLayout(VulkanDevice::getVulkanDevice(), &pipelineLayoutInfo, nullptr, &m_PipelineLayout) != VK_SUCCESS)
-		throw(false);
+		assert(false);
 
 	VkPipelineShaderStageCreateInfo shaderStages[] = {
 		m_Specification.Shader->getStageCreateInfo(ShaderStage::VERTEX),
@@ -198,7 +198,7 @@ VulkanPipeline::VulkanPipeline(const PipelineSpecification& spec) : m_Specificat
 		pipelineInfo.renderPass = m_Specification.Framebuffer->getRenderPass();
 
 	if (vkCreateGraphicsPipelines(VulkanDevice::getVulkanDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_Pipeline) != VK_SUCCESS)
-		throw(false);
+		assert(false);
 }
 
 VulkanPipeline::~VulkanPipeline()

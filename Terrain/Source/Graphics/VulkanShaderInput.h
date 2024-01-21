@@ -16,7 +16,9 @@ enum class ShaderInputType
 {
 	UNIFORM_BUFFER,
 	UNIFORM_BUFFER_SET,
-	IMAGE_SAMPLER,
+	COMBINED_IMAGE_SAMPLER,
+	SAMPLER,
+	TEXTURE,
 };
 
 struct ShaderInput

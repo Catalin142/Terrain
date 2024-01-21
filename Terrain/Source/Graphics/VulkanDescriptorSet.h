@@ -28,6 +28,7 @@ public:
 	void bindInput(uint32_t set, uint32_t binding, const std::shared_ptr<VulkanUniformBufferSet>& bufferSet);
 	void bindInput(uint32_t set, uint32_t binding, const std::shared_ptr<VulkanTexture>& texture);
 	void bindInput(uint32_t set, uint32_t binding, const std::shared_ptr<VulkanImage>& image);
+	void bindInput(uint32_t set, uint32_t binding, const std::shared_ptr<VulkanSampler>& sampler);
 
 	std::vector<VkDescriptorSet> getDescriptorSet(uint32_t frameIndex);
 	uint32_t getNumberOfSets() { return m_Shader->getNumberOfSets(); }

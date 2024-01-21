@@ -143,6 +143,7 @@ void VulkanFramebuffer::Create()
 		imgSpec.Height = m_Specification.Height;
 		imgSpec.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
 		imgSpec.UsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
 		imgSpec.CreateSampler = colorAttachment.Sample;
 		if (colorAttachment.Sample)
 			imgSpec.UsageFlags |= VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -160,12 +161,19 @@ void VulkanFramebuffer::Create()
 		depthSpec.Format = m_Specification.DepthAttachment.Format;
 		depthSpec.Width = m_Specification.Width;
 		depthSpec.Height = m_Specification.Height;
+
 		depthSpec.Aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
 		if (hasStencil(m_Specification.DepthAttachment.Format))
 			depthSpec.Aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+
 		depthSpec.UsageFlags = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 		if (m_Specification.DepthAttachment.Sample)
 			depthSpec.UsageFlags |= VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+
+		depthSpec.CreateSampler = m_Specification.DepthAttachment.Sample;
+		if (m_Specification.DepthAttachment.Sample)
+			depthSpec.UsageFlags |= VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+
 		m_DepthAttachment = std::make_shared<VulkanImage>(depthSpec);
 		m_DepthAttachment->Create();
 		attachments.emplace_back(m_DepthAttachment->getVkImageView());

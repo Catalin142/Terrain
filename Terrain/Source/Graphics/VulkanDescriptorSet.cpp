@@ -17,20 +17,22 @@ VulkanDescriptorSet::~VulkanDescriptorSet()
 void VulkanDescriptorSet::Create()
 {
 	// ================== CREATE DESCRIPTOR POOL ==================
-	VkDescriptorPoolSize poolSizes[2] = 
+	VkDescriptorPoolSize poolSizes[4] = 
 	{
 		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 100 },
 		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100 },
+		{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 100 },
+		{ VK_DESCRIPTOR_TYPE_SAMPLER, 100 },
 	};
 
 	VkDescriptorPoolCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	createInfo.poolSizeCount = 2;
+	createInfo.poolSizeCount = 4;
 	createInfo.pPoolSizes = poolSizes;
 	createInfo.maxSets = 10;
 
 	if (vkCreateDescriptorPool(VulkanDevice::getVulkanDevice(), &createInfo, nullptr, &m_DescriptorPool) != VK_SUCCESS)
-		throw(false);
+		assert(false);
 
 
 	// ================== CREATE DESCRIPTOR SETS ==================
@@ -52,7 +54,7 @@ void VulkanDescriptorSet::Create()
 
 			VkDescriptorSet descSet;
 			if (vkAllocateDescriptorSets(VulkanDevice::getVulkanDevice(), &allocInfo, &descSet) != VK_SUCCESS)
-				throw(false);
+				assert(false);
 
 			m_DescriptorSets[frameIndex].emplace_back(descSet);
 
@@ -109,6 +111,15 @@ void VulkanDescriptorSet::bindInput(uint32_t set, uint32_t binding, const std::s
 	m_DescriptorBindings.ImageInfos[getHash(set, binding)] = imageInfo;
 }
 
+
+void VulkanDescriptorSet::bindInput(uint32_t set, uint32_t binding, const std::shared_ptr<VulkanSampler>& sampler)
+{
+	VkDescriptorImageInfo samplerInfo{};
+	samplerInfo.sampler = sampler->Get();
+
+	m_DescriptorBindings.ImageInfos[getHash(set, binding)] = samplerInfo;
+}
+
 std::vector<VkDescriptorSet> VulkanDescriptorSet::getDescriptorSet(uint32_t frameIndex)
 {
 	assert(frameIndex < m_DescriptorSets.size());
@@ -136,8 +147,18 @@ VkWriteDescriptorSet VulkanDescriptorSet::getWriteDescriptorSet(const ShaderInpu
 		descriptorWrite.pBufferInfo = &m_DescriptorBindings.UniformBufferSetInfos[getHash(input.Set, input.Binding)][frame];
 		break;
 
-	case ShaderInputType::IMAGE_SAMPLER:
+	case ShaderInputType::COMBINED_IMAGE_SAMPLER:
 		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		descriptorWrite.pImageInfo = &m_DescriptorBindings.ImageInfos[getHash(input.Set, input.Binding)];
+		break;
+
+	case ShaderInputType::TEXTURE:
+		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+		descriptorWrite.pImageInfo = &m_DescriptorBindings.ImageInfos[getHash(input.Set, input.Binding)];
+		break;
+
+	case ShaderInputType::SAMPLER:
+		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
 		descriptorWrite.pImageInfo = &m_DescriptorBindings.ImageInfos[getHash(input.Set, input.Binding)];
 		break;
 
