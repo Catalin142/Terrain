@@ -174,8 +174,29 @@ uint32_t VulkanDevice::getGPUQueues(VkPhysicalDevice gpu)
 
 	uint32_t availableQueues = 0;
 
+	// Search for separate compute queue
 	for (size_t i = 0; i < queueFamilies.size(); i++)
 	{
+		if (queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT && m_computeQueue.familyIndex == INVALID_VK_INDEX &&
+			(queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0)
+		{
+			QueueBundle queueBundle;
+			queueBundle.familyIndex = (uint32_t)i;
+			m_computeQueue = queueBundle;
+			availableQueues++;
+			break;
+		}
+	}
+	for (size_t i = 0; i < queueFamilies.size(); i++)
+	{
+		if (queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT && m_computeQueue.familyIndex == INVALID_VK_INDEX)
+		{
+			QueueBundle queueBundle;
+			queueBundle.familyIndex = (uint32_t)i;
+			m_computeQueue = queueBundle;
+			availableQueues++;
+		}
+
 		if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT && m_graphicsQueue.familyIndex == INVALID_VK_INDEX)
 		{
 			QueueBundle queueBundle;
@@ -253,7 +274,7 @@ void VulkanDevice::createLogicalDevice(const InstanceProperties& instanceProps)
 	// iau indexu la toate queue rile de care am nevoie
 
 	std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-	std::set<uint32_t> uniqueQueueFamilies = { getGraphicsFamilyIndex(), getPresentFamilyIndex() };
+	std::set<uint32_t> uniqueQueueFamilies = { getGraphicsFamilyIndex(), getPresentFamilyIndex(), getComputeFamilyIndex()};
 
 	float queuePriority = 1.0f;
 	for (uint32_t famIndex : uniqueQueueFamilies)
@@ -295,6 +316,7 @@ void VulkanDevice::createLogicalDevice(const InstanceProperties& instanceProps)
 	vkGetDeviceQueue(m_VulkanPlatform.logicalDevice, m_graphicsQueue.familyIndex, 0, &m_graphicsQueue.handle);
 	vkGetDeviceQueue(m_VulkanPlatform.logicalDevice, m_presentQueue.familyIndex, 0, &m_presentQueue.handle);
 	vkGetDeviceQueue(m_VulkanPlatform.logicalDevice, m_transferQueue.familyIndex, 0, &m_transferQueue.handle);
+	vkGetDeviceQueue(m_VulkanPlatform.logicalDevice, m_computeQueue.familyIndex, 0, &m_computeQueue.handle);
 }
 
 VulkanCommandPool::VulkanCommandPool()
