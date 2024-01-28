@@ -22,9 +22,7 @@ static uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags memFla
 }
 
 VulkanImage::VulkanImage(const ImageSpecification& spec) : m_Specification(spec)
-{
-	//Create();
-}
+{ }
 
 VulkanImage::~VulkanImage()
 {

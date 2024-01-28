@@ -8,6 +8,7 @@ enum class ShaderStage : uint32_t
 {
 	VERTEX,
 	FRAGMENT,
+	COMPUTE,
 
 	NONE
 };

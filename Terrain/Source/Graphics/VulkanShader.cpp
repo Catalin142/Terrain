@@ -18,6 +18,7 @@ static VkShaderStageFlagBits getStage(const ShaderStage& stage)
 	{
 	case ShaderStage::VERTEX:   return VK_SHADER_STAGE_VERTEX_BIT;
 	case ShaderStage::FRAGMENT: return VK_SHADER_STAGE_FRAGMENT_BIT; break;
+	case ShaderStage::COMPUTE: return VK_SHADER_STAGE_COMPUTE_BIT; break;
 	case ShaderStage::NONE:     assert(false); break;
 	default:
 		return VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM;
@@ -215,6 +216,8 @@ shaderc_shader_kind getShadercKind(ShaderStage stage)
 		return shaderc_glsl_vertex_shader;
 	case ShaderStage::FRAGMENT:
 		return shaderc_glsl_fragment_shader;
+	case ShaderStage::COMPUTE:
+		return shaderc_glsl_compute_shader;
 	case ShaderStage::NONE:
 		assert(false);
 	}

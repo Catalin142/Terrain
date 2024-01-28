@@ -1,6 +1,8 @@
 #pragma once
-#include <vulkan/vulkan.h>
 #include "VulkanBaseBuffer.h"
+
+#include <vulkan/vulkan.h>
+#include <memory>
 
 class VulkanBuffer
 {
@@ -19,7 +21,7 @@ private:
 	VkBufferUsageFlags getUsage();
 
 private:
-	VulkanBaseBuffer* m_Buffer = nullptr;
+	std::shared_ptr<VulkanBaseBuffer> m_Buffer = nullptr;
 	BufferType m_Type;
 
 	void* m_Storage = nullptr;

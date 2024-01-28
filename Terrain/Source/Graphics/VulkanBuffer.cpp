@@ -21,8 +21,6 @@ VulkanBuffer::VulkanBuffer(void* data, uint32_t size, BufferType type, BufferUsa
 
 VulkanBuffer::~VulkanBuffer()
 {
-	delete m_Buffer;
-
 	if (m_Storage)
 		delete[] m_Storage;
 }
@@ -57,7 +55,7 @@ void VulkanBuffer::createGPUBuffer(void* data, uint32_t size)
 	vertexBufferProps.Usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | getUsage();
 	vertexBufferProps.MemProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
-	m_Buffer = new VulkanBaseBuffer(vertexBufferProps);
+	m_Buffer = std::make_shared<VulkanBaseBuffer>(vertexBufferProps);
 	m_Buffer->Copy(stagingBuffer);
 
 }
@@ -69,7 +67,7 @@ void VulkanBuffer::createGPUCPUBuffer(void* data, uint32_t size)
 	vertexBufferProps.Usage = getUsage();
 	vertexBufferProps.MemProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
-	m_Buffer = new VulkanBaseBuffer(vertexBufferProps);
+	m_Buffer = std::make_shared<VulkanBaseBuffer>(vertexBufferProps);
 	
 	m_Storage = new uint8_t[size];
 

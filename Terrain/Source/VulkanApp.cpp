@@ -371,11 +371,11 @@ void VulkanApp::createGeometryPass()
 		DescriptorSet->bindInput(0, 0, m_UniformBufferSet);
 		DescriptorSet->bindInput(0, 1, m_OffsetBuffer);
 		DescriptorSet->bindInput(1, 0, m_TextureImage);
-		//DescriptorSet->bindInput(2, 0, m_TextureImage2);
-		//DescriptorSet->bindInput(2, 1, m_Grass);
-		//DescriptorSet->bindInput(2, 2, m_Slope);
-		//DescriptorSet->bindInput(2, 3, m_Rock);
-		//DescriptorSet->bindInput(2, 4, m_Sampler);
+		DescriptorSet->bindInput(2, 0, m_TextureImage2);
+		DescriptorSet->bindInput(2, 1, m_Grass);
+		DescriptorSet->bindInput(2, 2, m_Slope);
+		DescriptorSet->bindInput(2, 3, m_Rock);
+		DescriptorSet->bindInput(2, 4, m_Sampler);
 		
 		DescriptorSet->Create();
 		m_GeometryPass->setDescriptorSet(DescriptorSet);

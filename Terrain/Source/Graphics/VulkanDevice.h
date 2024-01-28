@@ -69,9 +69,11 @@ public:
 	~VulkanCommandPool();
 
 	VkCommandPool getGraphicsCommandPool() { return m_GraphicsCommandPool; }
+	VkCommandPool getComputeCommandPool()  { return m_ComputeCommandPool; }
 
 private:
 	VkCommandPool m_GraphicsCommandPool;
+	VkCommandPool m_ComputeCommandPool;
 };
 
 class VulkanDevice
@@ -90,9 +92,11 @@ public:
 
 	inline VkQueue getGraphicsQueue() const			{ return m_graphicsQueue.handle; }
 	inline VkQueue getPresentQueue() const			{ return m_presentQueue.handle; }
+	inline VkQueue getComputeQueue() const			{ return m_computeQueue.handle; }
 															 
 	inline uint32_t getGraphicsFamilyIndex() const	{ return m_graphicsQueue.familyIndex; }
 	inline uint32_t getPresentFamilyIndex() const	{ return m_presentQueue.familyIndex; }
+	inline uint32_t getComputeFamilyIndex() const	{ return m_computeQueue.familyIndex; }
 
 	VkPhysicalDeviceLimits getPhysicalDeviceLimits() const { return m_physicalDeviceProperties.limits; }
 	VkPhysicalDeviceProperties getPhysicalDeviceProperties() const { return m_physicalDeviceProperties; }
@@ -141,6 +145,7 @@ private:
 	QueueBundle m_graphicsQueue;
 	QueueBundle m_presentQueue;
 	QueueBundle m_transferQueue;
+	QueueBundle m_computeQueue;
 
 	std::shared_ptr<VulkanCommandPool> m_CommandPool;
 

@@ -27,7 +27,7 @@ struct Vertex
 	glm::vec2 texCoord2;
 };
 
-#define CHUNK_SIZE 64
+#define CHUNK_SIZE 128
 struct TerrainChunk
 {
 	uint32_t xOffset = 0;
