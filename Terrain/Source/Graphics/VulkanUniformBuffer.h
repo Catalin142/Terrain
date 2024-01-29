@@ -17,7 +17,7 @@ public:
 	uint32_t getSize() { return m_Buffer->m_Properties.bufferSize; }
 
 private:
-	VulkanBaseBuffer* m_Buffer;
+	std::shared_ptr<VulkanBaseBuffer> m_Buffer;
 	void* m_Storage;
 };
 

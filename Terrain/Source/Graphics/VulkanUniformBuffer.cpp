@@ -8,14 +8,13 @@ VulkanUniformBuffer::VulkanUniformBuffer(uint32_t size)
 	props.bufferSize = size;
 	props.MemProperties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 	props.Usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-	m_Buffer = new VulkanBaseBuffer(props);
+	m_Buffer = std::make_shared<VulkanBaseBuffer>(props);
 
 	m_Storage = new uint8_t[size];
 }
 
 VulkanUniformBuffer::~VulkanUniformBuffer()
 { 
-	delete m_Buffer;
 	delete[] m_Storage;
 }
 
