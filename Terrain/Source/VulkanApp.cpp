@@ -155,7 +155,7 @@ void VulkanApp::onUpdate()
 			for (auto& currentChunk : m_Chunks)
 			{
 				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
-				if (distance < 150.0f)
+				if (distance < 450.0f)
 				{
 					lod0Count++;
 					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 0.0, 0.0f });
@@ -168,7 +168,7 @@ void VulkanApp::onUpdate()
 			for (auto& currentChunk : m_Chunks)
 			{
 				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
-				if (distance >= 150.0f && distance < 550.0f)
+				if (distance >= 450.0f && distance < 850.0f)
 				{
 					lod1Count++;
 					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 0.0, 0.0f });
@@ -181,7 +181,7 @@ void VulkanApp::onUpdate()
 			for (auto& currentChunk : m_Chunks)
 			{
 				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
-				if (distance >= 550.0f && distance < 750.0f)
+				if (distance >= 850.0f && distance < 1250.0f)
 				{
 					lod2Count++;
 					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 0.0, 0.0f });
@@ -195,7 +195,7 @@ void VulkanApp::onUpdate()
 			for (auto& currentChunk : m_Chunks)
 			{
 				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
-				if (distance >= 750.0f)
+				if (distance >= 1250.0f)
 				{
 					lod3Count++;
 					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 0.0, 0.0f });
@@ -213,7 +213,7 @@ void VulkanApp::onUpdate()
 			for (auto& currentChunk : m_Chunks)
 			{
 				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
-				if (distance < 150.0f)
+				if (distance < 450.0f)
 				{
 					lod0Count++;
 				}
@@ -232,7 +232,7 @@ void VulkanApp::onUpdate()
 			for (auto& currentChunk : m_Chunks)
 			{
 				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
-				if (distance >= 150.0f && distance < 550.0f)
+				if (distance >= 450.0f && distance < 850.0f)
 				{
 					lod1Count++;
 				}
@@ -252,7 +252,7 @@ void VulkanApp::onUpdate()
 			for (auto& currentChunk : m_Chunks)
 			{
 				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
-				if (distance >= 550.0f && distance < 750.0f)
+				if (distance >= 850.0f && distance < 1250.0f)
 				{
 					lod2Count++;
 				}
@@ -273,7 +273,7 @@ void VulkanApp::onUpdate()
 			for (auto& currentChunk : m_Chunks)
 			{
 				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
-				if (distance >= 750.0f)
+				if (distance >= 1250.0f)
 				{
 					lod3Count++;
 				}
@@ -371,11 +371,11 @@ void VulkanApp::createGeometryPass()
 		DescriptorSet->bindInput(0, 0, m_UniformBufferSet);
 		DescriptorSet->bindInput(0, 1, m_OffsetBuffer);
 		DescriptorSet->bindInput(1, 0, m_TextureImage);
-		//DescriptorSet->bindInput(2, 0, m_TextureImage2);
-		//DescriptorSet->bindInput(2, 1, m_Grass);
-		//DescriptorSet->bindInput(2, 2, m_Slope);
-		//DescriptorSet->bindInput(2, 3, m_Rock);
-		//DescriptorSet->bindInput(2, 4, m_Sampler);
+		DescriptorSet->bindInput(2, 0, m_TextureImage2);
+		DescriptorSet->bindInput(2, 1, m_Grass);
+		DescriptorSet->bindInput(2, 2, m_Slope);
+		DescriptorSet->bindInput(2, 3, m_Rock);
+		DescriptorSet->bindInput(2, 4, m_Sampler);
 		
 		DescriptorSet->Create();
 		m_GeometryPass->setDescriptorSet(DescriptorSet);

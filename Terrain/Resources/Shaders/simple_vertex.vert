@@ -1,6 +1,6 @@
 #version 460
 
-#define GRID_SIZE 64
+#define GRID_SIZE 128
 
 layout(location = 0) out vec2 fragTexCoord;
 layout(location = 1) out vec2 texCoord;
