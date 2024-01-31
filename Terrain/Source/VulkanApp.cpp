@@ -361,8 +361,8 @@ void VulkanApp::createGeometryPass()
 
 	{
 		std::shared_ptr<VulkanShader>& mainShader = ShaderManager::createShader("GeometryShader");
-		mainShader->addShaderStage(ShaderStage::VERTEX, "Resources/Shaders/simple_vertex.vert");
-		mainShader->addShaderStage(ShaderStage::FRAGMENT, "Resources/Shaders/simple_fragment.frag");
+		mainShader->addShaderStage(ShaderStage::VERTEX, "Resources/Shaders/simple_vertex.glsl");
+		mainShader->addShaderStage(ShaderStage::FRAGMENT, "Resources/Shaders/simple_fragment.glsl");
 		mainShader->createDescriptorSetLayouts();
 	}
 	{

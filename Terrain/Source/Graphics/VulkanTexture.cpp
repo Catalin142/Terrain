@@ -183,8 +183,6 @@ VulkanSampler::VulkanSampler(SamplerSpecification spec)
 	samplerInfo.addressModeV = m_Specification.addresMode;
 	samplerInfo.addressModeW = m_Specification.addresMode;
 	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	samplerInfo.maxLod = float(m_Specification.Mips);
-
 	samplerInfo.anisotropyEnable = VK_FALSE;
 	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
 	samplerInfo.unnormalizedCoordinates = VK_FALSE;
@@ -192,8 +190,8 @@ VulkanSampler::VulkanSampler(SamplerSpecification spec)
 	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
 	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 	samplerInfo.mipLodBias = 0.0f;
+	samplerInfo.maxLod = float(m_Specification.Mips - 1);
 	samplerInfo.minLod = 0.0f;
-	samplerInfo.maxLod = 0.0f;
 
 	if (vkCreateSampler(VulkanDevice::getVulkanDevice(), &samplerInfo, nullptr, &m_Sampler) != VK_SUCCESS)
 		assert(false);
