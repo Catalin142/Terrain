@@ -20,71 +20,95 @@ VkFormat getFormat(uint32_t channels)
 	return VK_FORMAT_UNDEFINED;
 }
 
-VulkanTexture::VulkanTexture(const std::string& filepath, const TextureSpecification& spec)
+VulkanTexture::VulkanTexture(const TextureSpecification& spec)
 {
 	m_Specification = spec;
-	stbi_uc* pixels = stbi_load(filepath.c_str(), &m_Info.Width, &m_Info.Height,
-		&m_Info.Channels, m_Specification.Channles);
 
-	if (m_Specification.Channles != 0)
-		m_Info.Channels = m_Specification.Channles;
+	assert(m_Specification.LayerCount == m_Specification.Filepath.size());
 
-	VkDeviceSize imageSize = m_Info.Width * m_Info.Height * m_Info.Channels;
-
-	m_Info.mipCount = m_Specification.generateMips ? VkUtils::calculateNumberOfMips(m_Info.Width, m_Info.Height) : 1;
-
-	if (!pixels)
-		assert(false);
-
-	BufferProperties stagingBufferProps;
-	stagingBufferProps.bufferSize = (uint32_t)imageSize;
-	stagingBufferProps.Usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-	stagingBufferProps.MemProperties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-
-	VulkanBaseBuffer stagingBuffer{ stagingBufferProps };
-
-	void* data;
-	stagingBuffer.Map(data);
-	memcpy(data, pixels, static_cast<size_t>(imageSize));
-	stagingBuffer.Unmap();
-
-	stbi_image_free(pixels);
-	
-	ImageSpecification imgSpec;
-	imgSpec.Width = m_Info.Width;
-	imgSpec.Height = m_Info.Height;
-	imgSpec.Format = getFormat(m_Info.Channels);
-
-	imgSpec.Mips = m_Info.mipCount;
-	imgSpec.Tiling = VK_IMAGE_TILING_OPTIMAL;
-	imgSpec.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-	imgSpec.UsageFlags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-	imgSpec.CreateSampler = m_Specification.createSampler;
-
-	m_VulkanImage = std::make_shared<VulkanImage>(imgSpec);
-	m_VulkanImage->Create();
-
-	VkImageSubresourceRange imgSubresource{};
-	ImageSpecification texSpec = m_VulkanImage->getSpecification();
-	imgSubresource.aspectMask = texSpec.Aspect;
-	imgSubresource.layerCount = 1;
-	imgSubresource.levelCount = texSpec.Mips;
-	imgSubresource.baseMipLevel = 0;
-	imgSubresource.baseArrayLayer = 0;
-
-	VkUtils::transitionImageLayout(m_VulkanImage->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-	m_VulkanImage->copyBuffer(stagingBuffer);
-
-	if (m_Info.mipCount == 1)
-		VkUtils::transitionImageLayout(m_VulkanImage->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	else
-		this->generateMips();
+	loadTextures();
 }
 
 VulkanTexture::~VulkanTexture()
 { }
 
-void VulkanTexture::generateMips()
+void VulkanTexture::loadTextures()
+{
+	std::vector<std::shared_ptr<VulkanBaseBuffer>> stagingBuffers;
+	for (uint32_t layer = 0; layer < m_Specification.LayerCount; layer++)
+	{
+		TextureInformation currentInfo{};
+
+		stbi_uc* pixels = stbi_load(m_Specification.Filepath[layer].c_str(), &currentInfo.Width, &currentInfo.Height,
+			&currentInfo.Channels, m_Specification.Channles);
+
+		if (layer >= 1)
+			assert(currentInfo.Width == m_Info.Width && currentInfo.Height == m_Info.Height);
+		else
+			m_Info = currentInfo;
+
+		if (m_VulkanImage == nullptr)
+		{
+			if (m_Specification.Channles != 0)
+				m_Info.Channels = m_Specification.Channles;
+
+			m_Info.mipCount = m_Specification.GenerateMips ? VkUtils::calculateNumberOfMips(m_Info.Width, m_Info.Height) : 1;
+
+			ImageSpecification imgSpec;
+			imgSpec.Width = m_Info.Width;
+			imgSpec.Height = m_Info.Height;
+			imgSpec.Format = getFormat(m_Info.Channels);
+
+			imgSpec.Mips = m_Info.mipCount;
+			imgSpec.Tiling = VK_IMAGE_TILING_OPTIMAL;
+			imgSpec.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+			imgSpec.UsageFlags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+			imgSpec.CreateSampler = m_Specification.CreateSampler;
+			imgSpec.LayerCount = m_Specification.LayerCount;
+
+			m_VulkanImage = std::make_shared<VulkanImage>(imgSpec);
+			m_VulkanImage->Create();
+		}
+
+		VkDeviceSize imageSize = m_Info.Width * m_Info.Height * m_Info.Channels;
+
+		if (!pixels)
+			assert(false);
+
+		BufferProperties stagingBufferProps;
+		stagingBufferProps.bufferSize = (uint32_t)imageSize;
+		stagingBufferProps.Usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+		stagingBufferProps.MemProperties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+
+		stagingBuffers.push_back(std::make_shared<VulkanBaseBuffer>(stagingBufferProps));
+
+		void* data;
+		stagingBuffers.back()->Map(data);
+		memcpy(data, pixels, static_cast<size_t>(imageSize));
+		stagingBuffers.back()->Unmap();
+
+		stbi_image_free(pixels);
+	}
+
+	VkImageSubresourceRange imgSubresource{};
+	ImageSpecification texSpec = m_VulkanImage->getSpecification();
+	imgSubresource.aspectMask = texSpec.Aspect;
+	imgSubresource.layerCount = m_Specification.LayerCount;
+	imgSubresource.levelCount = texSpec.Mips;
+	imgSubresource.baseMipLevel = 0;
+
+	VkUtils::transitionImageLayout(m_VulkanImage->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+	for (uint32_t layer = 0; layer < m_Specification.LayerCount; layer++)
+		m_VulkanImage->copyBuffer(*stagingBuffers[layer], layer);
+
+	if (m_Info.mipCount == 1)
+		VkUtils::transitionImageLayout(m_VulkanImage->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	else
+		this->GenerateMips();
+}
+
+void VulkanTexture::GenerateMips()
 {
 	VkFormatProperties formatProperties;
 	vkGetPhysicalDeviceFormatProperties(VulkanDevice::getVulkanContext()->getGPU(), VK_FORMAT_R8G8B8A8_SRGB, &formatProperties);
@@ -101,7 +125,7 @@ void VulkanTexture::generateMips()
 	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	barrier.subresourceRange.baseArrayLayer = 0;
-	barrier.subresourceRange.layerCount = 1;
+	barrier.subresourceRange.layerCount = m_Specification.LayerCount;
 	barrier.subresourceRange.levelCount = 1;
 
 	int32_t mipWidth = m_Info.Width;
@@ -127,13 +151,13 @@ void VulkanTexture::generateMips()
 		blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		blit.srcSubresource.mipLevel = i - 1;
 		blit.srcSubresource.baseArrayLayer = 0;
-		blit.srcSubresource.layerCount = 1;
+		blit.srcSubresource.layerCount = m_Specification.LayerCount;
 		blit.dstOffsets[0] = { 0, 0, 0 };
 		blit.dstOffsets[1] = { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 };
 		blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		blit.dstSubresource.mipLevel = i;
 		blit.dstSubresource.baseArrayLayer = 0;
-		blit.dstSubresource.layerCount = 1;
+		blit.dstSubresource.layerCount = m_Specification.LayerCount;
 
 		vkCmdBlitImage(commandBuffer,
 			m_VulkanImage->getVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,

@@ -24,3 +24,9 @@
 		   
 		   - TODO:
 				- Fix terrain cracks
+
+02.02.2024 - Added array texture for faster texture sampling
+
+		   - TODO:
+				- Fix terrain cracks
+			

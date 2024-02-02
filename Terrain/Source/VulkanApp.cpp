@@ -31,25 +31,31 @@ void VulkanApp::onCreate()
 {
 	CommandBuffer = std::make_shared<VulkanRenderCommandBuffer>(true);
 
-	TextureSpecification texSpec{};
-	texSpec.createSampler = true;
 	{
-		m_TextureImage = std::make_shared<VulkanTexture>("Resources/Img/heightmap2.png", texSpec);
+		TextureSpecification texSpec{};
+		texSpec.CreateSampler = true;
+		texSpec.Filepath.push_back("Resources/Img/heightmap2.png");
+		m_TextureImage = std::make_shared<VulkanTexture>(texSpec);
 	}
 	{
+		TextureSpecification texSpec{};
+		texSpec.CreateSampler = true;
 		texSpec.Channles = 4;
-		m_TextureImage2 = std::make_shared<VulkanTexture>("Resources/Img/image4.png", texSpec);
+		texSpec.Filepath.push_back("Resources/Img/image4.png");
+		m_TextureImage2 = std::make_shared<VulkanTexture>(texSpec);
 	}
 	{
-		texSpec.generateMips = true;
-		texSpec.createSampler = false;
-		m_Grass = std::make_shared<VulkanTexture>("Resources/Img/grass.png", texSpec);
-		m_Slope = std::make_shared<VulkanTexture>("Resources/Img/slope.png", texSpec);
-		m_Rock = std::make_shared<VulkanTexture>("Resources/Img/rock.png", texSpec);
-
-		SamplerSpecification spec{};
-		spec.Mips = m_Rock->getInfo().mipCount;
-		m_Sampler = std::make_shared<VulkanSampler>(spec);
+		{
+			TextureSpecification texSpec{};
+			texSpec.CreateSampler = true;
+			texSpec.GenerateMips = true;
+			texSpec.Channles = 4;
+			texSpec.LayerCount = 3;
+			texSpec.Filepath.push_back("Resources/Img/grass.png");
+			texSpec.Filepath.push_back("Resources/Img/slope.png");
+			texSpec.Filepath.push_back("Resources/Img/rock.png");
+			m_TerrainTextureArray = std::make_shared<VulkanTexture>(texSpec);
+		}
 	}
 
 	{
@@ -372,10 +378,7 @@ void VulkanApp::createGeometryPass()
 		DescriptorSet->bindInput(0, 1, m_OffsetBuffer);
 		DescriptorSet->bindInput(1, 0, m_TextureImage);
 		DescriptorSet->bindInput(2, 0, m_TextureImage2);
-		DescriptorSet->bindInput(2, 1, m_Grass);
-		DescriptorSet->bindInput(2, 2, m_Slope);
-		DescriptorSet->bindInput(2, 3, m_Rock);
-		DescriptorSet->bindInput(2, 4, m_Sampler);
+		DescriptorSet->bindInput(2, 1, m_TerrainTextureArray);
 		
 		DescriptorSet->Create();
 		m_GeometryPass->setDescriptorSet(DescriptorSet);

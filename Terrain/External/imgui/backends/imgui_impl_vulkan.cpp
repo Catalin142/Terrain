@@ -745,12 +745,12 @@ bool ImGui_ImplVulkan_CreateFontsTexture()
         copy_barrier[0].image = bd->FontImage;
         copy_barrier[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         copy_barrier[0].subresourceRange.levelCount = 1;
-        copy_barrier[0].subresourceRange.layerCount = 1;
+        copy_barrier[0].subresourceRange. layerCount = 1;
         vkCmdPipelineBarrier(bd->FontCommandBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, copy_barrier);
 
         VkBufferImageCopy region = {};
         region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        region.imageSubresource.layerCount = 1;
+        region.imageSubresource. layerCount = 1;
         region.imageExtent.width = width;
         region.imageExtent.height = height;
         region.imageExtent.depth = 1;

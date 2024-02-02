@@ -13,10 +13,10 @@ VulkanDevice* VulkanDevice::m_Instance;
 */
 static void checkLayersSupport(std::vector<const char*>& requestedLayers)
 {
-	uint32_t layerCount = 0;
-	vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-	std::vector<VkLayerProperties> layers(layerCount);
-	vkEnumerateInstanceLayerProperties(&layerCount, layers.data());
+	uint32_t LayerCount = 0;
+	vkEnumerateInstanceLayerProperties(&LayerCount, nullptr);
+	std::vector<VkLayerProperties> layers(LayerCount);
+	vkEnumerateInstanceLayerProperties(&LayerCount, layers.data());
 
 #if DEBUG
 	std::cout << "\nrequested layers:\n";

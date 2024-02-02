@@ -10,6 +10,7 @@ struct ImageSpecification
 	uint32_t Height;
 	uint32_t Samples = 1;
 	uint32_t Mips = 1;
+	uint32_t LayerCount = 1;
 
 	VkFormat Format = VK_FORMAT_UNDEFINED;
 	VkImageTiling Tiling = VK_IMAGE_TILING_OPTIMAL;
@@ -38,18 +39,18 @@ public:
 	VkSampler getVkSampler() const { return m_Sampler; }
 
 	const ImageSpecification& getSpecification() { return m_Specification; }
-	void copyBuffer(const VulkanBaseBuffer& buffer);
+	void copyBuffer(const VulkanBaseBuffer& buffer, uint32_t layer = 0);
 
 private:
 	void createImage();
-	void createSampler();
+	void CreateSampler();
 	void createView();
 
 private:
 	ImageSpecification m_Specification;
 
 	VkImage m_Image = nullptr;
-	VkImageView m_ImageView = nullptr;
+	VkImageView m_ImageView;
 	VkDeviceMemory m_DeviceMemory = nullptr;
 	VkSampler m_Sampler = nullptr;
 };

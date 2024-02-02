@@ -37,7 +37,7 @@ void VulkanImage::Create()
 	createView();
 
 	if (m_Specification.CreateSampler)
-		createSampler();
+		CreateSampler();
 }
 
 void VulkanImage::Release()
@@ -58,7 +58,7 @@ void VulkanImage::Release()
 	m_DeviceMemory = nullptr;
 }
 
-void VulkanImage::copyBuffer(const VulkanBaseBuffer& buffer)
+void VulkanImage::copyBuffer(const VulkanBaseBuffer& buffer, uint32_t layer)
 {
 	VkCommandBuffer commandBuffer = VkUtils::beginSingleTimeCommand();
 
@@ -69,7 +69,7 @@ void VulkanImage::copyBuffer(const VulkanBaseBuffer& buffer)
 
 	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	region.imageSubresource.mipLevel = 0;
-	region.imageSubresource.baseArrayLayer = 0;
+	region.imageSubresource.baseArrayLayer = layer;
 	region.imageSubresource.layerCount = 1;
 
 	region.imageOffset = { 0, 0, 0 };
@@ -99,7 +99,7 @@ void VulkanImage::createImage()
 	imageInfo.extent.width = m_Specification.Width;
 	imageInfo.extent.height = m_Specification.Height;
 	imageInfo.extent.depth = 1;
-	imageInfo.arrayLayers = 1;
+	imageInfo.arrayLayers = m_Specification.LayerCount;
 	imageInfo.format = m_Specification.Format;
 	imageInfo.tiling = m_Specification.Tiling;
 	imageInfo.usage = m_Specification.UsageFlags;
@@ -134,7 +134,7 @@ void VulkanImage::createImage()
 	}
 }
 
-void VulkanImage::createSampler()
+void VulkanImage::CreateSampler()
 {
 	VkSamplerCreateInfo samplerInfo{};
 	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -144,7 +144,6 @@ void VulkanImage::createSampler()
 	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
 	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
 	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	samplerInfo.maxLod = float(m_Specification.Mips);
 
 	VulkanDevice* device = VulkanDevice::getVulkanContext();
 
@@ -156,7 +155,7 @@ void VulkanImage::createSampler()
 	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 	samplerInfo.mipLodBias = 0.0f;
 	samplerInfo.minLod = 0.0f;
-	samplerInfo.maxLod = 0.0f;
+	samplerInfo.maxLod = float(m_Specification.Mips - 1);
 
 	if (vkCreateSampler(device->getLogicalDevice(), &samplerInfo, nullptr, &m_Sampler) != VK_SUCCESS)
 		assert(false);
@@ -167,15 +166,16 @@ void VulkanImage::createView()
 	VkImageViewCreateInfo viewInfo{};
 	viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 	viewInfo.image = m_Image;
-	viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	viewInfo.viewType = m_Specification.LayerCount > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
 	viewInfo.format = m_Specification.Format;
 	viewInfo.subresourceRange.aspectMask = m_Specification.Aspect;
 	viewInfo.subresourceRange.baseMipLevel = 0;
 	viewInfo.subresourceRange.levelCount = m_Specification.Mips;
 	viewInfo.subresourceRange.baseArrayLayer = 0;
-	viewInfo.subresourceRange.layerCount = 1;
+	viewInfo.subresourceRange.layerCount = m_Specification.LayerCount;
 
 	VkDevice device = VulkanDevice::getVulkanDevice();
+
 	if (vkCreateImageView(device, &viewInfo, nullptr, &m_ImageView) != VK_SUCCESS)
 	{
 		std::cerr << "failed to create image view!\n";
