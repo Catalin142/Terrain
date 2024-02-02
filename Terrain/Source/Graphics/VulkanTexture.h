@@ -7,6 +7,8 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 
+#define MAX_NUMBER_OF_LAYERS 8
+
 struct TextureInformation
 {
 	int32_t Width = 0;
