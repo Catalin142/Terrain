@@ -24,6 +24,7 @@ VulkanTexture::VulkanTexture(const TextureSpecification& spec)
 {
 	m_Specification = spec;
 
+	assert(m_Specification.LayerCount <= MAX_NUMBER_OF_LAYERS);
 	assert(m_Specification.LayerCount == m_Specification.Filepath.size());
 
 	loadTextures();
