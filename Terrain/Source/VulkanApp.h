@@ -24,6 +24,7 @@ struct UniformBufferObject {
 
 struct Vertex
 {
+	glm::vec2 Position;
 	glm::vec2 texCoord2;
 };
 

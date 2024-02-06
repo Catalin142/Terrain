@@ -65,10 +65,10 @@ void VulkanApp::onCreate()
 	}
 	{
 		float FullscreenVertices[] = {
-			-1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
-			 1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
-			 1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
-			-1.0f,  1.0f, 0.0f, 0.0f, 1.0f
+			-1.0f, -1.0f, 0.0f, 0.0f,
+			 1.0f, -1.0f, 1.0f, 0.0f,
+			 1.0f,  1.0f, 1.0f, 1.0f,
+			-1.0f,  1.0f, 0.0f, 1.0f
 		};
 
 		uint32_t FullscreenIndices[] = {
@@ -76,7 +76,7 @@ void VulkanApp::onCreate()
 			0, 2, 3
 		};
 
-		m_FullscreenVertexBuffer = std::make_shared<VulkanBuffer>(FullscreenVertices, (uint32_t)(sizeof(float) * 20),
+		m_FullscreenVertexBuffer = std::make_shared<VulkanBuffer>(FullscreenVertices, (uint32_t)(sizeof(float) * 16),
 			BufferType::VERTEX, BufferUsage::STATIC);
 
 		m_FullscreenIndexBuffer = std::make_shared<VulkanBuffer>(FullscreenIndices, (uint32_t)(sizeof(uint32_t) * 6),
@@ -155,9 +155,12 @@ void VulkanApp::onUpdate()
 		//vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
 		std::vector<glm::vec4> offsets;
+		uint32_t lod0Count = 0;
+		uint32_t lod1Count = 0;
+		uint32_t lod2Count = 0;
+		uint32_t lod3Count = 0;
 		{
 
-			uint32_t lod0Count = 0;
 			for (auto& currentChunk : m_Chunks)
 			{
 				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
@@ -170,7 +173,6 @@ void VulkanApp::onUpdate()
 		}
 		{
 
-			uint32_t lod1Count = 0;
 			for (auto& currentChunk : m_Chunks)
 			{
 				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
@@ -183,7 +185,6 @@ void VulkanApp::onUpdate()
 		}
 		{
 
-			uint32_t lod2Count = 0;
 			for (auto& currentChunk : m_Chunks)
 			{
 				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
@@ -197,7 +198,6 @@ void VulkanApp::onUpdate()
 
 		{
 
-			uint32_t lod3Count = 0;
 			for (auto& currentChunk : m_Chunks)
 			{
 				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
@@ -214,16 +214,6 @@ void VulkanApp::onUpdate()
 		uint32_t firstInstance = 0;
 		{
 			START_SCOPE_PROFILE("Lod0Render");
-
-			uint32_t lod0Count = 0;
-			for (auto& currentChunk : m_Chunks)
-			{
-				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
-				if (distance < 450.0f)
-				{
-					lod0Count++;
-				}
-			}
 			if (lod0Count)
 			{
 				vkCmdBindIndexBuffer(commandBuffer, m_IndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
@@ -233,17 +223,6 @@ void VulkanApp::onUpdate()
 		}
 		{
 			START_SCOPE_PROFILE("Lod1Render");
-
-			uint32_t lod1Count = 0;
-			for (auto& currentChunk : m_Chunks)
-			{
-				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
-				if (distance >= 450.0f && distance < 850.0f)
-				{
-					lod1Count++;
-				}
-			}
-
 			if (lod1Count)
 			{
 				vkCmdBindIndexBuffer(commandBuffer, m_IndexBuffer1->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
@@ -253,17 +232,6 @@ void VulkanApp::onUpdate()
 		}
 		{
 			START_SCOPE_PROFILE("Lod2Render");
-
-			uint32_t lod2Count = 0;
-			for (auto& currentChunk : m_Chunks)
-			{
-				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
-				if (distance >= 850.0f && distance < 1250.0f)
-				{
-					lod2Count++;
-				}
-			}
-
 			if (lod2Count)
 			{
 				vkCmdBindIndexBuffer(commandBuffer, m_IndexBuffer2->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
@@ -274,17 +242,6 @@ void VulkanApp::onUpdate()
 
 		{
 			START_SCOPE_PROFILE("Lod3Render");
-
-			uint32_t lod3Count = 0;
-			for (auto& currentChunk : m_Chunks)
-			{
-				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
-				if (distance >= 1250.0f)
-				{
-					lod3Count++;
-				}
-			}
-
 			if (lod3Count)
 			{
 				vkCmdBindIndexBuffer(commandBuffer, m_IndexBuffer3->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
@@ -292,6 +249,7 @@ void VulkanApp::onUpdate()
 				firstInstance += lod3Count;
 			}
 		}
+
 		VulkanRenderer::endRenderPass(CommandBuffer);
 
 		CommandBuffer->endQuery("GeometryPass");
@@ -405,7 +363,8 @@ void VulkanApp::createGeometryPass()
 		spec.Wireframe = false;
 		spec.Culling = true;
 		spec.Shader = ShaderManager::getShader("GeometryShader");
-		spec.vertexBufferLayout = VulkanVertexBufferLayout({});
+		spec.vertexBufferLayout = VulkanVertexBufferLayout{};
+		//spec.vertexBufferLayout = VBOLayout;
 		spec.depthCompareFunction = DepthCompare::LESS;
 		terrainPipeline = std::make_shared<VulkanPipeline>(spec);
 
@@ -434,7 +393,7 @@ void VulkanApp::createFinalPass()
 	}
 	{
 		VulkanVertexBufferLayout VBOLayout = VulkanVertexBufferLayout({
-			VertexType::FLOAT_3,
+			VertexType::FLOAT_2,
 			VertexType::FLOAT_2,
 			});
 
@@ -457,16 +416,77 @@ void VulkanApp::updateUniformBuffer(uint32_t currentImage)
 	m_UniformBufferSet->setData(&ubo, sizeof(ubo), currentImage);
 }
 
+void generateIndices(std::vector<uint32_t>& indices, uint32_t lod, uint32_t vertCount)
+{
+	for (uint32_t x = 0; x < vertCount - 1; x += lod * 2) {
+		for (uint32_t y = 0; y < vertCount - 1; y += lod * 2) {
+			uint32_t index = x * vertCount + y;
+			/*
+			c      d      i
+
+
+			b      e      h
+
+
+			a      f      g
+			*/
+
+			uint32_t a = index;
+			uint32_t b = index + lod;
+			uint32_t c = index + lod * 2;
+			uint32_t d = index + vertCount * lod + lod * 2;
+			uint32_t e = index + vertCount * lod + lod;
+			uint32_t f = index + vertCount * lod;
+			uint32_t g = index + vertCount * lod * 2;
+			uint32_t h = index + vertCount * lod * 2 + lod;
+			uint32_t i = index + vertCount * lod * 2 + lod * 2;
+
+			indices.push_back(a);
+			indices.push_back(b);
+			indices.push_back(e);
+
+			indices.push_back(f);
+			indices.push_back(a);
+			indices.push_back(e);
+
+			indices.push_back(b);
+			indices.push_back(c);
+			indices.push_back(e);
+
+			indices.push_back(e);
+			indices.push_back(c);
+			indices.push_back(d);
+
+			indices.push_back(e);
+			indices.push_back(d);
+			indices.push_back(i);
+
+			indices.push_back(h);
+			indices.push_back(e);
+			indices.push_back(i);
+
+			indices.push_back(f);
+			indices.push_back(e);
+			indices.push_back(g);
+
+			indices.push_back(g);
+			indices.push_back(e);
+			indices.push_back(h);
+		}
+	}
+}
+
 void VulkanApp::loadModel(const std::string& filepath)
 {
 	{
-		std::vector<glm::vec4> offsets;
 		uint32_t gridSize = 1024;
+		std::vector<glm::vec4> offsets;
 		for (uint32_t xOffset = 0; xOffset < gridSize / CHUNK_SIZE; xOffset++)
 			for (uint32_t yOffset = 0; yOffset < gridSize / CHUNK_SIZE; yOffset++)
 			{
 				vertices.clear();
 				TerrainChunk& chunk = m_Chunks.emplace_back();
+
 
 				chunk.xOffset = xOffset * CHUNK_SIZE;
 				chunk.yOffset = yOffset * CHUNK_SIZE;
@@ -479,18 +499,7 @@ void VulkanApp::loadModel(const std::string& filepath)
 			indices.clear();
 			uint32_t lod = 4;
 			uint32_t vertCount = CHUNK_SIZE + 1;
-			for (int x = 0; x < vertCount - 1; x += lod) {
-				for (int y = 0; y < vertCount - 1; y += lod) {
-					uint32_t index = x * vertCount + y;
-					indices.push_back(index);
-					indices.push_back(index + lod);
-					indices.push_back(index + vertCount * lod);
-
-					indices.push_back(index + lod);
-					indices.push_back(index + vertCount * lod + lod);
-					indices.push_back(index + vertCount * lod);
-				}
-			}
+			generateIndices(indices, lod, vertCount);
 
 			index = indices.size();
 			m_IndexBuffer = std::make_shared<VulkanBuffer>(indices.data(), (uint32_t)(sizeof(indices[0]) * (uint32_t)indices.size()),
@@ -501,18 +510,7 @@ void VulkanApp::loadModel(const std::string& filepath)
 			indices.clear();
 			uint32_t lod = 8;
 			uint32_t vertCount = CHUNK_SIZE + 1;
-			for (int x = 0; x < vertCount - 1; x += lod) {
-				for (int y = 0; y < vertCount - 1; y += lod) {
-					uint32_t index = x * vertCount + y;
-					indices.push_back(index);
-					indices.push_back(index + lod);
-					indices.push_back(index + vertCount * lod);
-
-					indices.push_back(index + lod);
-					indices.push_back(index + vertCount * lod + lod);
-					indices.push_back(index + vertCount * lod);
-				}
-			}
+			generateIndices(indices, lod, vertCount);
 
 			index1 = indices.size();
 			m_IndexBuffer1 = std::make_shared<VulkanBuffer>(indices.data(), (uint32_t)(sizeof(indices[0]) * (uint32_t)indices.size()),
@@ -523,18 +521,7 @@ void VulkanApp::loadModel(const std::string& filepath)
 			indices.clear();
 			uint32_t lod = 16;
 			uint32_t vertCount = CHUNK_SIZE + 1;
-			for (int x = 0; x < vertCount - 1; x += lod) {
-				for (int y = 0; y < vertCount - 1; y += lod) {
-					uint32_t index = x * vertCount + y;
-					indices.push_back(index);
-					indices.push_back(index + lod);
-					indices.push_back(index + vertCount * lod);
-
-					indices.push_back(index + lod);
-					indices.push_back(index + vertCount * lod + lod);
-					indices.push_back(index + vertCount * lod);
-				}
-			}
+			generateIndices(indices, lod, vertCount);
 
 			index2 = indices.size();
 			m_IndexBuffer2 = std::make_shared<VulkanBuffer>(indices.data(), (uint32_t)(sizeof(indices[0]) * (uint32_t)indices.size()),
@@ -545,18 +532,7 @@ void VulkanApp::loadModel(const std::string& filepath)
 			indices.clear();
 			uint32_t lod = 32;
 			uint32_t vertCount = CHUNK_SIZE + 1;
-			for (int x = 0; x < vertCount - 1; x += lod) {
-				for (int y = 0; y < vertCount - 1; y += lod) {
-					uint32_t index = x * vertCount + y;
-					indices.push_back(index);
-					indices.push_back(index + lod);
-					indices.push_back(index + vertCount * lod);
-
-					indices.push_back(index + lod);
-					indices.push_back(index + vertCount * lod + lod);
-					indices.push_back(index + vertCount * lod);
-				}
-			}
+			generateIndices(indices, lod, vertCount);
 
 			index3 = indices.size();
 			m_IndexBuffer3 = std::make_shared<VulkanBuffer>(indices.data(), (uint32_t)(sizeof(indices[0]) * (uint32_t)indices.size()),
