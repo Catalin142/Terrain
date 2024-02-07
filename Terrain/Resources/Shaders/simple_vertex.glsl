@@ -13,20 +13,42 @@ layout(set = 0, binding = 0) uniform UniformBufferObjectSet
 
 layout(set = 0, binding = 1) uniform OffsetsUniformBufferSet
 {
-    vec2 offset[256];
+    vec4 offset[256];
 } offsets;
 
+layout(set = 0, binding = 2) uniform LodMapUniformBufferSet
+{
+    lowp int lod[128 * 128];
+} lodMap;
+
+
 layout (set = 1, binding = 0) uniform sampler2D heightMap;
+
+float getEdge(int n, int x) 
+{    
+    if (n == GRID_SIZE || n == 0)
+        return float(n);
+
+    n = n + x / 2;
+    n = n - (n % x);
+    return float(n);
+} 
 
 void main() 
 {
     vec4 position = vec4(0.0, 0.0, 0.0, 1.0);
-    vec2 offset = offsets.offset[gl_InstanceIndex];
+    vec4 offset = offsets.offset[gl_InstanceIndex];
 
     position.x = floor(gl_VertexIndex / (GRID_SIZE + 1));
     position.z = gl_VertexIndex % (GRID_SIZE + 1);
     
     texCoord = vec2(position.x / 128.0, position.z / 128.0);
+
+    if (position.x == 128 || position.x == 0)
+        position.z = getEdge(int(position.z), 32);
+        
+    if (position.z == 128 || position.z == 0)
+        position.x = getEdge(int(position.x), 32);
 
     position.x += offset.x;
     position.z += offset.y;

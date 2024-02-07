@@ -61,6 +61,7 @@ void VulkanApp::onCreate()
 	{
 		// need to store chunks offsets
 		m_OffsetBuffer = std::make_shared<VulkanUniformBufferSet>(256 * sizeof(glm::vec4), MAX_FRAMES_IN_FLIGHT);
+		m_lodMapBufferSet = std::make_shared<VulkanUniformBufferSet>(128 * 128 * sizeof(uint8_t), MAX_FRAMES_IN_FLIGHT);
 		loadModel("Resources/model/viking_room/viking_room.obj");
 	}
 	{
@@ -159,15 +160,16 @@ void VulkanApp::onUpdate()
 		uint32_t lod1Count = 0;
 		uint32_t lod2Count = 0;
 		uint32_t lod3Count = 0;
-		{
 
+		{
 			for (auto& currentChunk : m_Chunks)
 			{
 				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
 				if (distance < 450.0f)
 				{
+					lodLevels[currentChunk.xOffset / CHUNK_SIZE, currentChunk.yOffset / CHUNK_SIZE] = 0;
 					lod0Count++;
-					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 0.0, 0.0f });
+					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 4.0, 0.0f });
 				}
 			}
 		}
@@ -178,38 +180,39 @@ void VulkanApp::onUpdate()
 				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
 				if (distance >= 450.0f && distance < 850.0f)
 				{
+					lodLevels[currentChunk.xOffset / CHUNK_SIZE, currentChunk.yOffset / CHUNK_SIZE] = 1;
 					lod1Count++;
-					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 0.0, 0.0f });
+					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 8.0, 0.0f });
 				}
 			}
 		}
 		{
-
 			for (auto& currentChunk : m_Chunks)
 			{
 				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
 				if (distance >= 850.0f && distance < 1250.0f)
 				{
 					lod2Count++;
-					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 0.0, 0.0f });
+					lodLevels[currentChunk.xOffset / CHUNK_SIZE, currentChunk.yOffset / CHUNK_SIZE] = 2;
+					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 16.0, 0.0f });
 				}
 			}
 		}
-
 		{
-
 			for (auto& currentChunk : m_Chunks)
 			{
 				float distance = glm::distance(cam.getPosition(), glm::vec3(currentChunk.xOffset, 0.0f, currentChunk.yOffset));
 				if (distance >= 1250.0f)
 				{
 					lod3Count++;
-					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 0.0, 0.0f });
+					lodLevels[currentChunk.xOffset / CHUNK_SIZE, currentChunk.yOffset / CHUNK_SIZE] = 3;
+					offsets.push_back({ currentChunk.xOffset, currentChunk.yOffset, 32.0, 0.0f });
 				}
 			}
 		}
 
 		m_OffsetBuffer->setData(offsets.data(), offsets.size() * sizeof(glm::vec4), VulkanRenderer::getCurrentFrame());
+		m_lodMapBufferSet->setData(offsets.data(), offsets.size() * sizeof(glm::vec4), VulkanRenderer::getCurrentFrame());
 
 		uint32_t firstInstance = 0;
 		{
@@ -325,8 +328,8 @@ void VulkanApp::createGeometryPass()
 
 	{
 		std::shared_ptr<VulkanShader>& mainShader = ShaderManager::createShader("GeometryShader");
-		mainShader->addShaderStage(ShaderStage::VERTEX, "Resources/Shaders/simple_vertex.glsl");
-		mainShader->addShaderStage(ShaderStage::FRAGMENT, "Resources/Shaders/simple_fragment.glsl");
+		mainShader->addShaderStage(ShaderStage::VERTEX, "simple_vertex.glsl");
+		mainShader->addShaderStage(ShaderStage::FRAGMENT, "simple_fragment.glsl");
 		mainShader->createDescriptorSetLayouts();
 	}
 	{
@@ -334,6 +337,7 @@ void VulkanApp::createGeometryPass()
 		DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("GeometryShader"));
 		DescriptorSet->bindInput(0, 0, m_UniformBufferSet);
 		DescriptorSet->bindInput(0, 1, m_OffsetBuffer);
+		DescriptorSet->bindInput(0, 2, m_lodMapBufferSet);
 		DescriptorSet->bindInput(1, 0, m_TextureImage);
 		DescriptorSet->bindInput(2, 0, m_TextureImage2);
 		DescriptorSet->bindInput(2, 1, m_TerrainTextureArray);
@@ -380,8 +384,8 @@ void VulkanApp::createFinalPass()
 	m_FinalPass = std::make_shared<VulkanRenderPass>();
 	{
 		std::shared_ptr<VulkanShader>& mainShader = ShaderManager::createShader("FinalShader");
-		mainShader->addShaderStage(ShaderStage::VERTEX, "Resources/Shaders/finalPass_vertex.vert");
-		mainShader->addShaderStage(ShaderStage::FRAGMENT, "Resources/Shaders/finalPass_fragment.frag");
+		mainShader->addShaderStage(ShaderStage::VERTEX, "finalPass_vertex.vert");
+		mainShader->addShaderStage(ShaderStage::FRAGMENT, "finalPass_fragment.frag");
 		mainShader->createDescriptorSetLayouts();
 	}
 	{

@@ -12,6 +12,8 @@
 
 std::unordered_map<std::string, std::shared_ptr<VulkanShader>> ShaderManager::m_Shaders;
 
+#define SOURCE_FILEPATH "Resources/Shaders/"
+
 static VkShaderStageFlagBits getStage(const ShaderStage& stage)
 {
 	switch (stage)
@@ -79,7 +81,7 @@ static std::string readFile(const std::string& filepath)
 
 VulkanShaderStage::VulkanShaderStage(ShaderStage stage, const std::string& filepath) : m_Stage(stage)
 {
-	std::vector<uint32_t> data = VulkanShaderCompiler::compileVulkanShader(stage, filepath);
+	std::vector<uint32_t> data = VulkanShaderCompiler::compileVulkanShader(stage, SOURCE_FILEPATH + filepath);
 	m_Input = VulkanShaderCompiler::Reflect(stage, data);
 
 	VkShaderModuleCreateInfo createInfo{};

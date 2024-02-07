@@ -59,6 +59,7 @@ private:
 	std::shared_ptr<VulkanRenderCommandBuffer> CommandBuffer;
 	std::shared_ptr<VulkanUniformBufferSet> m_UniformBufferSet;
 	std::shared_ptr<VulkanUniformBufferSet> m_OffsetBuffer;
+	std::shared_ptr<VulkanUniformBufferSet> m_lodMapBufferSet;
 
 	std::shared_ptr<VulkanRenderPass> m_GeometryPass;
 	std::shared_ptr<VulkanRenderPass> m_FinalPass;
@@ -67,6 +68,8 @@ private:
 	std::vector<uint32_t> indices;
 
 	std::vector<TerrainChunk> m_Chunks;
+
+	uint8_t lodLevels[128 * 128];
 
 	uint32_t index = 0;
 	std::shared_ptr<VulkanBuffer> m_IndexBuffer;
