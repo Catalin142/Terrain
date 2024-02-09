@@ -5,6 +5,11 @@
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
 
+struct CameraRenderMatrices
+{
+	glm::mat4 Projection{ 1.0f };
+	glm::mat4 View{ 1.0f };
+};
 
 class Camera
 {
@@ -16,12 +21,15 @@ public:
 
 	glm::mat4 getProjection() const;
 	glm::mat4 getView();
+	CameraRenderMatrices getRenderMatrices() const { return m_CameraRenderMatrices; }
+
+	void updateMatrices();
 
 	void setFOV(float fov);
 	void setAspectRatio(float ar);
 	void setPlanes(float nearPlane, float farPlane);
 
-	const glm::vec3& getPosition() { return m_Position; }
+	const glm::vec3& getPosition() const { return m_Position; }
 
 private:
 	glm::vec3 Right() const;
@@ -30,8 +38,7 @@ private:
 	glm::quat Orientation() const;
 
 private:
-	glm::mat4 m_Projection{ 1.0f };
-	glm::mat4 m_View{ 1.0f };
+	CameraRenderMatrices m_CameraRenderMatrices;
 
 	glm::vec3 m_Position{ 0.0f, 0.0f, 10.0f };
 

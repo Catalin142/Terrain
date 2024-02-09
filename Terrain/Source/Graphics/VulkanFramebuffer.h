@@ -29,6 +29,8 @@ struct FramebufferSpecification
 	uint32_t Samples = 1;
 
 	glm::vec4 colorClear = { 0.0f, 0.0f, 0.0f, 1.0f };
+	bool Clear = true;
+
 	float depthClear = 1.0f;
 
 	std::vector<FramebufferAttachment> Attachments;

@@ -43,7 +43,7 @@ VulkanFramebuffer::VulkanFramebuffer(const FramebufferSpecification& spec) : m_S
 	for (const FramebufferAttachment& colorAttachment : m_Specification.Attachments)
 	{
 		VkAttachmentDescription colorAttachmentInfo{};
-		colorAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		colorAttachmentInfo.loadOp = m_Specification.Clear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
 		colorAttachmentInfo.storeOp = colorAttachment.Sample ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		colorAttachmentInfo.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		colorAttachmentInfo.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;

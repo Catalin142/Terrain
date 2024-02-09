@@ -1,6 +1,7 @@
 #include "VulkanSwapchain.h"
 
 #include "VulkanDevice.h"
+#include "Core/Instrumentor.h"
 
 #include <iostream>
 #include <algorithm>
@@ -274,7 +275,7 @@ void VulkanSwapchain::beginFrame()
 	VkDevice device = VulkanDevice::getVulkanDevice();
 
 	VkResult res = vkAcquireNextImageKHR(device, m_SwapChain, UINT64_MAX, getImageAvailableSemaphore(m_currentFrameIndex), VK_NULL_HANDLE, &m_ImageIndex);
-
+	
 	if (res == VK_ERROR_OUT_OF_DATE_KHR) {
 		onResize(m_Width, m_Height);
 		return;
@@ -302,23 +303,29 @@ void VulkanSwapchain::endFrame()
 	VkSemaphore signalSemaphores[] = { getRenderFinishedSemaphore(m_currentFrameIndex) };
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores = signalSemaphores;
-	
+
 	vkResetFences(device, 1, &m_inFlightFences[m_currentFrameIndex]);
 	if (vkQueueSubmit(VulkanDevice::getVulkanContext()->getGraphicsQueue(), 1, &submitInfo, m_inFlightFences[m_currentFrameIndex]) != VK_SUCCESS)
 		assert(false);
 
+}
+
+void VulkanSwapchain::presentFrame()
+{
+	VkDevice device = VulkanDevice::getVulkanDevice();
+
 	VkPresentInfoKHR presentInfo{};
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 	presentInfo.waitSemaphoreCount = 1;
+	VkSemaphore signalSemaphores[] = { getRenderFinishedSemaphore(m_currentFrameIndex) };
 	presentInfo.pWaitSemaphores = signalSemaphores;
 	VkSwapchainKHR swapChains[] = { m_SwapChain };
 	presentInfo.swapchainCount = 1;
 	presentInfo.pSwapchains = swapChains;
 	presentInfo.pImageIndices = &m_ImageIndex;
-	presentInfo.pResults = nullptr; // Optional
-	
+
 	VkResult res = vkQueuePresentKHR(VulkanDevice::getVulkanContext()->getPresentQueue(), &presentInfo);
-	
+
 	if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR) {
 		onResize(m_Width, m_Height);
 	}

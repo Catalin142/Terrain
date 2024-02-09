@@ -4,7 +4,7 @@
 Camera::Camera(float fov, float aspectRatio, float nearPlane, float farPlane) : 
 	m_FieldOfView(fov), m_AspectRatio(aspectRatio), m_Near(nearPlane), m_Far(farPlane)
 {
-	m_Projection = glm::perspective(glm::radians(m_FieldOfView), m_AspectRatio, m_Near, m_Far);
+	m_CameraRenderMatrices.Projection = glm::perspective(glm::radians(m_FieldOfView), m_AspectRatio, m_Near, m_Far);
 }
 
 void Camera::Move(const glm::vec3& direction)
@@ -25,35 +25,40 @@ void Camera::Rotate(const glm::vec2& axis)
 
 glm::mat4 Camera::getProjection() const
 {
-	return m_Projection;
+	return m_CameraRenderMatrices.Projection;
 }
 
 glm::mat4 Camera::getView()
 {
 	const float yawSign = Up().y < 0 ? -1.0f : 1.0f;
 	const glm::vec3 lookAt = m_Position + Forward();
-	m_View = glm::lookAt(m_Position, lookAt, glm::vec3{ 0.f, yawSign, 0.f });
+	m_CameraRenderMatrices.View = glm::lookAt(m_Position, lookAt, glm::vec3{ 0.f, yawSign, 0.f });
 
-	return m_View;
+	return m_CameraRenderMatrices.View;
+}
+
+void Camera::updateMatrices()
+{
+	getView();
 }
 
 void Camera::setFOV(float fov)
 {
 	m_FieldOfView = fov;
-	m_Projection = glm::perspective(glm::radians(m_FieldOfView), m_AspectRatio, m_Near, m_Far);
+	m_CameraRenderMatrices.Projection = glm::perspective(glm::radians(m_FieldOfView), m_AspectRatio, m_Near, m_Far);
 }
 
 void Camera::setAspectRatio(float ar)
 {
 	m_AspectRatio = ar;
-	m_Projection = glm::perspective(glm::radians(m_FieldOfView), m_AspectRatio, m_Near, m_Far);
+	m_CameraRenderMatrices.Projection = glm::perspective(glm::radians(m_FieldOfView), m_AspectRatio, m_Near, m_Far);
 }
 
 void Camera::setPlanes(float nearPlane, float farPlane)
 {
 	m_Near = nearPlane;
 	m_Far = farPlane;
-	m_Projection = glm::perspective(glm::radians(m_FieldOfView), m_AspectRatio, m_Near, m_Far);
+	m_CameraRenderMatrices.Projection = glm::perspective(glm::radians(m_FieldOfView), m_AspectRatio, m_Near, m_Far);
 }
 
 glm::vec3 Camera::Right() const

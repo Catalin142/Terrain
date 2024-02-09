@@ -16,6 +16,7 @@ public:
 
 	void beginFrame();
 	void endFrame();
+	void presentFrame();
 
 	VkSwapchainKHR getVkHandle() const { return m_SwapChain; }
 	VkRenderPass getRenderPass() const { return m_RenderPass; }

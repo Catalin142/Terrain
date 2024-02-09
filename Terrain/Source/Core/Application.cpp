@@ -2,7 +2,7 @@
 
 #include "Graphics/VulkanRenderer.h"
 
-#include "Benchmark.h"
+#include "Instrumentor.h"
 
 float Time::deltaTime = 0;
 Application* Application::m_Instance;
@@ -40,7 +40,8 @@ void Application::Run()
 
 	while (m_Window->isOpened())
 	{
-		START_SCOPE_PROFILE("mainLoop");
+		Instrumentor::Get().beginTimer("_TotalTime");
+
 		if (m_Window->Resized)
 		{
 			int width = 0, height = 0;
@@ -65,12 +66,15 @@ void Application::Run()
 		preFrame();
 		m_Swapchain->beginFrame();
 
+		Instrumentor::Get().beginTimer("_Update");
 		onUpdate();
-		{
-			START_SCOPE_PROFILE("endFrame");
-			m_Swapchain->endFrame();
-			postFrame();
-		}
+		Instrumentor::Get().endTimer("_Update");
+
+		m_Swapchain->endFrame();
+		postFrame();
+		m_Swapchain->presentFrame();
+
+		Instrumentor::Get().endTimer("_TotalTime");
 	}
 
 	onDestroy();
