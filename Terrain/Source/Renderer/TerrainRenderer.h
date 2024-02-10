@@ -32,13 +32,15 @@ public:
 private:
 	void initializeBuffers();
 
-	void initializeRenderPass(const std::shared_ptr<Terrain>& terrain);
+	void initializeRenderPass();
 
-	void createDistanceLODRenderPass(const std::shared_ptr<Terrain>& terrain);
+	void createDistanceLODRenderPass();
 	void createDistanceLODPipeline();
-	void renderDistanceLOD(const Camera& camera, const std::shared_ptr<Terrain>& terrain);
+	void renderDistanceLOD(const Camera& camera);
 
 private:
+	std::shared_ptr<Terrain> m_Terrain;
+
 	std::shared_ptr<VulkanRenderCommandBuffer> m_RenderCommandBuffer;
 
 	std::shared_ptr<VulkanRenderPass> m_TerrainRenderPass;
@@ -46,9 +48,9 @@ private:
 
 	std::shared_ptr<VulkanFramebuffer> m_TargetFramebuffer;
 
-	std::shared_ptr<VulkanUniformBufferSet> m_CameraBufferSet;
 	std::shared_ptr<VulkanUniformBufferSet> m_TerrainChunksSet;
 	std::shared_ptr<VulkanUniformBufferSet> m_LodMapSet;
+	std::shared_ptr<VulkanUniformBuffer> m_TerrainInfo;
 
 	LODTechnique m_LastTechniqueUsed = LODTechnique::NONE;
 	bool m_InWireframe = false;

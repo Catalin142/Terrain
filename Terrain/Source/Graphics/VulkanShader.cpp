@@ -123,6 +123,10 @@ void VulkanShader::createDescriptorSetLayouts()
 {
 	std::map<uint32_t, std::vector<VkDescriptorSetLayoutBinding>> bindings = getDescriptorSetLayoutBindings();
 
+	for (VkDescriptorSetLayout layout : m_DescriptorSetLayouts)
+		vkDestroyDescriptorSetLayout(VulkanDevice::getVulkanDevice(), layout, nullptr);
+	m_DescriptorSetLayouts.clear();
+
 	for (auto& [set, descLayoutBindings] : bindings)
 	{
 		m_DescriptorSetLayouts.emplace_back();
@@ -141,7 +145,7 @@ void VulkanShader::createDescriptorSetLayouts()
 void VulkanShader::addShaderStage(ShaderStage stage, const std::string& filepath)
 {
 	if (m_Stages.find(stage) != m_Stages.end())
-		assert(false);
+		return;
 
 	m_Stages[stage] = std::make_shared<VulkanShaderStage>(stage, filepath);
 	for (const ShaderInput& input : m_Stages[stage]->getInput())

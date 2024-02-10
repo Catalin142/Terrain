@@ -9,15 +9,14 @@ m_LODRanges(LODRanges)
 		return lhs.DistanceNear < rhs.DistanceNear;
 		});
 
-	m_LodMap.resize(16 * 16, { -1 });
 
 	Initialize();
 }
 
 void DistanceLOD::getChunksToRender(std::vector<TerrainChunk>& chunks, const glm::vec3& cameraPosition)
 {
-	uint32_t minimumChunkSize = m_TerrainSpecification.MinimumChunkSize;
-	uint32_t chunksPerRow = m_TerrainSpecification.TerrainSize.x / minimumChunkSize;
+	uint32_t minimumChunkSize = m_TerrainSpecification.Info.MinimumChunkSize;
+	uint32_t chunksPerRow = m_TerrainSpecification.Info.TerrainSize.x / minimumChunkSize;
 	uint32_t currentLOD = 0;
 
 	for (const LODRange& range : m_LODRanges)
@@ -28,8 +27,7 @@ void DistanceLOD::getChunksToRender(std::vector<TerrainChunk>& chunks, const glm
 			float distance = glm::distance(cameraPosition, glm::vec3(currentChunk.Offset.x, 0.0f, currentChunk.Offset.y));
 			if (distance >= range.DistanceNear && distance < range.DistanceFar)
 			{
-				// TODO: Get rid of hardcoded 16
-				m_LodMap[(currentChunk.Offset.y / minimumChunkSize) * 16 + (currentChunk.Offset.x / minimumChunkSize)].LOD = range.LOD;
+				m_LodMap[(currentChunk.Offset.y / minimumChunkSize) * chunksPerRow + (currentChunk.Offset.x / minimumChunkSize)].LOD = range.LOD;
 				m_LODProperties[currentLOD].CurrentCount++;
 				chunks.push_back({ currentChunk.Offset, minimumChunkSize, 0 });
 			}
@@ -42,10 +40,14 @@ void DistanceLOD::Initialize()
 {
 	loadTextures();
 
-	uint32_t chunkSize = m_TerrainSpecification.MinimumChunkSize;
+	uint32_t chunkSize = m_TerrainSpecification.Info.MinimumChunkSize;
 
-	uint32_t gridSizeX = (uint32_t)m_TerrainSpecification.TerrainSize.x;
-	uint32_t gridSizeY = (uint32_t)m_TerrainSpecification.TerrainSize.y;
+	m_LodMap.resize(m_TerrainSpecification.Info.TerrainSize.x / chunkSize *
+		m_TerrainSpecification.Info.TerrainSize.y / chunkSize, { -1 });
+
+
+	uint32_t gridSizeX = (uint32_t)m_TerrainSpecification.Info.TerrainSize.x;
+	uint32_t gridSizeY = (uint32_t)m_TerrainSpecification.Info.TerrainSize.y;
 
 	for (uint32_t xOffset = 0; xOffset < gridSizeX / chunkSize; xOffset++)
 		for (uint32_t yOffset = 0; yOffset < gridSizeY / chunkSize; yOffset++)
@@ -76,7 +78,7 @@ void DistanceLOD::loadTextures()
 		heightMapSpec.Filepath.push_back(m_TerrainSpecification.HeightMap);
 		m_HeightMap = std::make_shared<VulkanTexture>(heightMapSpec);
 
-		m_TerrainSpecification.TerrainSize = { (float)m_HeightMap->getInfo().Width, (float)m_HeightMap->getInfo().Height };
+		m_TerrainSpecification.Info.TerrainSize = { (float)m_HeightMap->getInfo().Width, (float)m_HeightMap->getInfo().Height };
 	}
 	{
 		TextureSpecification compositionMapSpec{};

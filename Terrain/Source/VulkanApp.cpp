@@ -68,7 +68,7 @@ void VulkanApp::onCreate()
 	}
 	{
 		TerrainSpecification terrainSpec;
-		terrainSpec.HeightMap = "Resources/Img/heightmap2.png";
+		terrainSpec.HeightMap = "Resources/Img/world1.png";
 		terrainSpec.CompositionMap = "Resources/Img/image4.png";
 
 		terrainSpec.TerrainTextures.push_back("Resources/Img/grass.png");
@@ -76,6 +76,7 @@ void VulkanApp::onCreate()
 		terrainSpec.TerrainTextures.push_back("Resources/Img/rock.png");
 
 		m_Terrain = std::make_shared<Terrain>(terrainSpec);
+		m_Terrain->setHeightMultiplier(250.0f);
 
 		m_TerrainRenderer = std::make_shared<TerrainRenderer>(m_Output);
 	}
@@ -126,6 +127,33 @@ void VulkanApp::onUpdate()
 
 	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_2))
 		m_TerrainRenderer->setWireframe(false);
+
+	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_3))
+	{
+		TerrainSpecification terrainSpec;
+		terrainSpec.HeightMap = "Resources/Img/world1.png";
+		terrainSpec.CompositionMap = "Resources/Img/image4.png";
+
+		terrainSpec.TerrainTextures.push_back("Resources/Img/grass.png");
+		terrainSpec.TerrainTextures.push_back("Resources/Img/slope.png");
+		terrainSpec.TerrainTextures.push_back("Resources/Img/rock.png");
+
+		m_Terrain = std::make_shared<Terrain>(terrainSpec);
+		m_Terrain->setHeightMultiplier(250.0f);
+	}
+	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_4))
+	{
+		TerrainSpecification terrainSpec;
+		terrainSpec.HeightMap = "Resources/Img/heightmap2.png";
+		terrainSpec.CompositionMap = "Resources/Img/image4.png";
+
+		terrainSpec.TerrainTextures.push_back("Resources/Img/grass.png");
+		terrainSpec.TerrainTextures.push_back("Resources/Img/slope.png");
+		terrainSpec.TerrainTextures.push_back("Resources/Img/rock.png");
+
+		m_Terrain = std::make_shared<Terrain>(terrainSpec);
+		m_Terrain->setHeightMultiplier(250.0f);
+	}
 
 	CommandBuffer->Begin();
 	VkCommandBuffer commandBuffer = CommandBuffer->getCurrentCommandBuffer();

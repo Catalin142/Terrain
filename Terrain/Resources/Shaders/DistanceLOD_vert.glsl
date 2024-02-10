@@ -1,12 +1,9 @@
 #version 460 core
 
-#define TERRIN_SIZE 1024
-#define HEIGHT_MULTIPLER 250
-
 layout(location = 0) out vec2 fragTexCoord;
 layout(location = 1) out vec2 texCoord;
 
-layout(set = 0, binding = 0) uniform CameraUniformBufferSet
+layout(push_constant) uniform CameraPushConstant
 {
     mat4 Projection;
     mat4 View;
@@ -18,15 +15,22 @@ struct TerrainChunk
     int Size;
 };
 
-layout(set = 0, binding = 1) uniform ChunksUniformBufferSet
+layout(set = 0, binding = 0) uniform ChunksUniformBufferSet
 {
     TerrainChunk chunk[256];
 } Chunks;
 
-layout(set = 0, binding = 2) uniform LodMapUniformBufferSet
+layout(set = 0, binding = 1) uniform LodMapUniformBufferSet
 {
-    int lod[16 * 16];
+    int lod[128 * 128];
 } lodMap;
+
+layout(set = 0, binding = 2) uniform TerrainInfoUniformBuffer
+{
+    vec2 Size;
+    float heightMultiplier;
+    int minimumChunkSize;
+} terrainInfo;
 
 layout (set = 1, binding = 0) uniform sampler2D heightMap;
 
@@ -42,9 +46,9 @@ float getClosestPosition(int position, int target, int chunkSize)
 
 int getLod(int posX, int posY)
 {
-    posX = clamp(posX, 0, 16);
-    posY = clamp(posY, 0, 16);
-    return lodMap.lod[posY * 16 + posX];
+    posX = clamp(posX, 0, (int(terrainInfo.Size.x) / terrainInfo.minimumChunkSize));
+    posY = clamp(posY, 0, (int(terrainInfo.Size.y) / terrainInfo.minimumChunkSize));
+    return lodMap.lod[posY * (int(terrainInfo.Size.x) / terrainInfo.minimumChunkSize) + posX];
 }
 
 void main() 
@@ -81,9 +85,9 @@ void main()
     position.x += offset.x;
     position.z += offset.y;
     
-    vec2 dynamicTexCoord = vec2(position.x / TERRIN_SIZE, position.z / TERRIN_SIZE);
+    vec2 dynamicTexCoord = vec2(position.x / terrainInfo.Size.x, position.z / terrainInfo.Size.y);
 
-    position.y = (1.0 - texture(heightMap, dynamicTexCoord).r) * HEIGHT_MULTIPLER;
+    position.y = (1.0 - texture(heightMap, dynamicTexCoord).r) * terrainInfo.heightMultiplier;
 
     gl_Position = Camera.Projection * Camera.View * position;
 

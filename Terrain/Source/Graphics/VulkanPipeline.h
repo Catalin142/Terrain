@@ -27,6 +27,12 @@ enum class DepthCompare
 
 static VkCompareOp getVulkanDepthCompareOperation(DepthCompare comp);
 
+struct PushConstant
+{
+	uint32_t Size;
+	VkShaderStageFlagBits Stage;
+};
+
 struct PipelineSpecification
 {
 	std::shared_ptr<VulkanShader> Shader;
@@ -34,6 +40,8 @@ struct PipelineSpecification
 	VulkanVertexBufferLayout vertexBufferLayout;
 	PrimitiveTopology Topology = PrimitiveTopology::TRIANGLES;
 	DepthCompare depthCompareFunction = DepthCompare::NEVER;
+
+	std::vector<PushConstant> pushConstants;
 
 	bool depthTest = true;
 	bool depthWrite = true;

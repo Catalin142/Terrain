@@ -172,6 +172,18 @@ VulkanPipeline::VulkanPipeline(const PipelineSpecification& spec) : m_Specificat
 	pipelineLayoutInfo.setLayoutCount = (uint32_t)descSetLayout.size();
 	pipelineLayoutInfo.pSetLayouts = descSetLayout.data();
 
+	std::vector<VkPushConstantRange> pushConstantRanges;
+	for (const PushConstant& pc : m_Specification.pushConstants)
+	{
+		VkPushConstantRange& currentRange = pushConstantRanges.emplace_back();
+		currentRange.offset = 0;
+		currentRange.size = pc.Size;
+		currentRange.stageFlags = pc.Stage;
+	}
+
+	pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges.data();
+	pipelineLayoutInfo.pushConstantRangeCount = (uint32_t)pushConstantRanges.size();
+
 	if (vkCreatePipelineLayout(VulkanDevice::getVulkanDevice(), &pipelineLayoutInfo, nullptr, &m_PipelineLayout) != VK_SUCCESS)
 		assert(false);
 

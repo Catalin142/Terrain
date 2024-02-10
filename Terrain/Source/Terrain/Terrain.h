@@ -22,15 +22,20 @@ struct LODLevel
 	alignas(16) int32_t LOD;
 };
 
+struct TerrainInfo
+{
+	glm::vec2 TerrainSize{ 0.0 };
+	float HeightMultiplier = 0.0f;
+	uint32_t MinimumChunkSize = 128;
+};
+
 struct TerrainSpecification
 {
 	std::string HeightMap;
 	std::string CompositionMap;
 	std::vector<std::string> TerrainTextures;
 
-	uint32_t MinimumChunkSize = 128;
-
-	glm::vec2 TerrainSize{ 0 };
+	TerrainInfo Info;
 };
 
 class Terrain
@@ -43,6 +48,9 @@ public:
 
 	LODTechnique getCurrentTechnique() { return m_CurrentLODTechnique; }
 	const std::shared_ptr<DistanceLOD>& getDistanceLODTechnique() { return m_DistanceLOD; }
+
+	TerrainInfo getInfo() { return m_Specification.Info; }
+	void setHeightMultiplier(float mul) { m_Specification.Info.HeightMultiplier = mul; }
 
 private:
 	TerrainSpecification m_Specification;
