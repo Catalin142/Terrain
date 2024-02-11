@@ -29,4 +29,12 @@
 
 		   - TODO:
 				- Fix terrain cracks
+
+11.02.2024 - Finally fixed terrain cracks
+		   - Added compute shader support (needs refactorization for better API)
+		   - Added FBM noise for terrain in compute shader
+		   
+		   - TODO:
+				- Get rid of detail map, use textures based on height
+
 			

@@ -17,7 +17,7 @@ struct TerrainChunk
 
 layout(set = 0, binding = 0) uniform ChunksUniformBufferSet
 {
-    TerrainChunk chunk[256];
+    TerrainChunk chunk[4096];
 } Chunks;
 
 layout(set = 0, binding = 1) uniform LodMapUniformBufferSet

@@ -10,6 +10,7 @@
 #include "Graphics/VulkanBuffer.h"
 #include "Graphics/VulkanVertexBufferLayout.h"
 #include "Graphics/VulkanRenderCommandBuffer.h"
+#include "Graphics/VulkanComputePipeline.h"
 #include "Graphics/VulkanRenderer.h"
 #include "Graphics/VulkanImgui.h"
 
@@ -20,6 +21,16 @@
 #include "Scene/Camera.h"
 
 #define MAX_FRAMES_IN_FLIGHT 2
+
+struct noiseParams
+{
+	int32_t octaves = 1;
+	float amplitude = 0.5f;
+	float frequency = 0.0f;
+	float gain = 0.5f;
+	float lacunarity = 2.0f;
+	float padding[2];
+};
 
 class VulkanApp : public Application
 {
@@ -41,14 +52,21 @@ private:
 	std::shared_ptr<VulkanRenderPass> m_FinalPass;
 
 	std::shared_ptr<VulkanFramebuffer> m_Output;
+	std::shared_ptr<VulkanImage> m_Noise;
 
 	std::shared_ptr<VulkanBuffer> m_FullscreenVertexBuffer;
 	std::shared_ptr<VulkanBuffer> m_FullscreenIndexBuffer;
+
+	std::shared_ptr<VulkanComputePipeline> m_ComputePipeline;
+	std::shared_ptr<VulkanDescriptorSet> m_ComputeDescriptorSet;
 
 	std::shared_ptr<Terrain> m_Terrain;
 	std::shared_ptr<TerrainRenderer> m_TerrainRenderer;
 	
 	Camera cam{45.0f, 1600.0f / 900.0f, 0.1f, 10000.0f};
+
+	noiseParams m_NoiseParams;
+	float heightMult = 1.0f;
 
 	bool Wireframe = false;
 };

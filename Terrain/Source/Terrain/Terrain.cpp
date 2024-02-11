@@ -5,10 +5,10 @@
 Terrain::Terrain(const TerrainSpecification& spec) : m_Specification(spec)
 {
 	std::vector<LODRange> ranges{
-		{ 0.0f, 450.0f, 4},
-		{ 450.0f, 800.0f, 8},
-		{ 800.0f, 1200.0f, 16},
-		{ 1200.0f, FLT_MAX, 32},
+		{ 0.0f, 1050.0f, 4},
+		{ 1050.0f, 2800.0f, 8},
+		{ 2800.0f, 4200.0f, 16},
+		{ 4200.0f, FLT_MAX, 32},
 	};
 
 	m_DistanceLOD = std::make_shared<DistanceLOD>(m_Specification, ranges);

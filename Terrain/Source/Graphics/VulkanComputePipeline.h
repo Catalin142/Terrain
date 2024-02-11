@@ -17,7 +17,7 @@ public:
 	void bufferMemoryBarrier(const std::shared_ptr<VulkanRenderCommandBuffer>& cmdBuffer, const std::shared_ptr<VulkanBaseBuffer>& buffer, 
 		VkAccessFlagBits from, VkAccessFlagBits to);
 	void imageMemoryBarrier(const std::shared_ptr<VulkanRenderCommandBuffer>& cmdBuffer, const std::shared_ptr<VulkanImage>& image,
-		VkAccessFlagBits from, VkAccessFlagBits to);
+		VkAccessFlagBits from, VkPipelineStageFlags fromStage, VkAccessFlagBits to, VkPipelineStageFlags toStage);
 
 	VkPipeline getVkPipeline() { return m_Pipeline; }
 	VkPipelineLayout getVkPipelineLayout() { return m_PipelineLayout; }

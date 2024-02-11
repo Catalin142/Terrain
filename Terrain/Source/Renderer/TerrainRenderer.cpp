@@ -59,8 +59,8 @@ void TerrainRenderer::initializeBuffers()
 	uint32_t framesInFlight = VulkanRenderer::getFramesInFlight();
 
 	// TODO: Get rid of hard coded values
-	m_TerrainChunksSet = std::make_shared<VulkanUniformBufferSet>(256 * sizeof(TerrainChunk), framesInFlight);
-	m_LodMapSet = std::make_shared<VulkanUniformBufferSet>(16 * 16 * sizeof(LODLevel), framesInFlight);
+	m_TerrainChunksSet = std::make_shared<VulkanUniformBufferSet>(4096 * sizeof(TerrainChunk), framesInFlight);
+	m_LodMapSet = std::make_shared<VulkanUniformBufferSet>(128 * 128 * sizeof(LODLevel), framesInFlight);
 	m_TerrainInfo = std::make_shared<VulkanUniformBuffer>(4 * sizeof(float));
 }
 

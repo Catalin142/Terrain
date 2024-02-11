@@ -1,5 +1,7 @@
 #include "VulkanRenderer.h"
 
+#include "VulkanDevice.h"
+
 std::shared_ptr<VulkanSwapchain> VulkanRenderer::m_Swapchain = nullptr;
 
 void VulkanRenderer::Initialize(const std::shared_ptr<VulkanSwapchain> swapchain)
@@ -145,5 +147,17 @@ void VulkanRenderer::beginSwapchainRenderPass(const std::shared_ptr<VulkanRender
 		vkCmdBindDescriptorSets(VulkanCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderPass->getVulkanPipelineLayout(),
 			0, renderPass->getDescriptorSet()->getNumberOfSets(),
 			renderPass->getDescriptorSet()->getDescriptorSet(m_Swapchain->getCurrentFrame()).data(), 0, nullptr);
+}
+
+void VulkanRenderer::dispatchCompute(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer,
+	const std::shared_ptr<VulkanComputePipeline>& computePipeline, glm::ivec3 workgroups)
+{
+	vkCmdDispatch(commandBuffer->getCurrentCommandBuffer(), workgroups.x, workgroups.y, workgroups.z);
+
+	VkSubmitInfo submitInfo{};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+	if (vkQueueSubmit(VulkanDevice::getVulkanContext()->getComputeQueue(), 1, &submitInfo, nullptr) != VK_SUCCESS)
+		assert(false);
 }
 

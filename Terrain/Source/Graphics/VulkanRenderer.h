@@ -3,6 +3,7 @@
 
 #include "VulkanSwapchain.h"
 #include "VulkanRenderCommandBuffer.h"
+#include "VulkanComputePipeline.h"
 #include "VulkanRenderPass.h"
 
 class VulkanRenderer
@@ -26,6 +27,9 @@ public:
 	static void endRenderPass(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer);
 
 	static void beginSwapchainRenderPass(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer, const std::shared_ptr<VulkanRenderPass>& renderpass);
+
+	static void dispatchCompute(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer, 
+		const std::shared_ptr<VulkanComputePipeline>& computePipeline, glm::ivec3 workgroups);
 
 private:
 	VulkanRenderer() = default;

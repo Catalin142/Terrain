@@ -14,7 +14,6 @@ Window::Window(const std::string& name, uint32_t width, uint32_t height) : m_Wid
 		std::cerr << "Eraore glfw\n";
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API); 
-	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE); 
 
 	m_Handle = glfwCreateWindow(width, height, name.c_str(), nullptr, nullptr);
 	glfwSetWindowUserPointer(m_Handle, this);

@@ -34,10 +34,38 @@ void VulkanImage::Create()
 	assert(m_Image == nullptr);
 
 	createImage();
+
+	if (m_Specification.UsageFlags & VK_IMAGE_USAGE_STORAGE_BIT)
+	{
+		VkUtils::transitionImageLayout(m_Image, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }, VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_GENERAL);
+
+		VkCommandBuffer commandBuffer = VkUtils::beginSingleTimeCommand();
+		VkImageMemoryBarrier imageMemoryBarrier = {};
+		imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+		imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+		imageMemoryBarrier.image = m_Image;
+		imageMemoryBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+		imageMemoryBarrier.srcAccessMask = 0;
+		imageMemoryBarrier.dstAccessMask = 0;
+		imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		vkCmdPipelineBarrier(
+			commandBuffer,
+			VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+			VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+			0,
+			0, nullptr,
+			0, nullptr,
+			1, &imageMemoryBarrier);
+		VkUtils::flushCommandBuffer(commandBuffer);
+	}
+
 	createView();
 
 	if (m_Specification.CreateSampler)
-		CreateSampler();
+		createSampler();
 }
 
 void VulkanImage::Release()
@@ -129,12 +157,10 @@ void VulkanImage::createImage()
 	}
 
 	if (vkBindImageMemory(device, m_Image, m_DeviceMemory, 0) != VK_SUCCESS)
-	{
 		assert(false);
-	}
 }
 
-void VulkanImage::CreateSampler()
+void VulkanImage::createSampler()
 {
 	VkSamplerCreateInfo samplerInfo{};
 	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;

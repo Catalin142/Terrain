@@ -43,7 +43,7 @@ public:
 
 private:
 	void createImage();
-	void CreateSampler();
+	void createSampler();
 	void createView();
 
 private:

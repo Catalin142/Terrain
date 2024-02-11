@@ -24,7 +24,8 @@ void DistanceLOD::getChunksToRender(std::vector<TerrainChunk>& chunks, const glm
 		m_LODProperties[currentLOD].CurrentCount = 0;
 		for (auto& currentChunk : m_Chunks)
 		{
-			float distance = glm::distance(cameraPosition, glm::vec3(currentChunk.Offset.x, 0.0f, currentChunk.Offset.y));
+			float distance = glm::distance(glm::vec3(cameraPosition.x, glm::min(0.0f, cameraPosition.y), cameraPosition.z),
+				glm::vec3(currentChunk.Offset.x, 0.0f, currentChunk.Offset.y));
 			if (distance >= range.DistanceNear && distance < range.DistanceFar)
 			{
 				m_LodMap[(currentChunk.Offset.y / minimumChunkSize) * chunksPerRow + (currentChunk.Offset.x / minimumChunkSize)].LOD = range.LOD;

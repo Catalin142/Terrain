@@ -12,6 +12,13 @@ VulkanComputePipeline::VulkanComputePipeline(const std::shared_ptr<VulkanShader>
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutInfo.setLayoutCount = shader->getDescriptorSetLayouts().size();
 	pipelineLayoutInfo.pSetLayouts = shader->getDescriptorSetLayouts().data();
+	pipelineLayoutInfo.pushConstantRangeCount = 1;
+
+	VkPushConstantRange range{};
+	range.offset = 0;
+	range.size = 8 * sizeof(float);
+	range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	pipelineLayoutInfo.pPushConstantRanges = &range;
 
 	if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &m_PipelineLayout) != VK_SUCCESS)
 		assert(false);
@@ -46,16 +53,19 @@ void VulkanComputePipeline::bufferMemoryBarrier(const std::shared_ptr<VulkanRend
 }
 
 void VulkanComputePipeline::imageMemoryBarrier(const std::shared_ptr<VulkanRenderCommandBuffer>& cmdBuffer, const std::shared_ptr<VulkanImage>& image, 
-	VkAccessFlagBits from, VkAccessFlagBits to)
+	VkAccessFlagBits from, VkPipelineStageFlags fromStage, VkAccessFlagBits to, VkPipelineStageFlags toStage)
 {
 	VkImageMemoryBarrier imageMemoryBarrier = {};
 	imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+	imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
 	imageMemoryBarrier.image = image->getVkImage();
 	imageMemoryBarrier.subresourceRange.aspectMask = image->getSpecification().Aspect;
 	imageMemoryBarrier.subresourceRange.baseArrayLayer = 0;
 	imageMemoryBarrier.subresourceRange.layerCount = 1;
 	imageMemoryBarrier.subresourceRange.levelCount = 1;
+	imageMemoryBarrier.subresourceRange.baseMipLevel = 0;
 	imageMemoryBarrier.srcAccessMask = from;
 	imageMemoryBarrier.dstAccessMask = to;
-	vkCmdPipelineBarrier(cmdBuffer->getCurrentCommandBuffer(), from, to, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
+	vkCmdPipelineBarrier(cmdBuffer->getCurrentCommandBuffer(), fromStage, toStage, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
 }

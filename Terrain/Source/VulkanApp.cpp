@@ -23,6 +23,7 @@
 
 #include "stb_image/std_image.h"
 #include "Graphics/VulkanShader.h"
+#include "Terrain/Techniques/DistanceLOD.h"
 
 VulkanApp::VulkanApp(const std::string& title, uint32_t width, uint32_t height) : Application(title, width, height)
 { }
@@ -50,7 +51,6 @@ void VulkanApp::onCreate()
 		m_FullscreenIndexBuffer = std::make_shared<VulkanBuffer>(FullscreenIndices, (uint32_t)(sizeof(uint32_t) * 6),
 			BufferType::INDEX, BufferUsage::STATIC);
 	}
-
 	{
 		FramebufferSpecification fbSpec;
 		fbSpec.Width = 1600;
@@ -67,8 +67,29 @@ void VulkanApp::onCreate()
 		m_Output = std::make_shared<VulkanFramebuffer>(fbSpec);
 	}
 	{
+		std::shared_ptr<VulkanShader>& shader = ShaderManager::createShader("TestCompute");
+		shader->addShaderStage(ShaderStage::COMPUTE, "Test_comp.glsl");
+		shader->createDescriptorSetLayouts();
+
+		ImageSpecification spec;
+		spec.Width = 1024;
+		spec.Height = 1024;
+		spec.Format = VK_FORMAT_R32G32B32A32_SFLOAT;
+		spec.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+		spec.UsageFlags = VK_IMAGE_USAGE_STORAGE_BIT;
+		spec.CreateSampler = true;
+		m_Noise = std::make_shared<VulkanImage>(spec);
+		m_Noise->Create();
+
+		m_ComputeDescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("TestCompute"));
+		m_ComputeDescriptorSet->bindInput(0, 0, m_Noise);
+		m_ComputeDescriptorSet->Create();
+
+		m_ComputePipeline = std::make_shared<VulkanComputePipeline>(shader);
+	}
+	{
 		TerrainSpecification terrainSpec;
-		terrainSpec.HeightMap = "Resources/Img/world1.png";
+		terrainSpec.HeightMap = "Resources/Img/heightmap2.png";
 		terrainSpec.CompositionMap = "Resources/Img/image4.png";
 
 		terrainSpec.TerrainTextures.push_back("Resources/Img/grass.png");
@@ -76,7 +97,8 @@ void VulkanApp::onCreate()
 		terrainSpec.TerrainTextures.push_back("Resources/Img/rock.png");
 
 		m_Terrain = std::make_shared<Terrain>(terrainSpec);
-		m_Terrain->setHeightMultiplier(250.0f);
+		m_Terrain->setHeightMultiplier(3300.0f);
+		m_Terrain->m_DistanceLOD->image = m_Noise;
 
 		m_TerrainRenderer = std::make_shared<TerrainRenderer>(m_Output);
 	}
@@ -113,9 +135,9 @@ void VulkanApp::onUpdate()
 	if (camVelocity != glm::vec3(0.0f, 0.0f, 0.0f))
 	{
 		if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_SPACE))
-			cam.Move(glm::normalize(camVelocity) * 5.75f);
+			cam.Move(glm::normalize(camVelocity) * 15.75f);
 		else
-			cam.Move(glm::normalize(camVelocity) * 0.75f);
+			cam.Move(glm::normalize(camVelocity) * 4.75f);
 	}
 
 	if (rotation != glm::vec2(0.0f, 0.0f))
@@ -156,8 +178,21 @@ void VulkanApp::onUpdate()
 	}
 
 	CommandBuffer->Begin();
-	VkCommandBuffer commandBuffer = CommandBuffer->getCurrentCommandBuffer();
 
+	VkCommandBuffer commandBuffer = CommandBuffer->getCurrentCommandBuffer();
+	{
+		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_ComputePipeline->getVkPipeline());
+		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_ComputePipeline->getVkPipelineLayout(),
+			0, m_ComputeDescriptorSet->getNumberOfSets(),
+			m_ComputeDescriptorSet->getDescriptorSet(VulkanRenderer::getCurrentFrame()).data(), 0, nullptr);
+
+		vkCmdPushConstants(commandBuffer, m_ComputePipeline->getVkPipelineLayout(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
+			sizeof(noiseParams), &m_NoiseParams);
+
+		VulkanRenderer::dispatchCompute(CommandBuffer, m_ComputePipeline, { 128, 128, 1 });
+		m_ComputePipeline->imageMemoryBarrier(CommandBuffer, m_Noise, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_COLOR_ATTACHMENT_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+	}
 	// Geometry pass
 	{
 		CommandBuffer->beginQuery("GeometryPass");
@@ -192,6 +227,17 @@ void VulkanApp::onUpdate()
 		ImGui::Text("Update = %f ms", Instrumentor::Get().getTime("_Update"));
 		ImGui::Text("Total Time = %f ms", Instrumentor::Get().getTime("_TotalTime"));
 		ImGui::End();
+
+		ImGui::Begin("Controls");
+		ImGui::DragInt("octavs", &m_NoiseParams.octaves);
+		ImGui::DragFloat("amplitude", &m_NoiseParams.amplitude, 0.01f);
+		ImGui::DragFloat("freq", &m_NoiseParams.frequency, 0.01f);
+		ImGui::DragFloat("gain", &m_NoiseParams.gain, 0.01f);
+		ImGui::DragFloat("lac", &m_NoiseParams.lacunarity, 0.01f);
+		ImGui::DragFloat("height", &heightMult, 1.0f);
+		ImGui::End();
+
+		m_Terrain->setHeightMultiplier(heightMult);
 
 		endImGuiFrame();
 		CommandBuffer->endQuery("Imgui");

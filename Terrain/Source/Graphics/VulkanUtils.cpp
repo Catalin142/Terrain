@@ -42,7 +42,35 @@ void VkUtils::endSingleTimeCommand(VkCommandBuffer buffer)
 	vkFreeCommandBuffers(deviceContext->getLogicalDevice(), VulkanDevice::getGraphicsCommandPool(), 1, &buffer);
 }
 
-void VkUtils::transitionImageLayout(VkImage image, VkImageSubresourceRange subresourceRange, VkImageLayout oldLayout, VkImageLayout newLayout)
+void VkUtils::flushCommandBuffer(VkCommandBuffer commandBuffer)
+{
+	if (commandBuffer == VK_NULL_HANDLE)
+		return;
+
+	vkEndCommandBuffer(commandBuffer);
+
+	VkSubmitInfo submitInfo{};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &commandBuffer;
+
+	VkFenceCreateInfo fenceInfo{};
+	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceInfo.flags = 0; 
+
+	VkFence fence;
+	if (vkCreateFence(VulkanDevice::getVulkanDevice(), &fenceInfo, nullptr, &fence))
+		assert(false);
+
+	vkQueueSubmit(VulkanDevice::getVulkanContext()->getGraphicsQueue(), 1, &submitInfo, fence);
+
+	vkWaitForFences(VulkanDevice::getVulkanDevice(), 1, &fence, VK_TRUE, 100000000000);
+	vkDestroyFence(VulkanDevice::getVulkanDevice(), fence, nullptr);
+	vkFreeCommandBuffers(VulkanDevice::getVulkanDevice(), VulkanDevice::getVulkanContext()->getGraphicsCommandPool(), 1, &commandBuffer);
+}
+
+void VkUtils::transitionImageLayout(VkImage image, VkImageSubresourceRange subresourceRange, VkImageLayout oldLayout, VkImageLayout newLayout,
+	VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask)
 {
 	VkCommandBuffer commandBuffer = beginSingleTimeCommand();
 
@@ -90,7 +118,7 @@ void VkUtils::transitionImageLayout(VkImage image, VkImageSubresourceRange subre
 	default:
 		break;
 	}
-	
+
 	switch (newLayout)
 	{
 	case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
@@ -111,9 +139,7 @@ void VkUtils::transitionImageLayout(VkImage image, VkImageSubresourceRange subre
 
 	case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
 		if (barrier.srcAccessMask == 0)
-		{
 			barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
-		}
 		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 		break;
 	default:
@@ -122,12 +148,12 @@ void VkUtils::transitionImageLayout(VkImage image, VkImageSubresourceRange subre
 
 	vkCmdPipelineBarrier(
 		commandBuffer,
-		sourceStage, destinationStage,
+		srcStageMask,
+		dstStageMask,
 		0,
 		0, nullptr,
 		0, nullptr,
-		1, &barrier
-	);
+		1, &barrier);
 
 	endSingleTimeCommand(commandBuffer);
 }

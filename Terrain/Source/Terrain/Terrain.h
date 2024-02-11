@@ -52,11 +52,11 @@ public:
 	TerrainInfo getInfo() { return m_Specification.Info; }
 	void setHeightMultiplier(float mul) { m_Specification.Info.HeightMultiplier = mul; }
 
+	std::shared_ptr<DistanceLOD> m_DistanceLOD;
 private:
 	TerrainSpecification m_Specification;
 
 	LODTechnique m_CurrentLODTechnique = LODTechnique::DISTANCE_BASED;
-	std::shared_ptr<DistanceLOD> m_DistanceLOD;
 
 	std::vector<TerrainChunk> m_ChunksToRender;
 	std::vector<LODLevel> m_LodLevelMap;

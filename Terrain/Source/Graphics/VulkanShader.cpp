@@ -38,6 +38,7 @@ static VkDescriptorType getInputType(const ShaderInputType& type)
 	case ShaderInputType::COMBINED_IMAGE_SAMPLER: return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	case ShaderInputType::TEXTURE: return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
 	case ShaderInputType::SAMPLER: return VK_DESCRIPTOR_TYPE_SAMPLER;
+	case ShaderInputType::STORAGE_IMAGE: return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	}
 
 	return VK_DESCRIPTOR_TYPE_MAX_ENUM;
@@ -311,6 +312,18 @@ std::vector<ShaderInput> VulkanShaderCompiler::Reflect(ShaderStage stage, const 
 		sampleImageInput.Set = compiler.get_decoration(sampler.id, spv::DecorationDescriptorSet);
 		sampleImageInput.Binding = compiler.get_decoration(sampler.id, spv::DecorationBinding);
 		sampleImageInput.Type = ShaderInputType::SAMPLER;
+
+		shaderInput.push_back(sampleImageInput);
+	}
+
+	for (const spirv_cross::Resource& sampler : resources.storage_images)
+	{
+		ShaderInput sampleImageInput;
+		sampleImageInput.Stage = stage;
+		sampleImageInput.DebugName = sampler.name;
+		sampleImageInput.Set = compiler.get_decoration(sampler.id, spv::DecorationDescriptorSet);
+		sampleImageInput.Binding = compiler.get_decoration(sampler.id, spv::DecorationBinding);
+		sampleImageInput.Type = ShaderInputType::STORAGE_IMAGE;
 
 		shaderInput.push_back(sampleImageInput);
 	}

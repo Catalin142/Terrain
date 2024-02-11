@@ -17,17 +17,18 @@ VulkanDescriptorSet::~VulkanDescriptorSet()
 void VulkanDescriptorSet::Create()
 {
 	// ================== CREATE DESCRIPTOR POOL ==================
-	VkDescriptorPoolSize poolSizes[4] = 
+	VkDescriptorPoolSize poolSizes[5] = 
 	{
 		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 100 },
 		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100 },
 		{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 100 },
 		{ VK_DESCRIPTOR_TYPE_SAMPLER, 100 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 100 },
 	};
 
 	VkDescriptorPoolCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	createInfo.poolSizeCount = 4;
+	createInfo.poolSizeCount = 5;
 	createInfo.pPoolSizes = poolSizes;
 	createInfo.maxSets = 10;
 
@@ -104,7 +105,8 @@ void VulkanDescriptorSet::bindInput(uint32_t set, uint32_t binding, const std::s
 void VulkanDescriptorSet::bindInput(uint32_t set, uint32_t binding, const std::shared_ptr<VulkanImage>& image)
 {
 	VkDescriptorImageInfo imageInfo{};
-	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	imageInfo.imageLayout = image->getSpecification().UsageFlags & VK_IMAGE_USAGE_STORAGE_BIT ? 
+		VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	imageInfo.imageView = image->getVkImageView();
 	imageInfo.sampler = image->getVkSampler();
 
@@ -159,6 +161,11 @@ VkWriteDescriptorSet VulkanDescriptorSet::getWriteDescriptorSet(const ShaderInpu
 
 	case ShaderInputType::SAMPLER:
 		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+		descriptorWrite.pImageInfo = &m_DescriptorBindings.ImageInfos[getHash(input.Set, input.Binding)];
+		break;
+
+	case ShaderInputType::STORAGE_IMAGE:
+		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 		descriptorWrite.pImageInfo = &m_DescriptorBindings.ImageInfos[getHash(input.Set, input.Binding)];
 		break;
 

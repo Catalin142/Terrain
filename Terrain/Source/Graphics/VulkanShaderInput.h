@@ -20,6 +20,7 @@ enum class ShaderInputType
 	COMBINED_IMAGE_SAMPLER,
 	SAMPLER,
 	TEXTURE,
+	STORAGE_IMAGE,
 };
 
 struct ShaderInput

@@ -33,7 +33,9 @@ public:
 	void getChunksToRender(std::vector<TerrainChunk>& chunks, const glm::vec3& cameraPosition);
 	const std::vector<LODProperties>& getLODProperties() { return m_LODProperties; }
 
-	const std::shared_ptr<VulkanTexture>& getHeightMap() { return m_HeightMap; }
+	std::shared_ptr<VulkanImage> image;
+
+	const std::shared_ptr<VulkanImage>& getHeightMap() { return image; }
 	const std::shared_ptr<VulkanTexture>& getCompositionMap() { return m_CompositionMap; }
 	const std::shared_ptr<VulkanTexture>& getTerrainTextures() { return m_TerrainTextures; }
 

@@ -15,8 +15,8 @@ void main()
 
     vec4 finalColor = vec4(0.0, 0.0, 0.0, 1.0);
     finalColor += texture(texturePack, vec3(texCoord, 0)) * composition.r;
-    finalColor += texture(texturePack, vec3(texCoord, 1)) * composition.g;
-    finalColor += texture(texturePack, vec3(texCoord, 2)) * composition.b;
+    finalColor += texture(texturePack, vec3(texCoord, 0)) * composition.g;
+    finalColor += texture(texturePack, vec3(texCoord, 0)) * composition.b;
 
     outColor = finalColor;
     outColor.a = 1.0;
