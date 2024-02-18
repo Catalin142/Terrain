@@ -7,9 +7,9 @@
 #include <unordered_map>
 #include <map>
 #include <memory>
+#include <thread>
 
 #include <vulkan/vulkan.h>
-
 
 namespace VulkanShaderCompiler
 {
@@ -23,16 +23,20 @@ public:
 	VulkanShaderStage(ShaderStage stage, const std::string& filepath);
 	~VulkanShaderStage();
 
+	void Recompile();
+
 	inline VkShaderModule getHandle() const { return m_ShaderModule; };
 	const std::vector<ShaderInput>& getInput() { return m_Input; }
 
 	VkPipelineShaderStageCreateInfo const getStageCreateInfo();
 
 private:
-	VkShaderModule m_ShaderModule;
 	ShaderStage m_Stage;
-	std::vector<ShaderInput> m_Input;
+	std::string m_Filepath;
 
+	VkShaderModule m_ShaderModule;
+	
+	std::vector<ShaderInput> m_Input;
 };
 
 class VulkanShader
@@ -45,6 +49,7 @@ public:
 
 	void addShaderStage(ShaderStage stage, const std::string& filepath);
 	std::shared_ptr<VulkanShaderStage> getShaderStage(ShaderStage stage);
+	bool hasStage(ShaderStage stage);
 
 	std::map<uint32_t, std::vector<VkDescriptorSetLayoutBinding>> getDescriptorSetLayoutBindings();
 	const std::vector<VkDescriptorSetLayout>& getDescriptorSetLayouts()

@@ -4,7 +4,7 @@
 
 #include <cassert>
 
-VulkanComputePipeline::VulkanComputePipeline(const std::shared_ptr<VulkanShader>& shader)
+VulkanComputePipeline::VulkanComputePipeline(const std::shared_ptr<VulkanShader>& shader, uint32_t pushConstantSize)
 {
 	VkDevice device = VulkanDevice::getVulkanDevice();
 
@@ -12,13 +12,17 @@ VulkanComputePipeline::VulkanComputePipeline(const std::shared_ptr<VulkanShader>
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutInfo.setLayoutCount = shader->getDescriptorSetLayouts().size();
 	pipelineLayoutInfo.pSetLayouts = shader->getDescriptorSetLayouts().data();
-	pipelineLayoutInfo.pushConstantRangeCount = 1;
 
 	VkPushConstantRange range{};
 	range.offset = 0;
-	range.size = 8 * sizeof(float);
+	range.size = pushConstantSize;
 	range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-	pipelineLayoutInfo.pPushConstantRanges = &range;
+
+	if (pushConstantSize != 0)
+	{
+		pipelineLayoutInfo.pPushConstantRanges = &range;
+		pipelineLayoutInfo.pushConstantRangeCount = 1;
+	}
 
 	if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &m_PipelineLayout) != VK_SUCCESS)
 		assert(false);

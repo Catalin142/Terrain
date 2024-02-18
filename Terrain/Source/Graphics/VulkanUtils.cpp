@@ -73,7 +73,12 @@ void VkUtils::transitionImageLayout(VkImage image, VkImageSubresourceRange subre
 	VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask)
 {
 	VkCommandBuffer commandBuffer = beginSingleTimeCommand();
+	transitionImageLayout(commandBuffer, image, subresourceRange, oldLayout, newLayout, srcStageMask, dstStageMask);
+	endSingleTimeCommand(commandBuffer);
+}
 
+void VkUtils::transitionImageLayout(VkCommandBuffer cmdBuffer, VkImage image, VkImageSubresourceRange subresourceRange, VkImageLayout oldLayout, VkImageLayout newLayout, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask)
+{
 	VkImageMemoryBarrier barrier{};
 	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 	barrier.oldLayout = oldLayout;
@@ -147,7 +152,7 @@ void VkUtils::transitionImageLayout(VkImage image, VkImageSubresourceRange subre
 	}
 
 	vkCmdPipelineBarrier(
-		commandBuffer,
+		cmdBuffer,
 		srcStageMask,
 		dstStageMask,
 		0,
@@ -155,7 +160,6 @@ void VkUtils::transitionImageLayout(VkImage image, VkImageSubresourceRange subre
 		0, nullptr,
 		1, &barrier);
 
-	endSingleTimeCommand(commandBuffer);
 }
 
 uint32_t VkUtils::calculateNumberOfMips(uint32_t width, uint32_t height)

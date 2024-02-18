@@ -39,8 +39,6 @@ void DistanceLOD::getChunksToRender(std::vector<TerrainChunk>& chunks, const glm
 
 void DistanceLOD::Initialize()
 {
-	loadTextures();
-
 	uint32_t chunkSize = m_TerrainSpecification.Info.MinimumChunkSize;
 
 	m_LodMap.resize(m_TerrainSpecification.Info.TerrainSize.x / chunkSize *
@@ -68,36 +66,6 @@ void DistanceLOD::Initialize()
 		prop.IndicesCount = indices.size();
 		prop.IndexBuffer = std::make_shared<VulkanBuffer>(indices.data(), (uint32_t)(sizeof(indices[0]) * (uint32_t)indices.size()),
 			BufferType::INDEX, BufferUsage::STATIC);
-	}
-}
-
-void DistanceLOD::loadTextures()
-{
-	{
-		TextureSpecification heightMapSpec{};
-		heightMapSpec.CreateSampler = true;
-		heightMapSpec.Filepath.push_back(m_TerrainSpecification.HeightMap);
-		m_HeightMap = std::make_shared<VulkanTexture>(heightMapSpec);
-
-		m_TerrainSpecification.Info.TerrainSize = { (float)m_HeightMap->getInfo().Width, (float)m_HeightMap->getInfo().Height };
-	}
-	{
-		TextureSpecification compositionMapSpec{};
-		compositionMapSpec.CreateSampler = true;
-		compositionMapSpec.Channles = 4;
-		compositionMapSpec.Filepath.push_back(m_TerrainSpecification.CompositionMap);
-		m_CompositionMap = std::make_shared<VulkanTexture>(compositionMapSpec);
-	}
-	{
-		{
-			TextureSpecification texSpec{};
-			texSpec.CreateSampler = true;
-			texSpec.GenerateMips = true;
-			texSpec.Channles = 4;
-			texSpec.LayerCount = m_TerrainSpecification.TerrainTextures.size();
-			texSpec.Filepath = m_TerrainSpecification.TerrainTextures;
-			m_TerrainTextures = std::make_shared<VulkanTexture>(texSpec);
-		}
 	}
 }
 

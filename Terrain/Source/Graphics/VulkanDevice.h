@@ -22,14 +22,12 @@ struct InstanceProperties
 // JUST GRAPHICS AND PRESENT QUEUE SUPPORTED
 static InstanceProperties getDefaultInstanceProperties()
 {
-	InstanceProperties default;
-	default.GPUType				= VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
-	default.requestedExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
-#if DEBUG
-	default.requestedLayers		= { "VK_LAYER_KHRONOS_validation" };
-#endif
+	InstanceProperties defaultProps;
+	defaultProps.GPUType				= VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
+	defaultProps.requestedExtensions	= { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+	defaultProps.requestedLayers		= { "VK_LAYER_KHRONOS_validation" };
 
-	return default;
+	return defaultProps;
 }
 
 /*
@@ -137,7 +135,7 @@ private:
 
 	void createLogicalDevice(const InstanceProperties& gpuProps);
 
-	uint32_t VulkanDevice::getGPUQueues(VkPhysicalDevice gpu);
+	uint32_t getGPUQueues(VkPhysicalDevice gpu);
 
 private:
 	VulkanPlatform m_VulkanPlatform;

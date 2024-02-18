@@ -9,8 +9,11 @@ enum class ShaderStage : uint32_t
 	VERTEX,
 	FRAGMENT,
 	COMPUTE,
+	GEOMETRY,
 
-	NONE
+	NONE,
+	ALL,
+
 };
 
 enum class ShaderInputType

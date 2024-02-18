@@ -24,6 +24,11 @@
 #include "stb_image/std_image.h"
 #include "Graphics/VulkanShader.h"
 #include "Terrain/Techniques/DistanceLOD.h"
+#include <backends/imgui_impl_vulkan.h>
+
+#include "GUI/ProfilerGUI.h"
+
+#include <future>
 
 VulkanApp::VulkanApp(const std::string& title, uint32_t width, uint32_t height) : Application(title, width, height)
 { }
@@ -33,73 +38,60 @@ void VulkanApp::onCreate()
 	CommandBuffer = std::make_shared<VulkanRenderCommandBuffer>(true);
 	
 	{
-		float FullscreenVertices[] = {
-			-1.0f, -1.0f, 0.0f, 0.0f,
-			 1.0f, -1.0f, 1.0f, 0.0f,
-			 1.0f,  1.0f, 1.0f, 1.0f,
-			-1.0f,  1.0f, 0.0f, 1.0f
-		};
+		FramebufferSpecification framebufferSpecification;
+		framebufferSpecification.Width = 1600;
+		framebufferSpecification.Height = 900;
+		framebufferSpecification.Samples = 1;
+		framebufferSpecification.Clear = true;
 
-		uint32_t FullscreenIndices[] = {
-			0, 1, 2,
-			0, 2, 3
-		};
+		framebufferSpecification.DepthAttachment.Format = VK_FORMAT_D32_SFLOAT;
+		framebufferSpecification.DepthAttachment.Blend = false;
+		framebufferSpecification.DepthAttachment.IntialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		framebufferSpecification.DepthAttachment.FinalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-		m_FullscreenVertexBuffer = std::make_shared<VulkanBuffer>(FullscreenVertices, (uint32_t)(sizeof(float) * 16),
-			BufferType::VERTEX, BufferUsage::STATIC);
+		FramebufferAttachment outputColorAttachment{};
+		outputColorAttachment.Format = VK_FORMAT_R8G8B8A8_SRGB;
+		outputColorAttachment.Sample = true;
+		outputColorAttachment.IntialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		outputColorAttachment.FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-		m_FullscreenIndexBuffer = std::make_shared<VulkanBuffer>(FullscreenIndices, (uint32_t)(sizeof(uint32_t) * 6),
-			BufferType::INDEX, BufferUsage::STATIC);
+		framebufferSpecification.Attachments.push_back(outputColorAttachment);
+
+		m_Output = std::make_shared<VulkanFramebuffer>(framebufferSpecification);
 	}
 	{
-		FramebufferSpecification fbSpec;
-		fbSpec.Width = 1600;
-		fbSpec.Height = 900;
-		fbSpec.Samples = 1;
-		fbSpec.DepthAttachment.Format = VK_FORMAT_D32_SFLOAT;
-		fbSpec.DepthAttachment.Blend = false;
-		FramebufferAttachment color1{};
-		color1.Format = VK_FORMAT_R8G8B8A8_SRGB;
-		color1.Sample = true;
-		fbSpec.Attachments.push_back(color1);
-
-		std::shared_ptr<VulkanFramebuffer> Framebuffer;
-		m_Output = std::make_shared<VulkanFramebuffer>(fbSpec);
-	}
-	{
-		std::shared_ptr<VulkanShader>& shader = ShaderManager::createShader("TestCompute");
-		shader->addShaderStage(ShaderStage::COMPUTE, "Test_comp.glsl");
-		shader->createDescriptorSetLayouts();
-
-		ImageSpecification spec;
-		spec.Width = 1024;
-		spec.Height = 1024;
-		spec.Format = VK_FORMAT_R32G32B32A32_SFLOAT;
-		spec.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-		spec.UsageFlags = VK_IMAGE_USAGE_STORAGE_BIT;
-		spec.CreateSampler = true;
-		m_Noise = std::make_shared<VulkanImage>(spec);
-		m_Noise->Create();
-
-		m_ComputeDescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("TestCompute"));
-		m_ComputeDescriptorSet->bindInput(0, 0, m_Noise);
-		m_ComputeDescriptorSet->Create();
-
-		m_ComputePipeline = std::make_shared<VulkanComputePipeline>(shader);
+		m_TerrainGenerator = std::make_shared<TerrainGenerator>(1024, 1024);
 	}
 	{
 		TerrainSpecification terrainSpec;
-		terrainSpec.HeightMap = "Resources/Img/heightmap2.png";
-		terrainSpec.CompositionMap = "Resources/Img/image4.png";
+		terrainSpec.HeightMap = m_TerrainGenerator->getHeightMap();
+		terrainSpec.CompositionMap = m_TerrainGenerator->getCompositionMap();
+		terrainSpec.NormalMap = m_TerrainGenerator->getNormalMap();
 
-		terrainSpec.TerrainTextures.push_back("Resources/Img/grass.png");
-		terrainSpec.TerrainTextures.push_back("Resources/Img/slope.png");
-		terrainSpec.TerrainTextures.push_back("Resources/Img/rock.png");
+		{
+			std::vector<std::string> filepaths = {
+				"Resources/Img/grass1.png",
+				"Resources/Img/slope1.png",
+				"Resources/Img/rock1.png",
+			};
+
+			TextureSpecification texSpec{};
+			texSpec.CreateSampler = true;
+			texSpec.GenerateMips = true;
+			texSpec.Channles = 4;
+			texSpec.LayerCount = filepaths.size();
+			texSpec.Filepath = filepaths;
+			terrainSpec.TerrainTextures = std::make_shared<VulkanTexture>(texSpec);
+		}
+
+		terrainSpec.Info.TerrainSize = { 1024.0f, 1024.0f };
 
 		m_Terrain = std::make_shared<Terrain>(terrainSpec);
 		m_Terrain->setHeightMultiplier(3300.0f);
-		m_Terrain->m_DistanceLOD->image = m_Noise;
 
+		m_Sampler = std::make_shared<VulkanSampler>(SamplerSpecification{});
+
+		TerrainGUI = std::make_shared<TerrainGenerationGUI>(m_TerrainGenerator, 500, ImVec2(1090.0f, 10.0f));
 		m_TerrainRenderer = std::make_shared<TerrainRenderer>(m_Output);
 	}
 
@@ -137,7 +129,7 @@ void VulkanApp::onUpdate()
 		if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_SPACE))
 			cam.Move(glm::normalize(camVelocity) * 15.75f);
 		else
-			cam.Move(glm::normalize(camVelocity) * 4.75f);
+			cam.Move(glm::normalize(camVelocity) * 0.25f);
 	}
 
 	if (rotation != glm::vec2(0.0f, 0.0f))
@@ -150,49 +142,10 @@ void VulkanApp::onUpdate()
 	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_2))
 		m_TerrainRenderer->setWireframe(false);
 
-	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_3))
-	{
-		TerrainSpecification terrainSpec;
-		terrainSpec.HeightMap = "Resources/Img/world1.png";
-		terrainSpec.CompositionMap = "Resources/Img/image4.png";
-
-		terrainSpec.TerrainTextures.push_back("Resources/Img/grass.png");
-		terrainSpec.TerrainTextures.push_back("Resources/Img/slope.png");
-		terrainSpec.TerrainTextures.push_back("Resources/Img/rock.png");
-
-		m_Terrain = std::make_shared<Terrain>(terrainSpec);
-		m_Terrain->setHeightMultiplier(250.0f);
-	}
-	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_4))
-	{
-		TerrainSpecification terrainSpec;
-		terrainSpec.HeightMap = "Resources/Img/heightmap2.png";
-		terrainSpec.CompositionMap = "Resources/Img/image4.png";
-
-		terrainSpec.TerrainTextures.push_back("Resources/Img/grass.png");
-		terrainSpec.TerrainTextures.push_back("Resources/Img/slope.png");
-		terrainSpec.TerrainTextures.push_back("Resources/Img/rock.png");
-
-		m_Terrain = std::make_shared<Terrain>(terrainSpec);
-		m_Terrain->setHeightMultiplier(250.0f);
-	}
-
 	CommandBuffer->Begin();
-
 	VkCommandBuffer commandBuffer = CommandBuffer->getCurrentCommandBuffer();
-	{
-		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_ComputePipeline->getVkPipeline());
-		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_ComputePipeline->getVkPipelineLayout(),
-			0, m_ComputeDescriptorSet->getNumberOfSets(),
-			m_ComputeDescriptorSet->getDescriptorSet(VulkanRenderer::getCurrentFrame()).data(), 0, nullptr);
+	m_TerrainGenerator->Generate(CommandBuffer);
 
-		vkCmdPushConstants(commandBuffer, m_ComputePipeline->getVkPipelineLayout(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
-			sizeof(noiseParams), &m_NoiseParams);
-
-		VulkanRenderer::dispatchCompute(CommandBuffer, m_ComputePipeline, { 128, 128, 1 });
-		m_ComputePipeline->imageMemoryBarrier(CommandBuffer, m_Noise, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			VK_ACCESS_COLOR_ATTACHMENT_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-	}
 	// Geometry pass
 	{
 		CommandBuffer->beginQuery("GeometryPass");
@@ -206,38 +159,32 @@ void VulkanApp::onUpdate()
 		CommandBuffer->beginQuery("PresentPass");
 
 		VulkanRenderer::beginSwapchainRenderPass(CommandBuffer, m_FinalPass);
+		VulkanRenderer::preparePipeline(CommandBuffer, m_FinalPass);
 
-		VkBuffer vertexBuffers[] = { m_FullscreenVertexBuffer->getBuffer() };
-		VkDeviceSize offsets[] = { 0 };
-		vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-		vkCmdBindIndexBuffer(commandBuffer, m_FullscreenIndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
-
-		vkCmdDrawIndexed(commandBuffer, 6, 1, 0, 0, 0);
+		vkCmdDraw(commandBuffer, 6, 1, 0, 0);
 
 		CommandBuffer->beginQuery("Imgui");
 		beginImGuiFrame();
-		ImGui::Begin("GPU Time");
-		ImGui::Text("Total time = %f ms", CommandBuffer->getCommandBufferTime());
-		ImGui::Text("Geometry Pass = %f ms", CommandBuffer->getTime("GeometryPass"));
-		ImGui::Text("Present Pass = %f ms", CommandBuffer->getTime("PresentPass"));
-		ImGui::Text("Imgui = %f ms", CommandBuffer->getTime("Imgui"));
-		ImGui::End();
 
-		ImGui::Begin("CPU Time");
-		ImGui::Text("Update = %f ms", Instrumentor::Get().getTime("_Update"));
-		ImGui::Text("Total Time = %f ms", Instrumentor::Get().getTime("_TotalTime"));
-		ImGui::End();
+		static ProfilerManager manager({10.0f, 10.0f}, 400.0f);
+		{
+			manager.addProfiler("GPUProfiler", 100);
+			manager["GPUProfiler"]->addProfileValue("TotalGPU", CommandBuffer->getCommandBufferTime(), 0xffff00ff);
+			manager["GPUProfiler"]->addProfileValue("GeometryPass", CommandBuffer->getTime("GeometryPass"), 0xffffffff);
+			manager["GPUProfiler"]->addProfileValue("PresentPass", CommandBuffer->getTime("PresentPass"), 0xff0000ff);
+			manager["GPUProfiler"]->addProfileValue("Imgui", CommandBuffer->getTime("Imgui"), 0xff00ffff);
+		}
+		{
+			manager.addProfiler("CPUProfiler", 100);
+			manager["CPUProfiler"]->addProfileValue("Total Time", Instrumentor::Get().getTime("_TotalTime"), 0xffffffff);
+			manager["CPUProfiler"]->addProfileValue("Update", Instrumentor::Get().getTime("_Update"), 0xffff00ff);
+		}
 
-		ImGui::Begin("Controls");
-		ImGui::DragInt("octavs", &m_NoiseParams.octaves);
-		ImGui::DragFloat("amplitude", &m_NoiseParams.amplitude, 0.01f);
-		ImGui::DragFloat("freq", &m_NoiseParams.frequency, 0.01f);
-		ImGui::DragFloat("gain", &m_NoiseParams.gain, 0.01f);
-		ImGui::DragFloat("lac", &m_NoiseParams.lacunarity, 0.01f);
-		ImGui::DragFloat("height", &heightMult, 1.0f);
-		ImGui::End();
+		manager.Render();
 
-		m_Terrain->setHeightMultiplier(heightMult);
+		TerrainGUI->Render();
+
+		m_Terrain->setHeightMultiplier(m_TerrainGenerator->Noise.Amplitude * 1024.0f);
 
 		endImGuiFrame();
 		CommandBuffer->endQuery("Imgui");
@@ -257,45 +204,52 @@ void VulkanApp::onResize()
 	std::shared_ptr<VulkanDescriptorSet> DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("FinalShader"));
 	DescriptorSet->bindInput(0, 0, m_Output->getImage(0));
 	DescriptorSet->Create();
-	m_FinalPass->setDescriptorSet(DescriptorSet);
+	m_FinalPass->DescriptorSet = DescriptorSet;
 }
 
 void VulkanApp::onDestroy()
 {
+	m_TerrainGenerator.reset();
 }
 
 void VulkanApp::postFrame()
 {
 	CommandBuffer->queryResults();
-}
 
+	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_U) && presed == false)
+	{
+		thread = new std::thread([&]() {
+			ShaderManager::getShader("DistanceLODShader")->getShaderStage(ShaderStage::FRAGMENT)->Recompile();
+			vkDeviceWaitIdle(VulkanDevice::getVulkanDevice());
+			m_TerrainRenderer->m_TerrainPipeline->Recreate();
+			});
+		//thread->join();
+		presed = true;
+	}
+}
 
 void VulkanApp::createFinalPass()
 {
-	m_FinalPass = std::make_shared<VulkanRenderPass>();
+	m_FinalPass = std::make_shared<RenderPass>();
 	{
 		std::shared_ptr<VulkanShader>& mainShader = ShaderManager::createShader("FinalShader");
-		mainShader->addShaderStage(ShaderStage::VERTEX, "fullscreenPass_vert.glsl");
-		mainShader->addShaderStage(ShaderStage::FRAGMENT, "texture_frag.glsl");
+		mainShader->addShaderStage(ShaderStage::VERTEX, "FullscreenPass_vert.glsl");
+		mainShader->addShaderStage(ShaderStage::FRAGMENT, "Texture_frag.glsl");
 		mainShader->createDescriptorSetLayouts();
 	}
 	{
 		std::shared_ptr<VulkanDescriptorSet> DescriptorSet;
 		DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("FinalShader"));
-		DescriptorSet->bindInput(0, 0, m_Output->getImage(0));
+		DescriptorSet->bindInput(0, 0, m_Sampler);
+		DescriptorSet->bindInput(0, 1, m_Output->getImage(0));
 		DescriptorSet->Create();
-		m_FinalPass->setDescriptorSet(DescriptorSet);
+		m_FinalPass->DescriptorSet = DescriptorSet;
 	}
 	{
-		VulkanVertexBufferLayout VBOLayout = VulkanVertexBufferLayout({
-			VertexType::FLOAT_2,
-			VertexType::FLOAT_2,
-			});
-
-		PipelineSpecification spec;
+		PipelineSpecification spec{};
 		spec.Framebuffer = nullptr;
 		spec.Shader = ShaderManager::getShader("FinalShader");
-		spec.vertexBufferLayout = VBOLayout;
-		m_FinalPass->setPipeline(std::make_shared<VulkanPipeline>(spec));
+		spec.vertexBufferLayout = VulkanVertexBufferLayout{};
+		m_FinalPass->Pipeline = std::make_shared<VulkanPipeline>(spec);
 	}
 }

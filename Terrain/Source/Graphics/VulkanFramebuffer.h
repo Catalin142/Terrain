@@ -19,6 +19,9 @@ struct FramebufferAttachment
 	bool Blend = true;
 	bool Sample = false;
 	BlendMode blendMode = BlendMode::SRC_ALPHA_ONE_MINUS_SRC_ALPHA;
+
+	VkImageLayout IntialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	VkImageLayout FinalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 };
 
 struct FramebufferSpecification

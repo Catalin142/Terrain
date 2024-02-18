@@ -11,7 +11,7 @@
 class VulkanComputePipeline
 {
 public:
-	VulkanComputePipeline(const std::shared_ptr<VulkanShader>& shader);
+	VulkanComputePipeline(const std::shared_ptr<VulkanShader>& shader, uint32_t pushConstantSize = 0);
 	~VulkanComputePipeline();
 
 	void bufferMemoryBarrier(const std::shared_ptr<VulkanRenderCommandBuffer>& cmdBuffer, const std::shared_ptr<VulkanBaseBuffer>& buffer, 

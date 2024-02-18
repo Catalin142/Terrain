@@ -37,4 +37,8 @@
 		   - TODO:
 				- Get rid of detail map, use textures based on height
 
+12.02.2024 - Finally found a sense of scale in terrain, every 128x128 will be 64m => 1 quad = 0.5m (far cry 5 terrain insipiration)
+		   - very important the resolution of textures
+
+14.02.2024 - Fixed normals, i put them in range [0, 1] and never got them back to [-1, 1], i just used a SNORM texture
 			

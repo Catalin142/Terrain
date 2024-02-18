@@ -45,13 +45,13 @@ uint32_t VulkanRenderer::getCurrentFrame()
 }
 
 void VulkanRenderer::beginRenderPass(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer, 
-	const std::shared_ptr<VulkanRenderPass>& renderPass)
+	const std::shared_ptr<RenderPass>& renderPass)
 {
 	VkCommandBuffer VulkanCommandBuffer = commandBuffer->getCurrentCommandBuffer();
 
 	VkExtent2D extent = { m_Swapchain->getWidth(), m_Swapchain->getHeight() };
 
-	std::shared_ptr<VulkanFramebuffer> framebuffer = renderPass->getTargetFramebuffer();
+	std::shared_ptr<VulkanFramebuffer> framebuffer = renderPass->Pipeline->getTargetFramebuffer();
 
 	VkRenderPassBeginInfo renderPassInfo{};
 	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -78,27 +78,6 @@ void VulkanRenderer::beginRenderPass(const std::shared_ptr<VulkanRenderCommandBu
 	renderPassInfo.pClearValues = clearValues.data();
 
 	vkCmdBeginRenderPass(VulkanCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-	VkViewport viewport{};
-	viewport.x = 0.0f;
-	viewport.y = 0.0f;
-	viewport.width = float(extent.width);
-	viewport.height = float(extent.height);
-	viewport.minDepth = 0.0f;
-	viewport.maxDepth = 1.0f;
-	vkCmdSetViewport(VulkanCommandBuffer, 0, 1, &viewport);
-
-	VkRect2D scissor{};
-	scissor.offset = { 0, 0 };
-	scissor.extent = extent;
-	vkCmdSetScissor(VulkanCommandBuffer, 0, 1, &scissor);
-	vkCmdBindPipeline(VulkanCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderPass->getVulkanPipelineHandle());
-
-	if (renderPass->hasDescriptorSet())
-		vkCmdBindDescriptorSets(VulkanCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderPass->getVulkanPipelineLayout(),
-			0, renderPass->getDescriptorSet()->getNumberOfSets(),
-			renderPass->getDescriptorSet()->getDescriptorSet(m_Swapchain->getCurrentFrame()).data(), 0, nullptr);
-
 }
 
 void VulkanRenderer::endRenderPass(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer)
@@ -108,7 +87,7 @@ void VulkanRenderer::endRenderPass(const std::shared_ptr<VulkanRenderCommandBuff
 }
 
 void VulkanRenderer::beginSwapchainRenderPass(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer, 
-	const std::shared_ptr<VulkanRenderPass>& renderPass)
+	const std::shared_ptr<RenderPass>& renderPass)
 {
 	VkCommandBuffer VulkanCommandBuffer = commandBuffer->getCurrentCommandBuffer();
 
@@ -129,29 +108,56 @@ void VulkanRenderer::beginSwapchainRenderPass(const std::shared_ptr<VulkanRender
 	renderPassInfo.clearValueCount = 1;
 
 	vkCmdBeginRenderPass(VulkanCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+}
+
+void VulkanRenderer::preparePipeline(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer, const std::shared_ptr<RenderPass>& renderPass)
+{
+	VkCommandBuffer VulkanCommandBuffer = commandBuffer->getCurrentCommandBuffer();
+
+	VkExtent2D extent = { m_Swapchain->getWidth(), m_Swapchain->getHeight() };
 
 	VkViewport viewport{};
 	viewport.x = 0.0f;
 	viewport.y = 0.0f;
 	viewport.width = float(extent.width);
 	viewport.height = float(extent.height);
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
 	vkCmdSetViewport(VulkanCommandBuffer, 0, 1, &viewport);
+
+	float lineWidth = renderPass->Pipeline->getSpecification().lineWidth;
+
+	if (renderPass->Pipeline->getSpecification().lineWidth != 1.0f)
+		vkCmdSetLineWidth(VulkanCommandBuffer, renderPass->Pipeline->getSpecification().lineWidth);
 
 	VkRect2D scissor{};
 	scissor.offset = { 0, 0 };
 	scissor.extent = extent;
 	vkCmdSetScissor(VulkanCommandBuffer, 0, 1, &scissor);
-	vkCmdBindPipeline(VulkanCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderPass->getVulkanPipelineHandle());
+	vkCmdBindPipeline(VulkanCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderPass->Pipeline->getVkPipeline());
 
-	if (renderPass->hasDescriptorSet())
-		vkCmdBindDescriptorSets(VulkanCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderPass->getVulkanPipelineLayout(),
-			0, renderPass->getDescriptorSet()->getNumberOfSets(),
-			renderPass->getDescriptorSet()->getDescriptorSet(m_Swapchain->getCurrentFrame()).data(), 0, nullptr);
+	if (renderPass->DescriptorSet != nullptr)
+		vkCmdBindDescriptorSets(VulkanCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderPass->Pipeline->getVkPipelineLayout(),
+			0, renderPass->DescriptorSet->getNumberOfSets(),
+			renderPass->DescriptorSet->getDescriptorSet(m_Swapchain->getCurrentFrame()).data(), 0, nullptr);
 }
 
-void VulkanRenderer::dispatchCompute(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer,
-	const std::shared_ptr<VulkanComputePipeline>& computePipeline, glm::ivec3 workgroups)
+void VulkanRenderer::dispatchCompute(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer, const std::shared_ptr<VulkanComputePass>& computePass, glm::ivec3 workgroups,
+	uint32_t pushConstantSize, void* data)
 {
+	VkCommandBuffer cmd = commandBuffer->getCurrentCommandBuffer();
+
+	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, computePass->Pipeline->getVkPipeline());
+
+	if (computePass->DescriptorSet != nullptr)
+	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, computePass->Pipeline->getVkPipelineLayout(),
+		0, computePass->DescriptorSet->getNumberOfSets(),
+		computePass->DescriptorSet->getDescriptorSet(VulkanRenderer::getCurrentFrame()).data(), 0, nullptr);
+
+	if (pushConstantSize != 0)
+		vkCmdPushConstants(cmd, computePass->Pipeline->getVkPipelineLayout(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
+			pushConstantSize, data);
+
 	vkCmdDispatch(commandBuffer->getCurrentCommandBuffer(), workgroups.x, workgroups.y, workgroups.z);
 
 	VkSubmitInfo submitInfo{};

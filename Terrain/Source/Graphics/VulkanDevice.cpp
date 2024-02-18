@@ -291,6 +291,8 @@ void VulkanDevice::createLogicalDevice(const InstanceProperties& instanceProps)
 	deviceFeatures.samplerAnisotropy = VK_TRUE; // trb sa actvezi feature
 	deviceFeatures.sampleRateShading = VK_TRUE;
 	deviceFeatures.fillModeNonSolid  = VK_TRUE;
+	deviceFeatures.geometryShader	 = VK_TRUE;
+	deviceFeatures.wideLines		 = VK_TRUE;
 
 	VkDeviceCreateInfo deviceCreateInfo{};
 	deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;

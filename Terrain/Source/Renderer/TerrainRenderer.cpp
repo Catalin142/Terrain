@@ -4,12 +4,17 @@
 
 #include "Graphics/VulkanRenderer.h"
 #include "Graphics/VulkanDevice.h"
+#include "Graphics/VulkanUtils.h"
 
 #include <cassert>
 
 TerrainRenderer::TerrainRenderer(const std::shared_ptr<VulkanFramebuffer>& targetFramebuffer) : m_TargetFramebuffer(targetFramebuffer)
 {
 	initializeBuffers();
+
+	SamplerSpecification terrainSamplerSpec{};
+	terrainSamplerSpec.addresMode = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+	m_TerrainSampler = std::make_shared<VulkanSampler>(terrainSamplerSpec);
 }
 
 void TerrainRenderer::renderTerrain(const Camera& camera, const std::shared_ptr<Terrain>& terrain)
@@ -33,7 +38,7 @@ void TerrainRenderer::renderTerrain(const Camera& camera, const std::shared_ptr<
 
 void TerrainRenderer::onResize(uint32_t width, uint32_t height)
 {
-	m_TerrainRenderPass->Resize(width, height);
+	m_TerrainRenderPass->Pipeline->getTargetFramebuffer()->Resize(width, height);
 }
 
 void TerrainRenderer::setWireframe(bool wireframe)
@@ -59,7 +64,7 @@ void TerrainRenderer::initializeBuffers()
 	uint32_t framesInFlight = VulkanRenderer::getFramesInFlight();
 
 	// TODO: Get rid of hard coded values
-	m_TerrainChunksSet = std::make_shared<VulkanUniformBufferSet>(4096 * sizeof(TerrainChunk), framesInFlight);
+	m_TerrainChunksSet = std::make_shared<VulkanUniformBufferSet>(8 * 8 * sizeof(TerrainChunk), framesInFlight);
 	m_LodMapSet = std::make_shared<VulkanUniformBufferSet>(128 * 128 * sizeof(LODLevel), framesInFlight);
 	m_TerrainInfo = std::make_shared<VulkanUniformBuffer>(4 * sizeof(float));
 }
@@ -79,7 +84,7 @@ void TerrainRenderer::createDistanceLODRenderPass()
 	if (m_Terrain->getDistanceLODTechnique() == nullptr)
 		assert(false);
 
-	m_TerrainRenderPass = std::make_shared<VulkanRenderPass>();
+	m_TerrainRenderPass = std::make_shared<RenderPass>();
 
 	{
 		std::shared_ptr<VulkanShader>& mainShader = ShaderManager::createShader("DistanceLODShader");
@@ -93,12 +98,14 @@ void TerrainRenderer::createDistanceLODRenderPass()
 		DescriptorSet->bindInput(0, 0, m_TerrainChunksSet);
 		DescriptorSet->bindInput(0, 1, m_LodMapSet);
 		DescriptorSet->bindInput(0, 2, m_TerrainInfo);
-		DescriptorSet->bindInput(1, 0, m_Terrain->getDistanceLODTechnique()->getHeightMap());
-		DescriptorSet->bindInput(2, 0, m_Terrain->getDistanceLODTechnique()->getCompositionMap());
-		DescriptorSet->bindInput(2, 1, m_Terrain->getDistanceLODTechnique()->getTerrainTextures());
+		DescriptorSet->bindInput(1, 0, m_TerrainSampler);
+		DescriptorSet->bindInput(1, 1, m_Terrain->getHeightMap());
+		DescriptorSet->bindInput(1, 2, m_Terrain->getCompositionMap());
+		DescriptorSet->bindInput(1, 3, m_Terrain->getNormalMap());
+		DescriptorSet->bindInput(2, 0, m_Terrain->getTerrainTextures());
 
 		DescriptorSet->Create();
-		m_TerrainRenderPass->setDescriptorSet(DescriptorSet);
+		m_TerrainRenderPass->DescriptorSet = DescriptorSet;
 	}
 
 	createDistanceLODPipeline();
@@ -106,7 +113,7 @@ void TerrainRenderer::createDistanceLODRenderPass()
 
 void TerrainRenderer::createDistanceLODPipeline()
 {
-	PipelineSpecification spec;
+	PipelineSpecification spec{};
 	spec.Framebuffer = m_TargetFramebuffer;
 	spec.depthTest = true;
 	spec.depthWrite = true;
@@ -120,7 +127,11 @@ void TerrainRenderer::createDistanceLODPipeline()
 
 	m_TerrainPipeline = std::make_shared<VulkanPipeline>(spec);
 
-	m_TerrainRenderPass->setPipeline(m_TerrainPipeline);
+	m_TerrainRenderPass->Pipeline = m_TerrainPipeline;
+
+#if DEBUG_TERRAIN_NORMALS == 1
+	createNormalDebugRenderPass();
+#endif
 }
 
 void TerrainRenderer::renderDistanceLOD(const Camera& camera)
@@ -133,19 +144,20 @@ void TerrainRenderer::renderDistanceLOD(const Camera& camera)
 
 	m_TerrainChunksSet->setData(chunksToRender.data(), chunksToRender.size() * sizeof(TerrainChunk), m_CurrentFrame);
 	m_LodMapSet->setData(distanceLOD->getLodMap().data(), chunksToRender.size() * sizeof(LODLevel), m_CurrentFrame);
-	m_TerrainInfo->setData(&m_Terrain->getInfo(), 4 * sizeof(float));
 
-	uint32_t firstInstance = 0;
+	TerrainInfo terrainInfo = m_Terrain->getInfo();
+	m_TerrainInfo->setData(&terrainInfo, 4 * sizeof(float));
 
 	VkCommandBuffer commandBuffer = m_RenderCommandBuffer->getCurrentCommandBuffer();
 
-	uint32_t instanceCount = 0;
-
 	VulkanRenderer::beginRenderPass(m_RenderCommandBuffer, m_TerrainRenderPass);
+	VulkanRenderer::preparePipeline(m_RenderCommandBuffer, m_TerrainRenderPass);
 
-	vkCmdPushConstants(commandBuffer, m_TerrainRenderPass->getVulkanPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0,
-		sizeof(CameraRenderMatrices), &camera.getRenderMatrices());
+	CameraRenderMatrices matrices = camera.getRenderMatrices();
+	vkCmdPushConstants(commandBuffer, m_TerrainRenderPass->Pipeline->getVkPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0,
+		sizeof(CameraRenderMatrices), &matrices);
 
+	uint32_t instanceCount = 0;
 	for (const LODProperties& props : distanceLOD->getLODProperties())
 	{
 		if (props.CurrentCount)
@@ -156,5 +168,65 @@ void TerrainRenderer::renderDistanceLOD(const Camera& camera)
 		}
 	}
 
+
+#if DEBUG_TERRAIN_NORMALS == 1
+	VulkanRenderer::preparePipeline(m_RenderCommandBuffer, m_NormalsDebugRenderPass);
+
+	vkCmdPushConstants(commandBuffer, m_NormalsDebugRenderPass->Pipeline->getVkPipelineLayout(),
+		VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT, 0,
+		sizeof(CameraRenderMatrices), &matrices);
+
+	instanceCount = 0;
+	for (const LODProperties& props : m_Terrain->m_DistanceLOD->getLODProperties())
+	{
+		if (props.CurrentCount)
+		{
+			vkCmdBindIndexBuffer(commandBuffer, props.IndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+			vkCmdDrawIndexed(commandBuffer, uint32_t(props.IndicesCount), props.CurrentCount, 0, 0, instanceCount);
+			instanceCount += props.CurrentCount;
+		}
+	}
+#endif
+
 	VulkanRenderer::endRenderPass(m_RenderCommandBuffer);
+
 }
+
+#if DEBUG_TERRAIN_NORMALS == 1
+void TerrainRenderer::createNormalDebugRenderPass()
+{
+	{
+		std::shared_ptr<VulkanShader>& mainShader = ShaderManager::createShader("debugNormals");
+		mainShader->addShaderStage(ShaderStage::VERTEX, "Debug/TerrainNormals_vert.glsl");
+		mainShader->addShaderStage(ShaderStage::GEOMETRY, "Debug/TerrainNormals_geom.glsl");
+		mainShader->addShaderStage(ShaderStage::FRAGMENT, "Debug/TerrainNormals_frag.glsl");
+		mainShader->createDescriptorSetLayouts();
+
+		std::shared_ptr<VulkanDescriptorSet> DescriptorSet;
+		DescriptorSet = std::make_shared<VulkanDescriptorSet>(mainShader);
+		DescriptorSet->bindInput(0, 0, m_TerrainChunksSet);
+		DescriptorSet->bindInput(0, 1, m_TerrainInfo);
+		DescriptorSet->bindInput(1, 0, m_TerrainSampler);
+		DescriptorSet->bindInput(1, 1, m_Terrain->getHeightMap());
+		DescriptorSet->bindInput(1, 2, m_Terrain->getNormalMap());
+		DescriptorSet->Create();
+
+		PipelineSpecification spec{};
+		spec.lineWidth = 1.0f;
+		spec.Framebuffer = m_TargetFramebuffer;
+		spec.Shader = mainShader;
+		spec.depthTest = true;
+		spec.depthCompareFunction = DepthCompare::LESS;
+		spec.vertexBufferLayout = VulkanVertexBufferLayout{};
+
+		spec.pushConstants.push_back({ sizeof(CameraRenderMatrices),
+			VkShaderStageFlagBits(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT) });
+
+		std::shared_ptr<VulkanPipeline> pipelineDebug = std::make_shared<VulkanPipeline>(spec);
+
+		m_NormalsDebugRenderPass = std::make_shared<RenderPass>();
+		m_NormalsDebugRenderPass->DescriptorSet = DescriptorSet;
+		m_NormalsDebugRenderPass->Pipeline = pipelineDebug;
+	}
+}
+#endif

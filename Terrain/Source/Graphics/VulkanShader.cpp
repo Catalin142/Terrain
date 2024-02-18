@@ -1,11 +1,14 @@
 #include "VulkanShader.h"
 
 #include "VulkanDevice.h"
+#include "VulkanPipeline.h"
 
 #include <vector>
+#include <string>
+#include <iostream>
 #include <fstream>
 #include <cassert>
-#include <iostream>
+#include <filesystem>
 
 #include <shaderc/shaderc.hpp>
 #include <spirv_cross/spirv_glsl.hpp>
@@ -13,14 +16,16 @@
 std::unordered_map<std::string, std::shared_ptr<VulkanShader>> ShaderManager::m_Shaders;
 
 #define SOURCE_FILEPATH "Resources/Shaders/"
+#define CACHE_FILEPATH "Cache/Shaders/"
 
 static VkShaderStageFlagBits getStage(const ShaderStage& stage)
 {
 	switch (stage)
 	{
-	case ShaderStage::VERTEX:   return VK_SHADER_STAGE_VERTEX_BIT;
-	case ShaderStage::FRAGMENT: return VK_SHADER_STAGE_FRAGMENT_BIT; break;
-	case ShaderStage::COMPUTE: return VK_SHADER_STAGE_COMPUTE_BIT; break;
+	case ShaderStage::VERTEX:    return VK_SHADER_STAGE_VERTEX_BIT;
+	case ShaderStage::FRAGMENT:  return VK_SHADER_STAGE_FRAGMENT_BIT; break;
+	case ShaderStage::COMPUTE:   return VK_SHADER_STAGE_COMPUTE_BIT; break;
+	case ShaderStage::GEOMETRY:  return VK_SHADER_STAGE_GEOMETRY_BIT; break;
 	case ShaderStage::NONE:     assert(false); break;
 	default:
 		return VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM;
@@ -44,45 +49,59 @@ static VkDescriptorType getInputType(const ShaderInputType& type)
 	return VK_DESCRIPTOR_TYPE_MAX_ENUM;
 }
 
-static std::vector<char> readBinary(const std::string& filepath)
+static std::vector<uint32_t> readCachedShaderData(const std::string& filepath)
 {
-	std::ifstream file(filepath, std::ios::binary | std::ios::ate);
-	if (!file.good())
+	FILE* f = fopen(filepath.c_str(), "rb");
+	if (!f)
 	{
 		std::cerr << "FIsierul " << filepath << " nu exista\n";
 		assert(false);
 	}
 
-	size_t fileSize = (size_t)file.tellg();
-	std::vector<char> buffer(fileSize);
-	file.seekg(0);
-	file.read(buffer.data(), fileSize);
+	fseek(f, 0, SEEK_END);
+	uint64_t size = ftell(f);
+	fseek(f, 0, SEEK_SET);
 
-	file.close();
+	std::vector<uint32_t> buffer(size / sizeof(uint32_t));
+	fread(buffer.data(), sizeof(uint32_t), buffer.size(), f);
+
+	fclose(f);
+
 	return buffer;
 }
 
-static std::string readFile(const std::string& filepath)
+static void writeShaderBinary(void* data, uint32_t size, const std::string& path)
 {
-	std::ifstream file(filepath);
-	if (!file.good())
-	{
-		std::cerr << "FIsierul " << filepath << " nu exista\n";
+	FILE* file = fopen(path.c_str(), "wb");
+	if (!file)
 		assert(false);
-	}
-
-	file.seekg(0, std::ios::end);
-	size_t size = file.tellg();
-	std::string buffer(size, ' ');
-	file.seekg(0);
-	file.read(&buffer[0], size);
-
-	return buffer;
+	fwrite(data, sizeof(uint32_t), size, file);
+	fclose(file);
 }
 
-VulkanShaderStage::VulkanShaderStage(ShaderStage stage, const std::string& filepath) : m_Stage(stage)
+VulkanShaderStage::VulkanShaderStage(ShaderStage stage, const std::string& filepath) : m_Stage(stage), m_Filepath(filepath)
 {
-	std::vector<uint32_t> data = VulkanShaderCompiler::compileVulkanShader(stage, SOURCE_FILEPATH + filepath);
+	std::vector<uint32_t> data;
+
+	size_t lastD = filepath.find_last_of('\/');
+	std::string directoryPath = std::string(filepath.begin(), filepath.begin() + (lastD != std::string::npos ? lastD : 0));
+	std::string shaderName = std::string(filepath.begin(), filepath.begin() + filepath.find_last_of('.'));
+
+	std::string codeFilepath = SOURCE_FILEPATH + filepath;
+	std::string cacheFilepath = CACHE_FILEPATH + shaderName + ".spv";
+
+	if (std::filesystem::exists(cacheFilepath))
+		data = readCachedShaderData(cacheFilepath);
+
+	else
+		data = VulkanShaderCompiler::compileVulkanShader(stage, codeFilepath);
+
+	if (!std::filesystem::exists(CACHE_FILEPATH + directoryPath))
+		std::filesystem::create_directories(CACHE_FILEPATH + directoryPath);
+
+	if (!std::filesystem::exists(cacheFilepath))
+		writeShaderBinary(data.data(), data.size(), cacheFilepath);
+
 	m_Input = VulkanShaderCompiler::Reflect(stage, data);
 
 	VkShaderModuleCreateInfo createInfo{};
@@ -100,6 +119,30 @@ VulkanShaderStage::VulkanShaderStage(ShaderStage stage, const std::string& filep
 VulkanShaderStage::~VulkanShaderStage()
 {
 	vkDestroyShaderModule(VulkanDevice::getVulkanDevice(), m_ShaderModule, nullptr);
+}
+
+void VulkanShaderStage::Recompile()
+{
+	std::vector<uint32_t> data = VulkanShaderCompiler::compileVulkanShader(m_Stage, SOURCE_FILEPATH + m_Filepath);
+
+	std::string shaderName = std::string(m_Filepath.begin(), m_Filepath.begin() + m_Filepath.find_last_of('.'));
+	std::string cacheFilepath = CACHE_FILEPATH + shaderName + ".spv";
+	writeShaderBinary(data.data(), data.size(), cacheFilepath);
+
+	m_Input = VulkanShaderCompiler::Reflect(m_Stage, data);
+
+	VkShaderModuleCreateInfo createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	createInfo.codeSize = data.size() * sizeof(uint32_t);
+	createInfo.pCode = data.data();
+
+	vkDestroyShaderModule(VulkanDevice::getVulkanDevice(), m_ShaderModule, nullptr);
+	m_ShaderModule = VK_NULL_HANDLE;
+	if (vkCreateShaderModule(VulkanDevice::getVulkanDevice(), &createInfo, nullptr, &m_ShaderModule) != VK_SUCCESS)
+	{
+		std::cerr << "Eroare shader\n";
+		assert(false);
+	}
 }
 
 VkPipelineShaderStageCreateInfo const VulkanShaderStage::getStageCreateInfo()
@@ -149,6 +192,7 @@ void VulkanShader::addShaderStage(ShaderStage stage, const std::string& filepath
 		return;
 
 	m_Stages[stage] = std::make_shared<VulkanShaderStage>(stage, filepath);
+
 	for (const ShaderInput& input : m_Stages[stage]->getInput())
 		m_Input[input.Set].push_back(input);
 }
@@ -161,6 +205,13 @@ std::shared_ptr<VulkanShaderStage> VulkanShader::getShaderStage(ShaderStage stag
 	return m_Stages[stage];
 }
 
+bool VulkanShader::hasStage(ShaderStage stage)
+{
+	if (m_Stages.find(stage) == m_Stages.end())
+		return false;
+	return true;
+}
+
 std::map<uint32_t, std::vector<VkDescriptorSetLayoutBinding>> VulkanShader::getDescriptorSetLayoutBindings()
 {
 	std::map<uint32_t, std::vector<VkDescriptorSetLayoutBinding>> bindings;
@@ -168,17 +219,29 @@ std::map<uint32_t, std::vector<VkDescriptorSetLayoutBinding>> VulkanShader::getD
 	for (auto& [set, input] : m_Input)
 	{
 		bindings[set] = std::vector<VkDescriptorSetLayoutBinding>();
-		for (auto& i : input)
+
+		// double pass to match the same input on multiple stages
+		std::unordered_map<std::string, VkDescriptorSetLayoutBinding> inputs;
+
+		for (const ShaderInput& i : input)
 		{
+			if (inputs.find(i.DebugName) != inputs.end())
+			{
+				inputs[i.DebugName].stageFlags |= getStage(i.Stage);
+				continue;
+			}
+
 			VkDescriptorSetLayoutBinding layoutBinding{};
 			layoutBinding.binding = i.Binding;
 			layoutBinding.descriptorType = getInputType(i.Type);
 			layoutBinding.descriptorCount = 1;
 			layoutBinding.stageFlags = getStage(i.Stage);
 			layoutBinding.pImmutableSamplers = nullptr;
-
-			bindings[set].push_back(layoutBinding);
+			inputs[i.DebugName] = layoutBinding;
 		}
+
+		for (auto& [name, layoutBinding] : inputs)
+			bindings[set].push_back(layoutBinding);
 	}
 
 	return bindings;
@@ -225,11 +288,31 @@ shaderc_shader_kind getShadercKind(ShaderStage stage)
 		return shaderc_glsl_fragment_shader;
 	case ShaderStage::COMPUTE:
 		return shaderc_glsl_compute_shader;
+	case ShaderStage::GEOMETRY:
+		return shaderc_glsl_geometry_shader;
 	case ShaderStage::NONE:
 		assert(false);
 	}
 
 	return shaderc_vertex_shader;
+}
+
+static std::string readFile(const std::string& filepath)
+{
+	std::ifstream file(filepath);
+	if (!file.good())
+	{
+		std::cerr << "FIsierul " << filepath << " nu exista\n";
+		assert(false);
+	}
+
+	file.seekg(0, std::ios::end);
+	size_t size = file.tellg();
+	std::string buffer(size, ' ');
+	file.seekg(0);
+	file.read(&buffer[0], size);
+
+	return buffer;
 }
 
 std::vector<uint32_t> VulkanShaderCompiler::compileVulkanShader(ShaderStage stage, const std::string& filepath, bool optimize)

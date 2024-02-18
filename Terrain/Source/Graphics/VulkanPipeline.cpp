@@ -36,21 +36,44 @@ VkCompareOp getVulkanDepthCompareOperation(DepthCompare comp)
 
 VulkanPipeline::VulkanPipeline(const PipelineSpecification& spec) : m_Specification(spec)
 {
+	Recreate();
+}
+
+VulkanPipeline::~VulkanPipeline()
+{
+	VkDevice device = VulkanDevice::getVulkanDevice();
+	vkDestroyPipeline(device, m_Pipeline, nullptr);
+	vkDestroyPipelineLayout(device, m_PipelineLayout, nullptr);
+}
+
+void VulkanPipeline::Recreate()
+{
+	if (m_Pipeline)
+	{
+		VkDevice device = VulkanDevice::getVulkanDevice();
+		vkDestroyPipeline(device, m_Pipeline, nullptr);
+		vkDestroyPipelineLayout(device, m_PipelineLayout, nullptr);
+	}
+
 	// dynamic state
-	VkDynamicState dynamicStates[2] = {
+	std::vector<VkDynamicState> dynamicStates = {
 		VK_DYNAMIC_STATE_VIEWPORT,
-		VK_DYNAMIC_STATE_SCISSOR
+		VK_DYNAMIC_STATE_SCISSOR,
 	};
+
+	if (m_Specification.lineWidth != 1.0f)
+		dynamicStates.push_back(VK_DYNAMIC_STATE_LINE_WIDTH);
+
 
 	VkPipelineDynamicStateCreateInfo dynamicState{};
 	dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-	dynamicState.dynamicStateCount = 2;
-	dynamicState.pDynamicStates = dynamicStates;
+	dynamicState.dynamicStateCount = dynamicStates.size();
+	dynamicState.pDynamicStates = dynamicStates.data();
 
 
 	// vertex input
 	VkVertexInputBindingDescription bindingDescription = m_Specification.vertexBufferLayout.getBindindDescription();
-	const std::vector<VkVertexInputAttributeDescription>& attributeDescriptions = 
+	const std::vector<VkVertexInputAttributeDescription>& attributeDescriptions =
 		m_Specification.vertexBufferLayout.getInputAttributeDescriptions();
 
 	VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
@@ -104,7 +127,7 @@ VulkanPipeline::VulkanPipeline(const PipelineSpecification& spec) : m_Specificat
 		attachmentCount = (uint32_t)m_Specification.Framebuffer->getSpecification().Attachments.size();
 		fbAttachments = m_Specification.Framebuffer->getSpecification().Attachments;
 	}
-	
+
 	std::vector<VkPipelineColorBlendAttachmentState> colorBlendStates;
 	for (uint32_t i = 0; i < attachmentCount; i++)
 	{
@@ -124,23 +147,23 @@ VulkanPipeline::VulkanPipeline(const PipelineSpecification& spec) : m_Specificat
 
 		switch (fbAttachments[i].blendMode)
 		{
-			case BlendMode::SRC_ALPHA_ONE_MINUS_SRC_ALPHA:
-				colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-				colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-				colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-				colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-				break;
-			case BlendMode::ONE_ZERO:
-				colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-				colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
-				break;
-			case BlendMode::ZERO_SRC_COLOR:
-				colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ZERO;
-				colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_SRC_COLOR;
-				break;
+		case BlendMode::SRC_ALPHA_ONE_MINUS_SRC_ALPHA:
+			colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+			colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+			colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+			colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+			break;
+		case BlendMode::ONE_ZERO:
+			colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+			colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+			break;
+		case BlendMode::ZERO_SRC_COLOR:
+			colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+			colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_SRC_COLOR;
+			break;
 
-			default:
-				assert(false);
+		default:
+			assert(false);
 		}
 	}
 	// color blending
@@ -187,15 +210,18 @@ VulkanPipeline::VulkanPipeline(const PipelineSpecification& spec) : m_Specificat
 	if (vkCreatePipelineLayout(VulkanDevice::getVulkanDevice(), &pipelineLayoutInfo, nullptr, &m_PipelineLayout) != VK_SUCCESS)
 		assert(false);
 
-	VkPipelineShaderStageCreateInfo shaderStages[] = {
-		m_Specification.Shader->getStageCreateInfo(ShaderStage::VERTEX),
-		m_Specification.Shader->getStageCreateInfo(ShaderStage::FRAGMENT)
-	};
+	ShaderStage stages[] = { ShaderStage::VERTEX, ShaderStage::GEOMETRY, ShaderStage::FRAGMENT };
+
+	std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
+
+	for (uint32_t i = 0; i < 3; i++)
+		if (m_Specification.Shader->hasStage(stages[i]))
+			shaderStages.push_back(m_Specification.Shader->getStageCreateInfo(stages[i]));
 
 	VkGraphicsPipelineCreateInfo pipelineInfo{};
 	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-	pipelineInfo.stageCount = 2; // vertex si fragment
-	pipelineInfo.pStages = shaderStages;
+	pipelineInfo.stageCount = shaderStages.size();;
+	pipelineInfo.pStages = shaderStages.data();
 	pipelineInfo.pVertexInputState = &vertexInputInfo;
 	pipelineInfo.pInputAssemblyState = &inputAssembly;
 	pipelineInfo.pViewportState = &viewportState;
@@ -211,11 +237,4 @@ VulkanPipeline::VulkanPipeline(const PipelineSpecification& spec) : m_Specificat
 
 	if (vkCreateGraphicsPipelines(VulkanDevice::getVulkanDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_Pipeline) != VK_SUCCESS)
 		assert(false);
-}
-
-VulkanPipeline::~VulkanPipeline()
-{
-	VkDevice device = VulkanDevice::getVulkanDevice();
-	vkDestroyPipeline(device, m_Pipeline, nullptr);
-	vkDestroyPipelineLayout(device, m_PipelineLayout, nullptr);
 }

@@ -47,13 +47,10 @@ VulkanFramebuffer::VulkanFramebuffer(const FramebufferSpecification& spec) : m_S
 		colorAttachmentInfo.storeOp = colorAttachment.Sample ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		colorAttachmentInfo.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		colorAttachmentInfo.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		colorAttachmentInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		colorAttachmentInfo.initialLayout = colorAttachment.IntialLayout;
 		colorAttachmentInfo.format = colorAttachment.Format;
 		colorAttachmentInfo.samples = VkSampleCountFlagBits(m_Specification.Samples);
-
-		if (colorAttachment.Sample)
-			colorAttachmentInfo.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		else colorAttachmentInfo.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		colorAttachmentInfo.finalLayout = colorAttachment.FinalLayout;
 
 		colorAttachments.emplace_back(colorAttachmentInfo);
 	}
@@ -66,10 +63,10 @@ VulkanFramebuffer::VulkanFramebuffer(const FramebufferSpecification& spec) : m_S
 			depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 			depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 			depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-			depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			depthAttachment.initialLayout = m_Specification.DepthAttachment.IntialLayout;
 			depthAttachment.format = m_Specification.DepthAttachment.Format;
 			depthAttachment.samples = VkSampleCountFlagBits(m_Specification.Samples);
-			depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			depthAttachment.finalLayout = m_Specification.DepthAttachment.FinalLayout;
 		}
 	}
 

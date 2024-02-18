@@ -1,6 +1,8 @@
 #pragma once
 
 #include "TerrainChunk.h"
+#include "Graphics/VulkanImage.h"
+#include "Graphics/VulkanTexture.h"
 
 #include "glm/glm.hpp"
 
@@ -9,6 +11,8 @@
 #include <memory>
 
 class DistanceLOD;
+
+// 128 = 64m
 
 enum class LODTechnique
 {
@@ -31,9 +35,10 @@ struct TerrainInfo
 
 struct TerrainSpecification
 {
-	std::string HeightMap;
-	std::string CompositionMap;
-	std::vector<std::string> TerrainTextures;
+	std::shared_ptr<VulkanImage> HeightMap;
+	std::shared_ptr<VulkanImage> NormalMap;
+	std::shared_ptr<VulkanImage> CompositionMap;
+	std::shared_ptr<VulkanTexture> TerrainTextures;
 
 	TerrainInfo Info;
 };
@@ -51,6 +56,11 @@ public:
 
 	TerrainInfo getInfo() { return m_Specification.Info; }
 	void setHeightMultiplier(float mul) { m_Specification.Info.HeightMultiplier = mul; }
+
+	const std::shared_ptr<VulkanImage>& getHeightMap() { return m_Specification.HeightMap; }
+	const std::shared_ptr<VulkanImage>& getNormalMap() { return m_Specification.NormalMap; }
+	const std::shared_ptr<VulkanImage>& getCompositionMap() { return m_Specification.CompositionMap; }
+	const std::shared_ptr<VulkanTexture>& getTerrainTextures() { return m_Specification.TerrainTextures; }
 
 	std::shared_ptr<DistanceLOD> m_DistanceLOD;
 private:

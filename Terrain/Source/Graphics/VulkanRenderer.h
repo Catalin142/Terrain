@@ -4,7 +4,7 @@
 #include "VulkanSwapchain.h"
 #include "VulkanRenderCommandBuffer.h"
 #include "VulkanComputePipeline.h"
-#include "VulkanRenderPass.h"
+#include "VulkanPass.h"
 
 class VulkanRenderer
 {
@@ -23,13 +23,16 @@ public:
 	static uint32_t getCurrentFrame();
 
 	static void beginRenderPass(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer, 
-		const std::shared_ptr<VulkanRenderPass>& renderPass);
+		const std::shared_ptr<RenderPass>& renderPass);
 	static void endRenderPass(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer);
 
-	static void beginSwapchainRenderPass(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer, const std::shared_ptr<VulkanRenderPass>& renderpass);
+	static void beginSwapchainRenderPass(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer, const std::shared_ptr<RenderPass>& renderpass);
+
+	static void preparePipeline(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer,
+		const std::shared_ptr<RenderPass>& renderPass);
 
 	static void dispatchCompute(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer, 
-		const std::shared_ptr<VulkanComputePipeline>& computePipeline, glm::ivec3 workgroups);
+		const std::shared_ptr<VulkanComputePass>& computePass, glm::ivec3 workgroups, uint32_t pushConstantSize = 0, void* data = nullptr);
 
 private:
 	VulkanRenderer() = default;

@@ -58,6 +58,8 @@ public:
 
 	const PipelineSpecification& getSpecification() { return m_Specification; }
 
+	void Recreate();
+
 	VkPipeline getVkPipeline() { return m_Pipeline; }
 	VkPipelineLayout getVkPipelineLayout() { return m_PipelineLayout; }
 
@@ -67,6 +69,6 @@ public:
 private:
 	PipelineSpecification m_Specification;
 
-	VkPipeline m_Pipeline;
-	VkPipelineLayout m_PipelineLayout;
+	VkPipeline m_Pipeline = VK_NULL_HANDLE;
+	VkPipelineLayout m_PipelineLayout = VK_NULL_HANDLE;
 };

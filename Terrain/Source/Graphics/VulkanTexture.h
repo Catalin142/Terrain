@@ -52,7 +52,7 @@ private:
 struct SamplerSpecification
 {
 	VkFilter magFilter = VK_FILTER_LINEAR, minFilter = VK_FILTER_LINEAR;
-	VkSamplerAddressMode addresMode = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+	VkSamplerAddressMode addresMode = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	uint32_t Mips = 1;
 };
 

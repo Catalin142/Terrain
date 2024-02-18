@@ -17,8 +17,12 @@
 #include "Renderer/TerrainRenderer.h"
 
 #include "Terrain/Terrain.h"
+#include "Terrain/Generator/TerrainGenerator.h"
 
 #include "Scene/Camera.h"
+#include "GUI/TerrainGenerationGUI.h"
+
+#include <thread>
 
 #define MAX_FRAMES_IN_FLIGHT 2
 
@@ -49,24 +53,20 @@ private:
 
 private:
 	std::shared_ptr<VulkanRenderCommandBuffer> CommandBuffer;
-	std::shared_ptr<VulkanRenderPass> m_FinalPass;
+	std::shared_ptr<RenderPass> m_FinalPass;
 
 	std::shared_ptr<VulkanFramebuffer> m_Output;
-	std::shared_ptr<VulkanImage> m_Noise;
-
-	std::shared_ptr<VulkanBuffer> m_FullscreenVertexBuffer;
-	std::shared_ptr<VulkanBuffer> m_FullscreenIndexBuffer;
-
-	std::shared_ptr<VulkanComputePipeline> m_ComputePipeline;
-	std::shared_ptr<VulkanDescriptorSet> m_ComputeDescriptorSet;
 
 	std::shared_ptr<Terrain> m_Terrain;
 	std::shared_ptr<TerrainRenderer> m_TerrainRenderer;
-	
-	Camera cam{45.0f, 1600.0f / 900.0f, 0.1f, 10000.0f};
+	std::shared_ptr<TerrainGenerator> m_TerrainGenerator;
 
-	noiseParams m_NoiseParams;
-	float heightMult = 1.0f;
+	std::shared_ptr<VulkanSampler> m_Sampler;
+	std::shared_ptr<TerrainGenerationGUI> TerrainGUI;
 
+	Camera cam{45.0f, 1600.0f / 900.0f, 0.1f, 1000000000.0f};
 	bool Wireframe = false;
+
+	std::thread* thread;
+	bool presed = false;
 };

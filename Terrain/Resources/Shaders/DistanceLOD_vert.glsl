@@ -17,7 +17,7 @@ struct TerrainChunk
 
 layout(set = 0, binding = 0) uniform ChunksUniformBufferSet
 {
-    TerrainChunk chunk[4096];
+    TerrainChunk chunk[8 * 8];
 } Chunks;
 
 layout(set = 0, binding = 1) uniform LodMapUniformBufferSet
@@ -32,7 +32,8 @@ layout(set = 0, binding = 2) uniform TerrainInfoUniformBuffer
     int minimumChunkSize;
 } terrainInfo;
 
-layout (set = 1, binding = 0) uniform sampler2D heightMap;
+layout (set = 1, binding = 0) uniform sampler terrainSampler;
+layout (set = 1, binding = 1) uniform texture2D heightMap;
 
 float getClosestPosition(int position, int target, int chunkSize) 
 {    
@@ -80,15 +81,15 @@ void main()
     if (position.z == 0 && downLod > currentLod)
         position.x = getClosestPosition(int(position.x), downLod, chunk.Size);
         
-    texCoord = vec2(position.x / chunk.Size, position.z / chunk.Size);
-
+    texCoord = vec2(position.x / (chunk.Size / 16.0), position.z / (chunk.Size / 16.0));
+    
     position.x += offset.x;
     position.z += offset.y;
     
     vec2 dynamicTexCoord = vec2(position.x / terrainInfo.Size.x, position.z / terrainInfo.Size.y);
-
-    position.y = (1.0 - texture(heightMap, dynamicTexCoord).r) * terrainInfo.heightMultiplier;
-
+    
+    position.y = (1.0 - texture(sampler2D(heightMap, terrainSampler), dynamicTexCoord).r) * terrainInfo.heightMultiplier;
+    
     gl_Position = Camera.Projection * Camera.View * position;
 
     fragTexCoord = dynamicTexCoord;
