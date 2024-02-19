@@ -3,7 +3,7 @@
 layout (binding = 0, rgba8) uniform readonly image2D normalMap;
 layout (binding = 1, rgba8) uniform writeonly image2D composition;
 
-layout(local_size_x = 8, local_size_y = 8) in;
+layout(local_size_x = 16, local_size_y = 16) in;
 void main()
 {
 	ivec2 texel = ivec2(gl_GlobalInvocationID.xy);

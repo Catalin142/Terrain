@@ -35,6 +35,7 @@ public:
 
 	void notifyChange();
 
+	std::shared_ptr<VulkanComputePass> m_NormalComputePass;
 public:
 	GenerationParameters Noise{ };
 	CompositionParameters Composition{ };

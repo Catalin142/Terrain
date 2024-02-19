@@ -15,20 +15,27 @@ void TerrainGenerator::Generate(const std::shared_ptr<VulkanRenderCommandBuffer>
 		return;
 
 	{
-		VulkanRenderer::dispatchCompute(commandBuffer, m_NoiseGenerationPass, { m_Width / 8, m_Height / 8, 1 },
+		VulkanRenderer::dispatchCompute(commandBuffer, m_NoiseGenerationPass, { m_Width / 16, m_Height / 16, 1 },
 			sizeof(GenerationParameters), &Noise);
 
 		// Prevents the composition pass to read noise and normals before they are finished
 		m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Noise, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+	}
+
+	// compute normals
+	{
+		VulkanRenderer::dispatchCompute(commandBuffer, m_NormalComputePass, { m_Width / 16, m_Height / 16, 1 });
+
+		m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Normals, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
 		m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Normals, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-
 	}
 
 	{
-		VulkanRenderer::dispatchCompute(commandBuffer, m_CompositionPass, { m_Width / 8, m_Height / 8, 1 });
+		VulkanRenderer::dispatchCompute(commandBuffer, m_CompositionPass, { m_Width / 16, m_Height / 16, 1 });
 
 		// prevernts terrain fragment shader read from composition image until it is finished
 		m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Composition, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -57,6 +64,10 @@ void TerrainGenerator::createShaders()
 	noiseCompute->addShaderStage(ShaderStage::COMPUTE, "TerrainGeneration/Noise_comp.glsl");
 	noiseCompute->createDescriptorSetLayouts();
 
+	std::shared_ptr<VulkanShader>& normalCompute = ShaderManager::createShader("_NormalCompute");
+	normalCompute->addShaderStage(ShaderStage::COMPUTE, "TerrainGeneration/TerrainNormals_comp.glsl");
+	normalCompute->createDescriptorSetLayouts();
+
 	std::shared_ptr<VulkanShader>& compositionCompute = ShaderManager::createShader("_CompositionCompute");
 	compositionCompute->addShaderStage(ShaderStage::COMPUTE, "TerrainGeneration/TerrainComposition_comp.glsl");
 	compositionCompute->createDescriptorSetLayouts();
@@ -68,7 +79,7 @@ void TerrainGenerator::createImages()
 		ImageSpecification noiseHeightmapSpecification;
 		noiseHeightmapSpecification.Width = m_Width;
 		noiseHeightmapSpecification.Height = m_Height;
-		noiseHeightmapSpecification.Format = VK_FORMAT_R32_SFLOAT;
+		noiseHeightmapSpecification.Format = VK_FORMAT_R16_SFLOAT;
 		noiseHeightmapSpecification.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
 		noiseHeightmapSpecification.UsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 		m_Noise = std::make_shared<VulkanImage>(noiseHeightmapSpecification);
@@ -87,7 +98,6 @@ void TerrainGenerator::createImages()
 	}
 
 	{
-
 		ImageSpecification compositionSpecification;
 		compositionSpecification.Width = m_Width;
 		compositionSpecification.Height = m_Height;
@@ -105,10 +115,18 @@ void TerrainGenerator::createCompute()
 		m_NoiseGenerationPass = std::make_shared<VulkanComputePass>();
 		m_NoiseGenerationPass->DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("_NoiseCompute"));
 		m_NoiseGenerationPass->DescriptorSet->bindInput(0, 0, m_Noise);
-		m_NoiseGenerationPass->DescriptorSet->bindInput(0, 1, m_Normals);
 		m_NoiseGenerationPass->DescriptorSet->Create();
 		m_NoiseGenerationPass->Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader("_NoiseCompute"), 
 			sizeof(GenerationParameters));
+	}
+
+	{
+		m_NormalComputePass = std::make_shared<VulkanComputePass>();
+		m_NormalComputePass->DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("_NormalCompute"));
+		m_NormalComputePass->DescriptorSet->bindInput(0, 0, m_Noise);
+		m_NormalComputePass->DescriptorSet->bindInput(0, 1, m_Normals);
+		m_NormalComputePass->DescriptorSet->Create();
+		m_NormalComputePass->Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader("_NormalCompute"));
 	}
 
 	{

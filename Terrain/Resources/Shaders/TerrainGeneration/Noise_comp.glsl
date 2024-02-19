@@ -2,8 +2,7 @@
 
 // https://gist.github.com/Leslieghf/334b8cd6ed75fb35ae334416627995ee
 
-layout (binding = 0, r32f) uniform writeonly image2D image;
-layout (binding = 1, rgba8) uniform writeonly image2D noiseTexture;
+layout (binding = 0, r16f) uniform writeonly image2D heightMap;
 
 layout (push_constant) uniform noiseParameters
 {
@@ -194,11 +193,11 @@ float domainWarping(vec2 point)
     return computeFbm(point + 4.0 * q, params.octaves);
 }
 
-layout(local_size_x = 8, local_size_y = 8) in;
+layout(local_size_x = 16, local_size_y = 16) in;
 void main() 
 {
     float noise = domainWarping(vec2(gl_GlobalInvocationID.xy / 1024.0));
     
     ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
-	imageStore(image, pixelCoords, vec4(noise, noise, noise, 1.0));
+	imageStore(heightMap, pixelCoords, vec4(noise, noise, noise, 1.0));
 }

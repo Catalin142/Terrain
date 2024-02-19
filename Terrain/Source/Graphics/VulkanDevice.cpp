@@ -152,6 +152,7 @@ void VulkanDevice::pickPhysicalDevice(const InstanceProperties& instanceProps)
 	vkGetPhysicalDeviceProperties(m_VulkanPlatform.GPU, &m_physicalDeviceProperties);
 	vkGetPhysicalDeviceMemoryProperties(m_VulkanPlatform.GPU, &m_physicalDeviceMemoryProperties);
 	vkGetPhysicalDeviceFeatures(m_VulkanPlatform.GPU, &m_physicalDeviceFeatures);
+	GPUName = m_physicalDeviceProperties.deviceName;
 
 #if DEBUG
 	std::cout << "GPU: " << m_physicalDeviceProperties.deviceName << "\n";

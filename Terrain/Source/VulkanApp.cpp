@@ -91,7 +91,7 @@ void VulkanApp::onCreate()
 
 		m_Sampler = std::make_shared<VulkanSampler>(SamplerSpecification{});
 
-		TerrainGUI = std::make_shared<TerrainGenerationGUI>(m_TerrainGenerator, 500, ImVec2(1090.0f, 10.0f));
+		TerrainGUI = std::make_shared<TerrainGenerationGUI>(m_TerrainGenerator, 300, ImVec2(1290.0f, 10.0f));
 		m_TerrainRenderer = std::make_shared<TerrainRenderer>(m_Output);
 	}
 
@@ -184,7 +184,7 @@ void VulkanApp::onUpdate()
 
 		TerrainGUI->Render();
 
-		m_Terrain->setHeightMultiplier(m_TerrainGenerator->Noise.Amplitude * 1024.0f);
+		m_Terrain->setHeightMultiplier(100.0f);
 
 		endImGuiFrame();
 		CommandBuffer->endQuery("Imgui");
@@ -216,12 +216,12 @@ void VulkanApp::postFrame()
 {
 	CommandBuffer->queryResults();
 
-	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_U) && presed == false)
+	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_U))
 	{
 		thread = new std::thread([&]() {
-			ShaderManager::getShader("DistanceLODShader")->getShaderStage(ShaderStage::FRAGMENT)->Recompile();
+			ShaderManager::getShader("_NormalCompute")->getShaderStage(ShaderStage::COMPUTE)->Recompile();
 			vkDeviceWaitIdle(VulkanDevice::getVulkanDevice());
-			m_TerrainRenderer->m_TerrainPipeline->Recreate();
+			m_TerrainGenerator->m_NormalComputePass->Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader("_NormalCompute"));
 			});
 		//thread->join();
 		presed = true;

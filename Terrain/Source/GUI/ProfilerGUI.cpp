@@ -4,6 +4,8 @@
 #include <iostream>
 #include <format>
 
+#include "Graphics/VulkanDevice.h"
+
 ProfilerGUI::ProfilerGUI(const std::string& name, uint32_t sampleCount) : m_SampleCount(sampleCount), m_Name(name)
 { }
 
@@ -119,7 +121,7 @@ void ProfilerManager::Render()
 {
 	ImGui::SetNextWindowPos(m_Position);
 	ImGui::SetNextWindowSizeConstraints(ImVec2(m_Width, -1.0f), ImVec2(m_Width, FLT_MAX));
-	ImGui::Begin("Profilers", 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize);
+	ImGui::Begin(("Profilers " + VulkanDevice::getVulkanContext()->GPUName).c_str(), 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize);
 
 	for (auto& [name, profiler] : m_Profilers)
 	{

@@ -116,6 +116,9 @@ public:
 		return m_Instance->m_CommandPool->getGraphicsCommandPool();
 	}
 
+	// TODO modify
+	std::string GPUName;
+
 private:
 	static VulkanDevice* m_Instance;
 

@@ -41,4 +41,14 @@
 		   - very important the resolution of textures
 
 14.02.2024 - Fixed normals, i put them in range [0, 1] and never got them back to [-1, 1], i just used a SNORM texture
+
+19.02.2024 - Combined different layers of noise, with different weights
+		   - Moved the normal calculation to a different compute shader, since i want to have multiple layers
+		   - UI Update
+
+		   - TODO:
+				- A simpler way to stack different layers of noise from UI
+				- Terrain composition map
+				- Terrain texturing
+				- Hydraulic errosion
 			
