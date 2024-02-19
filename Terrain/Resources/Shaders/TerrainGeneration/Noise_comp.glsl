@@ -84,67 +84,120 @@ float cnoise(vec2 coords)
   return mix(y1, y2, sy);
 }
 
+// https://www.shadertoy.com/view/XlGcRh
+vec2 hashwithoutsine22(vec2 p)
+{
+	vec3 p3 = fract(vec3(p.xyx) * vec3(.1031, .1030, .0973));
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.xx + p3.yz) * p3.zy);
+}
+
+// https://iquilezles.org/articles/gradientnoise/
+vec3 NoiseDerivatives(vec2 p)
+{
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+
+    vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+    vec2 du = 30.0 * f * f * (f * (f - 2.0) + 1.0);
+    
+    vec2 ga = hashwithoutsine22(i + vec2(0.0, 0.0));
+    vec2 gb = hashwithoutsine22(i + vec2(1.0, 0.0));
+    vec2 gc = hashwithoutsine22(i + vec2(0.0, 1.0));
+    vec2 gd = hashwithoutsine22(i + vec2(1.0, 1.0));
+    
+    float va = dot(ga, f - vec2(0.0, 0.0));
+    float vb = dot(gb, f - vec2(1.0, 0.0));
+    float vc = dot(gc, f - vec2(0.0, 1.0));
+    float vd = dot(gd, f - vec2(1.0, 1.0));
+
+    return vec3( va + u.x * (vb - va) + u.y * (vc - va) + u.x * u.y * (va - vb - vc + vd),   // value
+                 ga + u.x * (gb - ga) + u.y * (gc - ga) + u.x * u.y * (ga - gb - gc + gd) +  // derivatives
+                 du * (u.yx * (va - vb - vc + vd) + vec2(vb, vc) - va));
+}
+
 float StandardPerlin(vec2 point)
 {
     return cnoise(point);
 }
 
-float BillowyNoise(vec2 point)
+float BillowNoise(vec2 point)
 {
     float noise = cnoise(point);
-    return 1.0 - abs(noise);
+    return abs(noise);
 }
 
-float RigidPerlinNoise(vec2 point)
+float RidgetNoise(vec2 point)
 {
-    return 1.0 - BillowyNoise(point);
+    return 1.0 - BillowNoise(point);
 }
 
 float sigmoid2(float x, float sharpness) {
-  if (x >= 1.0) return 1.0;
-  else if (x <= -1.0) return -1.0;
-  else {
-    if (sharpness < 0.0) sharpness -= 1.0;
+    if (x >= 1.0) return 1.0;
+    else if (x <= -1.0) return -1.0;
+    else 
+    {
+        if (sharpness < 0.0) sharpness -= 1.0;
 
-    if (x > 0.0) return sharpness * x / (sharpness - x + 1.0);
-    else if (x < 0.0) return sharpness * x / (sharpness - abs(x) + 1.0);
-    else return 0.0;
-  }
+        if (x > 0.0) return sharpness * x / (sharpness - x + 1.0);
+        else if (x < 0.0) return sharpness * x / (sharpness - abs(x) + 1.0);
+        else return 0.0;
+    }
 }
 
 float computeFbm(vec2 coords, int octaveCount) 
 {
-  float frequency = params.frequency;
-  float amplitude = params.amplitude;
-  float total = 0.0;
+    float frequency = params.frequency;
+    float amplitude = params.amplitude;
+    float total = 0.0;
 
-  for (int i = 0; i < octaveCount; ++i) 
-  {
-    total += StandardPerlin(coords * frequency) * amplitude;
+    vec2 d = vec2(0.0);
+    vec2 p = coords;
+    float a = 0.0;
+    float b = 1.0;
 
-    frequency *= params.lacunarity;
-    amplitude *= 0.5;
+    for (int i = 0; i < octaveCount; ++i) 
+    {
+        total += BillowNoise(coords * frequency) * amplitude;
+
+        frequency *= params.lacunarity;
+        amplitude *= 0.5;
+
+
+        vec3 n = NoiseDerivatives(p);
+        d += n.yz;
+        total += b * n.x / (1.5 + dot(d, d));
+        b *= 0.5;
+        p = p * 2.0;
   }
 
   // Abstract
-  float height = total * params.b;
-  float fl = floor(height);
-  float diff = height - fl;
-  diff = (sigmoid2(diff * 2.0 - 1.0, params.gain) + 1.0) / 2.0;
-  
-  float ffloor = float(fl) / params.b;
-  float fceil = float(fl + 1) / params.b;
-        
-  total = mix(ffloor, fceil, diff);
-
-  return total;
+    float height = total * params.b;
+    float fl = floor(height);
+    float diff = height - fl;
+    diff = (sigmoid2(diff * 2.0 - 1.0, params.gain) + 1.0) / 2.0;
+    
+    float ffloor = float(fl) / params.b;
+    float fceil = float(fl + 1) / params.b;
+          
+    total = mix(ffloor, fceil, diff);
+    
+    return total;
 }
 
+float domainWarping(vec2 point)
+{
+    float x = computeFbm(point + vec2(0.0, 0.0), params.octaves);
+    float y = computeFbm(point + vec2(5.2, 1.6), params.octaves);
+
+    vec2 q = vec2(x, y);
+    return computeFbm(point + 4.0 * q, params.octaves);
+}
 
 layout(local_size_x = 8, local_size_y = 8) in;
 void main() 
 {
-    float noise = computeFbm(vec2(gl_GlobalInvocationID.xy / 1024.0), params.octaves);
+    float noise = domainWarping(vec2(gl_GlobalInvocationID.xy / 1024.0));
     
     ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
 	imageStore(image, pixelCoords, vec4(noise, noise, noise, 1.0));

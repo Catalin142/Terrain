@@ -23,7 +23,7 @@ void TerrainGenerator::Generate(const std::shared_ptr<VulkanRenderCommandBuffer>
 			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
 		m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Normals, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			VK_ACCESS_COLOR_ATTACHMENT_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 
 	}
 
@@ -32,7 +32,7 @@ void TerrainGenerator::Generate(const std::shared_ptr<VulkanRenderCommandBuffer>
 
 		// prevernts terrain fragment shader read from composition image until it is finished
 		m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Composition, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			VK_ACCESS_COLOR_ATTACHMENT_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 	}
 
 	m_Valid = true;
