@@ -24,7 +24,7 @@ static InstanceProperties getDefaultInstanceProperties()
 {
 	InstanceProperties defaultProps;
 	defaultProps.GPUType				= VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
-	defaultProps.requestedExtensions	= { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+	defaultProps.requestedExtensions	= { VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME };
 	defaultProps.requestedLayers		= { "VK_LAYER_KHRONOS_validation" };
 
 	return defaultProps;

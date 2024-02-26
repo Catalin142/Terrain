@@ -4,6 +4,7 @@
 #include "Graphics/VulkanPass.h"
 
 #include <memory>
+#include <array>
 
 struct GenerationParameters
 {
@@ -21,6 +22,12 @@ struct CompositionParameters
 	int8_t _padding[4];
 };
 
+struct TimeUniform
+{
+	glm::vec2 pos;
+	int8_t _padding[2];
+};
+
 class TerrainGenerator
 {
 public:
@@ -29,13 +36,14 @@ public:
 	void Generate(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer);
 	void Resize(uint32_t width, uint32_t height);
 
+	void runHydraulicErosion(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer);
+
 	std::shared_ptr<VulkanImage> getHeightMap() { return m_Noise; }
 	std::shared_ptr<VulkanImage> getNormalMap() { return m_Normals; }
 	std::shared_ptr<VulkanImage> getCompositionMap() { return m_Composition; }
 
 	void notifyChange();
 
-	std::shared_ptr<VulkanComputePass> m_NormalComputePass;
 public:
 	GenerationParameters Noise{ };
 	CompositionParameters Composition{ };
@@ -50,6 +58,8 @@ private:
 
 	std::shared_ptr<VulkanComputePass> m_NoiseGenerationPass;
 	std::shared_ptr<VulkanComputePass> m_CompositionPass;
+	std::shared_ptr<VulkanComputePass> m_NormalComputePass;
+	std::shared_ptr<VulkanComputePass> m_HydraulicErosionPass;
 
 	std::shared_ptr<VulkanImage> m_Noise;
 	std::shared_ptr<VulkanImage> m_Normals;
@@ -57,6 +67,9 @@ private:
 
 	GenerationParameters m_OldNoise{ };
 	CompositionParameters m_OldComposition{ };
+
+	std::array<glm::vec4, 1024> m_RandomPos;
+	std::shared_ptr<VulkanUniformBuffer> m_UniformBuffer;
 
 	bool m_Valid = false;
 };

@@ -44,6 +44,7 @@
 		"External/glm/glm/**.inl",
 		"External/stb_image/**.h",
 		"External/stb_image/**.cpp",
+		"External/shaderc/glslc/file_includer.cc",
 	}
 
 	filter "system:windows"

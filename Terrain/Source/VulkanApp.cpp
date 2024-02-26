@@ -84,7 +84,7 @@ void VulkanApp::onCreate()
 			terrainSpec.TerrainTextures = std::make_shared<VulkanTexture>(texSpec);
 		}
 
-		terrainSpec.Info.TerrainSize = { 1024.0f, 1024.0f };
+		terrainSpec.Info.TerrainSize = { 1024.0, 1024.0 };
 
 		m_Terrain = std::make_shared<Terrain>(terrainSpec);
 		m_Terrain->setHeightMultiplier(3300.0f);
@@ -127,7 +127,7 @@ void VulkanApp::onUpdate()
 	if (camVelocity != glm::vec3(0.0f, 0.0f, 0.0f))
 	{
 		if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_SPACE))
-			cam.Move(glm::normalize(camVelocity) * 15.75f);
+			cam.Move(glm::normalize(camVelocity) * 2.0f);
 		else
 			cam.Move(glm::normalize(camVelocity) * 0.25f);
 	}
@@ -145,6 +145,9 @@ void VulkanApp::onUpdate()
 	CommandBuffer->Begin();
 	VkCommandBuffer commandBuffer = CommandBuffer->getCurrentCommandBuffer();
 	m_TerrainGenerator->Generate(CommandBuffer);
+
+	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_3))
+		m_TerrainGenerator->runHydraulicErosion(CommandBuffer);
 
 	// Geometry pass
 	{
@@ -216,16 +219,16 @@ void VulkanApp::postFrame()
 {
 	CommandBuffer->queryResults();
 
-	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_U))
-	{
-		thread = new std::thread([&]() {
-			ShaderManager::getShader("_NormalCompute")->getShaderStage(ShaderStage::COMPUTE)->Recompile();
-			vkDeviceWaitIdle(VulkanDevice::getVulkanDevice());
-			m_TerrainGenerator->m_NormalComputePass->Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader("_NormalCompute"));
-			});
-		//thread->join();
-		presed = true;
-	}
+	//if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_U))
+	//{
+	//	thread = new std::thread([&]() {
+	//		ShaderManager::getShader("_NormalCompute")->getShaderStage(ShaderStage::COMPUTE)->Recompile();
+	//		vkDeviceWaitIdle(VulkanDevice::getVulkanDevice());
+	//		m_TerrainGenerator->m_NormalComputePass->Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader("_NormalCompute"));
+	//		});
+	//	//thread->join();
+	//	presed = true;
+	//}
 }
 
 void VulkanApp::createFinalPass()

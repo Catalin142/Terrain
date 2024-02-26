@@ -121,7 +121,7 @@ void ProfilerManager::Render()
 {
 	ImGui::SetNextWindowPos(m_Position);
 	ImGui::SetNextWindowSizeConstraints(ImVec2(m_Width, -1.0f), ImVec2(m_Width, FLT_MAX));
-	ImGui::Begin(("Profilers " + VulkanDevice::getVulkanContext()->GPUName).c_str(), 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize);
+	ImGui::Begin(("Vulkan Profilers " + VulkanDevice::getVulkanContext()->GPUName).c_str(), 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize);
 
 	for (auto& [name, profiler] : m_Profilers)
 	{

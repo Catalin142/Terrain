@@ -11,6 +11,7 @@
 #include <filesystem>
 
 #include <shaderc/shaderc.hpp>
+#include <shaderc/glslc/file_includer.h>
 #include <spirv_cross/spirv_glsl.hpp>
 
 std::unordered_map<std::string, std::shared_ptr<VulkanShader>> ShaderManager::m_Shaders;
@@ -319,6 +320,9 @@ std::vector<uint32_t> VulkanShaderCompiler::compileVulkanShader(ShaderStage stag
 {
 	shaderc::Compiler compiler;
 	shaderc::CompileOptions options;
+
+	shaderc_util::FileFinder fileFinder;
+	options.SetIncluder(std::make_unique<glslc::FileIncluder>(&fileFinder));
 
 	std::string sourceCode = readFile(filepath);
 

@@ -31,7 +31,6 @@ public:
 
 	void setWireframe(bool wireframe);
 
-	std::shared_ptr<VulkanPipeline> m_TerrainPipeline;
 private:
 	void initializeBuffers();
 
@@ -49,6 +48,7 @@ private:
 	std::shared_ptr<VulkanRenderCommandBuffer> m_RenderCommandBuffer;
 
 	std::shared_ptr<RenderPass> m_TerrainRenderPass;
+	std::shared_ptr<VulkanPipeline> m_TerrainPipeline;
 
 	std::shared_ptr<VulkanFramebuffer> m_TargetFramebuffer;
 

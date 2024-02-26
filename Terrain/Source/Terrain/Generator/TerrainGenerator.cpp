@@ -4,6 +4,7 @@
 
 TerrainGenerator::TerrainGenerator(uint32_t width, uint32_t height) : m_Width(width), m_Height(height)
 {
+	m_UniformBuffer = std::make_shared<VulkanUniformBuffer>(sizeof(glm::vec4));
 	createShaders();
 	createImages();
 	createCompute();
@@ -15,7 +16,7 @@ void TerrainGenerator::Generate(const std::shared_ptr<VulkanRenderCommandBuffer>
 		return;
 
 	{
-		VulkanRenderer::dispatchCompute(commandBuffer, m_NoiseGenerationPass, { m_Width / 16, m_Height / 16, 1 },
+		VulkanRenderer::dispatchCompute(commandBuffer, m_NoiseGenerationPass, { m_Width / 8, m_Height / 8, 1 },
 			sizeof(GenerationParameters), &Noise);
 
 		// Prevents the composition pass to read noise and normals before they are finished
@@ -23,9 +24,19 @@ void TerrainGenerator::Generate(const std::shared_ptr<VulkanRenderCommandBuffer>
 			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 	}
 
+	{
+		VulkanRenderer::dispatchCompute(commandBuffer, m_HydraulicErosionPass, { 1, 1, 1 });
+
+		m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Noise, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+
+		m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Noise, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+	}
+
 	// compute normals
 	{
-		VulkanRenderer::dispatchCompute(commandBuffer, m_NormalComputePass, { m_Width / 16, m_Height / 16, 1 });
+		VulkanRenderer::dispatchCompute(commandBuffer, m_NormalComputePass, { m_Width / 8, m_Height / 8, 1 });
 
 		m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Normals, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
@@ -35,12 +46,14 @@ void TerrainGenerator::Generate(const std::shared_ptr<VulkanRenderCommandBuffer>
 	}
 
 	{
-		VulkanRenderer::dispatchCompute(commandBuffer, m_CompositionPass, { m_Width / 16, m_Height / 16, 1 });
+		VulkanRenderer::dispatchCompute(commandBuffer, m_CompositionPass, { m_Width / 8, m_Height / 8, 1 });
 
 		// prevernts terrain fragment shader read from composition image until it is finished
 		m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Composition, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 	}
+
+	
 
 	m_Valid = true;
 }
@@ -53,6 +66,51 @@ void TerrainGenerator::Resize(uint32_t width, uint32_t height)
 	m_Valid = false;
 }
 
+void TerrainGenerator::runHydraulicErosion(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer)
+{
+	for (auto& pos : m_RandomPos)
+	{
+		pos.x = ((float)rand() / (float)RAND_MAX) * 1024.0f;
+		pos.y = ((float)rand() / (float)RAND_MAX) * 1024.0f;
+	}
+
+	static float t = 0.0f;
+	static float r = 0.0f;
+	t = ((float)rand() / (float)RAND_MAX) * 17323.0f;
+	r = ((float)rand() / (float)RAND_MAX) * 238727.0f;
+	glm::vec2 a{ t, r };
+	m_UniformBuffer->setData(&a, sizeof(glm::vec2));
+
+	{
+		VulkanRenderer::dispatchCompute(commandBuffer, m_HydraulicErosionPass, { 1, 1, 1 });
+
+		m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Noise, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+
+		m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Noise, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+	}
+
+	// compute normals
+	{
+		VulkanRenderer::dispatchCompute(commandBuffer, m_NormalComputePass, { m_Width / 8, m_Height / 8, 1 });
+
+		m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Normals, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+
+		m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Normals, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+	}
+
+	{
+		VulkanRenderer::dispatchCompute(commandBuffer, m_CompositionPass, { m_Width / 8, m_Height / 8, 1 });
+
+		// prevernts terrain fragment shader read from composition image until it is finished
+		m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Composition, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+	}
+}
+
 void TerrainGenerator::notifyChange()
 {
 	m_Valid = false;
@@ -60,8 +118,8 @@ void TerrainGenerator::notifyChange()
 
 void TerrainGenerator::createShaders()
 {
-	std::shared_ptr<VulkanShader>& noiseCompute = ShaderManager::createShader("_NoiseCompute");
-	noiseCompute->addShaderStage(ShaderStage::COMPUTE, "TerrainGeneration/Noise_comp.glsl");
+	std::shared_ptr<VulkanShader>& noiseCompute = ShaderManager::createShader("_TerrainGenerator");
+	noiseCompute->addShaderStage(ShaderStage::COMPUTE, "TerrainGeneration/TerrainGenerator_comp.glsl");
 	noiseCompute->createDescriptorSetLayouts();
 
 	std::shared_ptr<VulkanShader>& normalCompute = ShaderManager::createShader("_NormalCompute");
@@ -71,6 +129,10 @@ void TerrainGenerator::createShaders()
 	std::shared_ptr<VulkanShader>& compositionCompute = ShaderManager::createShader("_CompositionCompute");
 	compositionCompute->addShaderStage(ShaderStage::COMPUTE, "TerrainGeneration/TerrainComposition_comp.glsl");
 	compositionCompute->createDescriptorSetLayouts();
+
+	std::shared_ptr<VulkanShader>& hydraulicErosionCompute = ShaderManager::createShader("_HydraulicErostionCompute");
+	hydraulicErosionCompute->addShaderStage(ShaderStage::COMPUTE, "TerrainGeneration/HydraulicErosion_comp.glsl");
+	hydraulicErosionCompute->createDescriptorSetLayouts();
 }
 
 void TerrainGenerator::createImages()
@@ -79,7 +141,7 @@ void TerrainGenerator::createImages()
 		ImageSpecification noiseHeightmapSpecification;
 		noiseHeightmapSpecification.Width = m_Width;
 		noiseHeightmapSpecification.Height = m_Height;
-		noiseHeightmapSpecification.Format = VK_FORMAT_R16_SFLOAT;
+		noiseHeightmapSpecification.Format = VK_FORMAT_R32_SFLOAT;
 		noiseHeightmapSpecification.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
 		noiseHeightmapSpecification.UsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 		m_Noise = std::make_shared<VulkanImage>(noiseHeightmapSpecification);
@@ -113,10 +175,10 @@ void TerrainGenerator::createCompute()
 {
 	{
 		m_NoiseGenerationPass = std::make_shared<VulkanComputePass>();
-		m_NoiseGenerationPass->DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("_NoiseCompute"));
+		m_NoiseGenerationPass->DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("_TerrainGenerator"));
 		m_NoiseGenerationPass->DescriptorSet->bindInput(0, 0, m_Noise);
 		m_NoiseGenerationPass->DescriptorSet->Create();
-		m_NoiseGenerationPass->Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader("_NoiseCompute"), 
+		m_NoiseGenerationPass->Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader("_TerrainGenerator"), 
 			sizeof(GenerationParameters));
 	}
 
@@ -136,5 +198,14 @@ void TerrainGenerator::createCompute()
 		m_CompositionPass->DescriptorSet->bindInput(0, 1, m_Composition);
 		m_CompositionPass->DescriptorSet->Create();
 		m_CompositionPass->Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader("_CompositionCompute"));
+	}
+
+	{
+		m_HydraulicErosionPass = std::make_shared<VulkanComputePass>();
+		m_HydraulicErosionPass->DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("_HydraulicErostionCompute"));
+		m_HydraulicErosionPass->DescriptorSet->bindInput(0, 0, m_Noise);
+		m_HydraulicErosionPass->DescriptorSet->bindInput(1, 0, m_UniformBuffer);
+		m_HydraulicErosionPass->DescriptorSet->Create();
+		m_HydraulicErosionPass->Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader("_HydraulicErostionCompute"));
 	}
 }

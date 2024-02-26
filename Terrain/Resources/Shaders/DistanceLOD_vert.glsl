@@ -2,6 +2,7 @@
 
 layout(location = 0) out vec2 fragTexCoord;
 layout(location = 1) out vec2 texCoord;
+layout(location = 2) out vec3 fragmentPosition;
 
 layout(push_constant) uniform CameraPushConstant
 {
@@ -35,20 +36,10 @@ layout(set = 0, binding = 2) uniform TerrainInfoUniformBuffer
 layout (set = 1, binding = 0) uniform sampler terrainSampler;
 layout (set = 1, binding = 1) uniform texture2D heightMap;
 
-float getClosestPosition(int position, int target, int chunkSize) 
-{    
-    if (position == chunkSize || position == 0)
-        return float(position);
-
-    position = position + target / 2;
-    position = position - (position % target);
-    return float(position);
-} 
-
 int getLod(int posX, int posY)
 {
-    posX = clamp(posX, 0, (int(terrainInfo.Size.x) / terrainInfo.minimumChunkSize));
-    posY = clamp(posY, 0, (int(terrainInfo.Size.y) / terrainInfo.minimumChunkSize));
+    posX = clamp(posX, 0, (int(terrainInfo.Size.x) / terrainInfo.minimumChunkSize) - 1);
+    posY = clamp(posY, 0, (int(terrainInfo.Size.y) / terrainInfo.minimumChunkSize) - 1);
     return lodMap.lod[posY * (int(terrainInfo.Size.x) / terrainInfo.minimumChunkSize) + posX];
 }
 
@@ -69,28 +60,26 @@ void main()
     int rightLod   = getLod(chunkPosition.x + 1, chunkPosition.y);
     int leftLod    = getLod(chunkPosition.x - 1, chunkPosition.y);
     
-    if (position.x == chunk.Size && rightLod > currentLod)
-        position.z = getClosestPosition(int(position.z), rightLod, chunk.Size);
+    float quadsPerChunk = (chunk.Size / currentLod);
+
+    // stiching patches
+    position.z += (rightLod - (int(position.z) % rightLod)) * float(position.x == chunk.Size) * float((int(position.z) % rightLod) != 0);
+    position.z += (leftLod - (int(position.z) % leftLod)) * float(position.x == 0.0) * float((int(position.z) % leftLod) != 0);
+    position.x += (upLod - (int(position.x) % upLod)) * float(position.z == chunk.Size) * float((int(position.x) % upLod) != 0);
+    position.x += (downLod - (int(position.x) % downLod)) * float(position.z == 0.0) * float((int(position.x) % downLod) != 0);
         
-    if (position.x == 0 && leftLod > currentLod)
-        position.z = getClosestPosition(int(position.z), leftLod, chunk.Size);
-        
-    if (position.z == chunk.Size && upLod > currentLod)
-        position.x = getClosestPosition(int(position.x), upLod, chunk.Size);
-        
-    if (position.z == 0 && downLod > currentLod)
-        position.x = getClosestPosition(int(position.x), downLod, chunk.Size);
-        
-    texCoord = vec2(position.x / (chunk.Size / 16.0), position.z / (chunk.Size / 16.0));
+    texCoord = vec2(position.x / (chunk.Size / 32.0), position.z / (chunk.Size / 32.0));
     
     position.x += offset.x;
     position.z += offset.y;
     
     vec2 dynamicTexCoord = vec2(position.x / terrainInfo.Size.x, position.z / terrainInfo.Size.y);
     
-    position.y = (1.0 - texture(sampler2D(heightMap, terrainSampler), dynamicTexCoord).r) * terrainInfo.heightMultiplier;
+    position.y = (-texture(sampler2D(heightMap, terrainSampler), dynamicTexCoord).r) * terrainInfo.heightMultiplier;
     
     gl_Position = Camera.Projection * Camera.View * position;
+
+    fragmentPosition = position.xyz;
 
     fragTexCoord = dynamicTexCoord;
 }
