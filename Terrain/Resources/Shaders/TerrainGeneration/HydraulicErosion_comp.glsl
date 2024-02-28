@@ -4,13 +4,28 @@
 
 layout (binding = 0, r32f) uniform image2D normalMap;
 
+layout (push_constant) uniform erosionParameters
+{
+    int simulations;
+
+	float inertia;
+
+	float erosionSpeed;
+	float depositSpeed;
+	float evaporation;
+
+	float initalWater;
+	float intialSpeed;
+
+	float maxCapacity;
+
+} params;
+
 layout(set = 1, binding = 0) uniform Seed
 {
 	float x;
 	float y;
 } seed;
-
-#define SIMULATIONS 300
 
 struct PositionInfo
 {
@@ -82,24 +97,19 @@ void main()
 
 	vec2 velocity = vec2(0.0);
 
-	const float intertia = 0.3;
-	
-    float water = 1.0;
+    float water = params.initalWater;
     float sediment = 0.0;
-	float speed = 1.0;
+	float speed = params.intialSpeed;
 
-	for (int sim = 0; sim < SIMULATIONS; sim++)
+	for (int sim = 0; sim < params.simulations; sim++)
 	{
 		PositionInfo ghOld = getGradientAndHeight(dopletPosition);
 
-		velocity = velocity * intertia - ghOld.gradientXYposition.xy * (1.0 - intertia);
+		velocity = velocity * params.inertia - ghOld.gradientXYposition.xy * (1.0 - params.inertia);
 
 		float len = max(0.01, sqrt(velocity.x * velocity.x + velocity.y * velocity.y));
         velocity.x /= len;
         velocity.y /= len;
-
-		if ((velocity.x == 0.0 && velocity.y == 0.0) || outsideOfMap(dopletPosition))
-			break;
 
 		vec2 newDopletPosition = dopletPosition + velocity;
 		
@@ -110,11 +120,7 @@ void main()
 
 		float hDiff = ghNew.gradientXYposition.z - ghOld.gradientXYposition.z;
 
-		// 0.1 = minSlope
-		// 0.3 = speed
-		// 0.2 = capacity
-        // float capacity = max(-hDiff * 1.0 * water * 3.0 * speed, 0.01);
-		float capacity = max(-hDiff, 0.01) * speed * water * 3.0;
+		float capacity = max(-hDiff, 0.01) * speed * water * params.maxCapacity;
 		
 		barrier();
 		groupMemoryBarrier();
@@ -122,7 +128,7 @@ void main()
 		// It went uphill
 		if (sediment > capacity || hDiff > 0.0)
 		{
-			float amountToDeposit = (hDiff > 0) ? min(hDiff, sediment) : (sediment - capacity) * 0.3;
+			float amountToDeposit = (hDiff > 0) ? min(hDiff, sediment) : (sediment - capacity) * params.depositSpeed;
             sediment -= amountToDeposit;
 
 			vec2 off = fract(dopletPosition);
@@ -133,7 +139,7 @@ void main()
 		}
 		else
 		{
-            float amountToErode = min((capacity - sediment) * 0.3, -hDiff);
+            float amountToErode = min((capacity - sediment) * params.erosionSpeed, -hDiff);
 			
 			vec2 off = fract(dopletPosition);
 
@@ -148,7 +154,7 @@ void main()
 		barrier();
 		groupMemoryBarrier();
 
-		water *= 0.99;
+		water *= (1.0 - params.evaporation);
         speed = sqrt(max(0, speed * speed + hDiff * 4.0));
 
 		dopletPosition = newDopletPosition;

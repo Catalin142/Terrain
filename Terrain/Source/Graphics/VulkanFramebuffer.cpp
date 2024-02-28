@@ -123,6 +123,8 @@ VulkanFramebuffer::~VulkanFramebuffer()
 
 void VulkanFramebuffer::Create()
 {
+	m_ColorAttachments.clear();
+
 	std::vector<VkImageView> attachments;
 	bool hasDepth = false;
 

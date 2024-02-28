@@ -13,12 +13,14 @@ public:
 
 	void Render();
 
+public:
+	ImVec2 Position;
+	uint32_t Width;
+
 private:
 	std::shared_ptr<TerrainGenerator> m_Generator;
 	std::shared_ptr<VulkanSampler> m_Sampler;
 
-	uint32_t m_Width;
-	ImVec2 m_Position;
 
 	VkDescriptorSet m_HeightMapDescriptor;
 	VkDescriptorSet m_NormalMapDescriptor;

@@ -24,10 +24,10 @@ public:
 
 	void setRenderCommandBuffer(const std::shared_ptr<VulkanRenderCommandBuffer>& renderCommandBuffer) 
 	{ m_RenderCommandBuffer = renderCommandBuffer; }
+	
+	void setTargetFramebuffer(const std::shared_ptr<VulkanFramebuffer>& targetFramebuffer);
 
 	const std::shared_ptr<VulkanImage> getOutput() { return m_TerrainRenderPass->Pipeline->getTargetFramebuffer()->getImage(0); }
-
-	void onResize(uint32_t width, uint32_t height);
 
 	void setWireframe(bool wireframe);
 

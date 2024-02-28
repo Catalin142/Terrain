@@ -36,9 +36,10 @@ void TerrainRenderer::renderTerrain(const Camera& camera, const std::shared_ptr<
 	}
 }
 
-void TerrainRenderer::onResize(uint32_t width, uint32_t height)
+void TerrainRenderer::setTargetFramebuffer(const std::shared_ptr<VulkanFramebuffer>& targetFramebuffer)
 {
-	m_TerrainRenderPass->Pipeline->getTargetFramebuffer()->Resize(width, height);
+	m_TargetFramebuffer = targetFramebuffer;
+	m_LastTechniqueUsed = LODTechnique::NONE;
 }
 
 void TerrainRenderer::setWireframe(bool wireframe)
@@ -46,16 +47,7 @@ void TerrainRenderer::setWireframe(bool wireframe)
 	if (m_InWireframe != wireframe)
 	{
 		m_InWireframe = wireframe;
-		
-		// Needs to be here so that GPU finish before recreating the Pipeline
-		vkDeviceWaitIdle(VulkanDevice::getVulkanDevice());
-
-		switch (m_LastTechniqueUsed)
-		{
-		case LODTechnique::DISTANCE_BASED:
-			createDistanceLODPipeline();
-			break;
-		}
+		initializeRenderPass();
 	}
 }
 
@@ -71,6 +63,7 @@ void TerrainRenderer::initializeBuffers()
 
 void TerrainRenderer::initializeRenderPass()
 {
+	vkDeviceWaitIdle(VulkanDevice::getVulkanDevice());
 	switch (m_Terrain->getCurrentTechnique())
 	{
 	case LODTechnique::DISTANCE_BASED:

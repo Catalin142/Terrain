@@ -52,6 +52,7 @@ void ProfilerGUI::Render(ImVec2 size)
 		float xOffset = size.x / float(m_SampleCount);
 		float yMultiplier = size.y / m_MaxValue;
 
+		m_MaxValue = 0.0f;
 		for (auto& [name, values] : m_ProfilerValues)
 		{
 			float prevValue = values[m_Start] * yMultiplier;
@@ -61,6 +62,8 @@ void ProfilerGUI::Render(ImVec2 size)
 			uint32_t currentIndex = (m_Start + 1) % m_SampleCount;
 			while (currentIndex != m_End)
 			{
+				m_MaxValue = std::max(m_MaxValue, values[currentIndex]);
+
 				float currentValue = values[currentIndex] * yMultiplier;
 				initialPositionStart = initialPositionEnd;
 
@@ -92,7 +95,9 @@ void ProfilerGUI::Render(ImVec2 size)
 				ImVec2(position.x + 15.0f, position.y + 15.0f + 10.0f), m_ProfilerColors[name]);
 
 			ImGui::SetCursorScreenPos(ImVec2(position.x + 20.0f, position.y + 10.0f));
-			ImGui::Text((name + " " + std::format("{:.4f}", (average / (float)m_CurrentSamples))).c_str());
+			float avg = (average / (float)m_CurrentSamples);
+
+			ImGui::Text((name + " " + std::format("{:.4f}", avg)).c_str());
 		}
 		ImGui::EndChild();
 	}
@@ -100,7 +105,7 @@ void ProfilerGUI::Render(ImVec2 size)
 	ImGui::EndChild();
 }
 
-ProfilerManager::ProfilerManager(ImVec2 position, float width) : m_Position(position), m_Width(width)
+ProfilerManager::ProfilerManager(ImVec2 position, float width) : Position(position), Width(width)
 { }
 
 void ProfilerManager::addProfiler(const std::string& name, uint32_t sampleCount)
@@ -119,15 +124,15 @@ std::shared_ptr<ProfilerGUI> ProfilerManager::operator[](const std::string& name
 
 void ProfilerManager::Render()
 {
-	ImGui::SetNextWindowPos(m_Position);
-	ImGui::SetNextWindowSizeConstraints(ImVec2(m_Width, -1.0f), ImVec2(m_Width, FLT_MAX));
+	ImGui::SetNextWindowPos(Position);
+	ImGui::SetNextWindowSizeConstraints(ImVec2(Width, -1.0f), ImVec2(Width, FLT_MAX));
 	ImGui::Begin(("Vulkan Profilers " + VulkanDevice::getVulkanContext()->GPUName).c_str(), 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize);
 
 	for (auto& [name, profiler] : m_Profilers)
 	{
 		profiler->nextFrame();
 		if (ImGui::CollapsingHeader(name.c_str()))
-			profiler->Render({ m_Width, 150.0f });
+			profiler->Render({ Width, 150.0f });
 	}
 	ImGui::End();
 }

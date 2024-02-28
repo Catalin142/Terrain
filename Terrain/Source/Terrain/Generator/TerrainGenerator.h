@@ -22,10 +22,20 @@ struct CompositionParameters
 	int8_t _padding[4];
 };
 
-struct TimeUniform
+struct HydraulicErosionParameters
 {
-	glm::vec2 pos;
-	int8_t _padding[2];
+	int Simulations = 300;
+
+	float Inertia = 0.1f;
+
+	float ErosionSpeed = 0.3f;
+	float DepositSpeed = 0.3f;
+	float Evaporation = 0.01f;
+
+	float InitalWater = 1.0;
+	float IntialSpeed = 1.0;
+
+	float MaxCapacity = 3.0;
 };
 
 class TerrainGenerator
@@ -47,6 +57,10 @@ public:
 public:
 	GenerationParameters Noise{ };
 	CompositionParameters Composition{ };
+	HydraulicErosionParameters HydraulicErosion{ };
+
+	bool RunHydraulicErosion = false;
+	uint32_t HydraulicSimulations = 0;
 
 private:
 	void createShaders();
@@ -68,8 +82,8 @@ private:
 	GenerationParameters m_OldNoise{ };
 	CompositionParameters m_OldComposition{ };
 
-	std::array<glm::vec4, 1024> m_RandomPos;
 	std::shared_ptr<VulkanUniformBuffer> m_UniformBuffer;
 
 	bool m_Valid = false;
+
 };

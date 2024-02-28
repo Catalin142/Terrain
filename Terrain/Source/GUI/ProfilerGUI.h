@@ -48,9 +48,10 @@ public:
 
 	void Render();
 
-private:
-	ImVec2 m_Position;
-	float m_Width;
+public:
+	ImVec2 Position;
+	float Width;
 
+private:
 	std::unordered_map<std::string, std::shared_ptr<ProfilerGUI>> m_Profilers;
 };

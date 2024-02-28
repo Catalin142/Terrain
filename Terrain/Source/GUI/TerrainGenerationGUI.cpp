@@ -3,7 +3,7 @@
 #include <backends/imgui_impl_vulkan.h>
 
 TerrainGenerationGUI::TerrainGenerationGUI(const std::shared_ptr<TerrainGenerator>& generator, uint32_t width, ImVec2 pos) :
-	m_Generator(generator), m_Width(width), m_Position(pos)
+	m_Generator(generator), Width(width), Position(pos)
 { 
 	m_Sampler = std::make_shared<VulkanSampler>(SamplerSpecification{});
 
@@ -19,32 +19,54 @@ TerrainGenerationGUI::TerrainGenerationGUI(const std::shared_ptr<TerrainGenerato
 
 void TerrainGenerationGUI::Render()
 {
-	ImGui::SetNextWindowPos(m_Position);
-	ImGui::SetNextWindowSizeConstraints(ImVec2(m_Width, -1.0f), ImVec2(m_Width, FLT_MAX));
+	ImGui::SetNextWindowPos(Position);
+	ImGui::SetNextWindowSizeConstraints(ImVec2(Width, -1.0f), ImVec2(Width, FLT_MAX));
 	ImGui::Begin("Terrain Generation", 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize);
 
-	bool shouldRegenerate = false;
+	if (ImGui::CollapsingHeader("Height map"))
+	{
+		bool shouldRegenerate = false;
 
-	shouldRegenerate = ImGui::DragInt("Octaves", &m_Generator->Noise.Octaves, 0.3f, 1, 36) || shouldRegenerate;
-	shouldRegenerate = ImGui::DragFloat("Amplitude", &m_Generator->Noise.Amplitude, 0.01f) || shouldRegenerate;
-	shouldRegenerate = ImGui::DragFloat("Frequency", &m_Generator->Noise.Frequency, 0.01f) || shouldRegenerate;
-	shouldRegenerate = ImGui::DragFloat("Gain", &m_Generator->Noise.Gain, 0.01f) || shouldRegenerate;
-	shouldRegenerate = ImGui::DragFloat("Lacunarity", &m_Generator->Noise.Lacunarity, 0.01f) || shouldRegenerate;
-	shouldRegenerate = ImGui::DragFloat("b", &m_Generator->Noise.b, 0.01f) || shouldRegenerate;
+		shouldRegenerate = ImGui::DragInt("Octaves", &m_Generator->Noise.Octaves, 0.3f, 1, 36) || shouldRegenerate;
+		shouldRegenerate = ImGui::DragFloat("Amplitude", &m_Generator->Noise.Amplitude, 0.01f) || shouldRegenerate;
+		shouldRegenerate = ImGui::DragFloat("Frequency", &m_Generator->Noise.Frequency, 0.01f) || shouldRegenerate;
+		shouldRegenerate = ImGui::DragFloat("Gain", &m_Generator->Noise.Gain, 0.01f) || shouldRegenerate;
+		shouldRegenerate = ImGui::DragFloat("Lacunarity", &m_Generator->Noise.Lacunarity, 0.01f) || shouldRegenerate;
+		shouldRegenerate = ImGui::DragFloat("b", &m_Generator->Noise.b, 0.01f) || shouldRegenerate;
 
-	if (shouldRegenerate)
-		m_Generator->notifyChange();
+		if (shouldRegenerate)
+			m_Generator->notifyChange();
 
-	float size = (float)m_Width / 2.0f;
+		float size = (float)Width / 3.5f;
 
-	ImGui::Text("Height map:");
-	ImGui::Image(m_HeightMapDescriptor, ImVec2{ size, size });
+		if (ImGui::CollapsingHeader("Maps"))
+		{
+			ImGui::Image(m_HeightMapDescriptor, ImVec2{ size, size });
+			ImGui::SameLine();
+			ImGui::Image(m_NormalMapDescriptor, ImVec2{ size, size });
+			ImGui::SameLine();
+			ImGui::Image(m_CompositionMapDescriptor, ImVec2{ size, size });
+		}
+	}
 
-	ImGui::Text("Normal map:");
-	ImGui::Image(m_NormalMapDescriptor, ImVec2{ size, size });
+	if (ImGui::CollapsingHeader("Hydraulic erosion"))
+	{
+		ImGui::DragInt("Simulations", &m_Generator->HydraulicErosion.Simulations, 0.3f, 1, 4000);
+		ImGui::DragFloat("Intertia", &m_Generator->HydraulicErosion.Inertia, 0.01f);
+		ImGui::DragFloat("Erosion", &m_Generator->HydraulicErosion.ErosionSpeed, 0.01f);
+		ImGui::DragFloat("Deposit", &m_Generator->HydraulicErosion.DepositSpeed, 0.01f);
+		ImGui::DragFloat("Evaporation", &m_Generator->HydraulicErosion.Evaporation, 0.01f, 0.0, 1.0);
+		ImGui::DragFloat("Water", &m_Generator->HydraulicErosion.InitalWater, 0.01f);
+		ImGui::DragFloat("Speed", &m_Generator->HydraulicErosion.IntialSpeed, 0.01f);
+		ImGui::DragFloat("Capacity", &m_Generator->HydraulicErosion.MaxCapacity, 0.01f);
 
-	ImGui::Text("Composition map:");
-	ImGui::Image(m_CompositionMapDescriptor, ImVec2{ size, size });
+		ImGui::Checkbox("Run", &m_Generator->RunHydraulicErosion);
+		ImGui::Text("Simulations: %d", m_Generator->HydraulicSimulations);
+
+		float size = (float)Width / 5.0f;
+		if (ImGui::Button("Reset", ImVec2(size, 20.0f)))
+			m_Generator->notifyChange();
+	}
 
 	ImGui::End();
 }

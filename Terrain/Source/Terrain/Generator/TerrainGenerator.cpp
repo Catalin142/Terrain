@@ -12,50 +12,52 @@ TerrainGenerator::TerrainGenerator(uint32_t width, uint32_t height) : m_Width(wi
 
 void TerrainGenerator::Generate(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer)
 {
-	if (m_Valid)
-		return;
-
+	if (!m_Valid)
 	{
-		VulkanRenderer::dispatchCompute(commandBuffer, m_NoiseGenerationPass, { m_Width / 8, m_Height / 8, 1 },
-			sizeof(GenerationParameters), &Noise);
+		HydraulicSimulations = 0;
+		{
+			VulkanRenderer::dispatchCompute(commandBuffer, m_NoiseGenerationPass, { m_Width / 8, m_Height / 8, 1 },
+				sizeof(GenerationParameters), &Noise);
 
-		// Prevents the composition pass to read noise and normals before they are finished
-		m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Noise, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+			// Prevents the composition pass to read noise and normals before they are finished
+			m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Noise, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+		}
+
+		{
+			VulkanRenderer::dispatchCompute(commandBuffer, m_HydraulicErosionPass, { 1, 1, 1 });
+
+			m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Noise, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+
+			m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Noise, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+		}
+
+		// compute normals
+		{
+			VulkanRenderer::dispatchCompute(commandBuffer, m_NormalComputePass, { m_Width / 8, m_Height / 8, 1 });
+
+			m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Normals, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+
+			m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Normals, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+		}
+
+		{
+			VulkanRenderer::dispatchCompute(commandBuffer, m_CompositionPass, { m_Width / 8, m_Height / 8, 1 });
+
+			// prevernts terrain fragment shader read from composition image until it is finished
+			m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Composition, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+		}
+
+		m_Valid = true;
 	}
 
-	{
-		VulkanRenderer::dispatchCompute(commandBuffer, m_HydraulicErosionPass, { 1, 1, 1 });
-
-		m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Noise, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-
-		m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Noise, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-	}
-
-	// compute normals
-	{
-		VulkanRenderer::dispatchCompute(commandBuffer, m_NormalComputePass, { m_Width / 8, m_Height / 8, 1 });
-
-		m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Normals, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-
-		m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Normals, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-	}
-
-	{
-		VulkanRenderer::dispatchCompute(commandBuffer, m_CompositionPass, { m_Width / 8, m_Height / 8, 1 });
-
-		// prevernts terrain fragment shader read from composition image until it is finished
-		m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Composition, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-	}
-
-	
-
-	m_Valid = true;
+	if (RunHydraulicErosion)
+		runHydraulicErosion(commandBuffer);
 }
 
 void TerrainGenerator::Resize(uint32_t width, uint32_t height)
@@ -68,12 +70,6 @@ void TerrainGenerator::Resize(uint32_t width, uint32_t height)
 
 void TerrainGenerator::runHydraulicErosion(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer)
 {
-	for (auto& pos : m_RandomPos)
-	{
-		pos.x = ((float)rand() / (float)RAND_MAX) * 1024.0f;
-		pos.y = ((float)rand() / (float)RAND_MAX) * 1024.0f;
-	}
-
 	static float t = 0.0f;
 	static float r = 0.0f;
 	t = ((float)rand() / (float)RAND_MAX) * 17323.0f;
@@ -82,7 +78,9 @@ void TerrainGenerator::runHydraulicErosion(const std::shared_ptr<VulkanRenderCom
 	m_UniformBuffer->setData(&a, sizeof(glm::vec2));
 
 	{
-		VulkanRenderer::dispatchCompute(commandBuffer, m_HydraulicErosionPass, { 1, 1, 1 });
+		HydraulicSimulations += 1024;
+		VulkanRenderer::dispatchCompute(commandBuffer, m_HydraulicErosionPass, { 1, 1, 1 }, 
+			sizeof(HydraulicErosionParameters), &HydraulicErosion);
 
 		m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Noise, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
@@ -206,6 +204,7 @@ void TerrainGenerator::createCompute()
 		m_HydraulicErosionPass->DescriptorSet->bindInput(0, 0, m_Noise);
 		m_HydraulicErosionPass->DescriptorSet->bindInput(1, 0, m_UniformBuffer);
 		m_HydraulicErosionPass->DescriptorSet->Create();
-		m_HydraulicErosionPass->Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader("_HydraulicErostionCompute"));
+		m_HydraulicErosionPass->Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader("_HydraulicErostionCompute"),
+			sizeof(HydraulicErosionParameters));
 	}
 }

@@ -51,4 +51,12 @@
 				- Terrain composition map
 				- Terrain texturing
 				- Hydraulic errosion
+
+28.03.2024 - Terrain texturing 
+		   - Hydraulic errosion
+		   - UI Update
+
+		   - TODO:
+				- Texture bombing
+				- Quad tree lod
 			

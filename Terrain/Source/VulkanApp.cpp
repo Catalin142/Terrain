@@ -202,12 +202,20 @@ void VulkanApp::onUpdate()
 
 void VulkanApp::onResize()
 {
-	m_TerrainRenderer->onResize(getWidth(), getHeight());
+	TerrainGUI->Position.x = getWidth() - 300.0f - 10.0f;
 
-	std::shared_ptr<VulkanDescriptorSet> DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("FinalShader"));
-	DescriptorSet->bindInput(0, 0, m_Output->getImage(0));
-	DescriptorSet->Create();
-	m_FinalPass->DescriptorSet = DescriptorSet;
+	m_Output->Resize(getWidth(), getHeight());
+
+	m_TerrainRenderer->setTargetFramebuffer(m_Output);
+
+	{
+		std::shared_ptr<VulkanDescriptorSet> DescriptorSet;
+		DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("FinalShader"));
+		DescriptorSet->bindInput(0, 0, m_Sampler);
+		DescriptorSet->bindInput(0, 1, m_Output->getImage(0));
+		DescriptorSet->Create();
+		m_FinalPass->DescriptorSet = DescriptorSet;
+	}
 }
 
 void VulkanApp::onDestroy()
