@@ -59,6 +59,8 @@ private:
 	LODTechnique m_LastTechniqueUsed = LODTechnique::NONE;
 	bool m_InWireframe = false;
 
+	std::shared_ptr<VulkanTexture> m_NoiseMap;
+
 
 private: // DEBUG
 

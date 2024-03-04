@@ -15,6 +15,18 @@ TerrainRenderer::TerrainRenderer(const std::shared_ptr<VulkanFramebuffer>& targe
 	SamplerSpecification terrainSamplerSpec{};
 	terrainSamplerSpec.addresMode = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
 	m_TerrainSampler = std::make_shared<VulkanSampler>(terrainSamplerSpec);
+
+	std::vector<std::string> filepaths = {
+		"Resources/Img/noiseMap.png",
+	};
+
+	TextureSpecification texSpec{};
+	texSpec.CreateSampler = false;
+	texSpec.GenerateMips = false;
+	texSpec.Channles = 4;
+	texSpec.LayerCount = filepaths.size();
+	texSpec.Filepath = filepaths;
+	m_NoiseMap = std::make_shared<VulkanTexture>(texSpec);
 }
 
 void TerrainRenderer::renderTerrain(const Camera& camera, const std::shared_ptr<Terrain>& terrain)
@@ -96,6 +108,7 @@ void TerrainRenderer::createDistanceLODRenderPass()
 		DescriptorSet->bindInput(1, 2, m_Terrain->getCompositionMap());
 		DescriptorSet->bindInput(1, 3, m_Terrain->getNormalMap());
 		DescriptorSet->bindInput(2, 0, m_Terrain->getTerrainTextures());
+		DescriptorSet->bindInput(2, 1, m_NoiseMap);
 
 		DescriptorSet->Create();
 		m_TerrainRenderPass->DescriptorSet = DescriptorSet;
