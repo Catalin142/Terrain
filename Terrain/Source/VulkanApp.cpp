@@ -70,9 +70,9 @@ void VulkanApp::onCreate()
 
 		{
 			std::vector<std::string> filepaths = {
-				"Resources/Img/grass1.png",
-				"Resources/Img/slope1.png",
-				"Resources/Img/rock1.png",
+				"Resources/Img/grs.png",
+				"Resources/Img/grs.png",
+				"Resources/Img/grs.png",
 			};
 
 			TextureSpecification texSpec{};

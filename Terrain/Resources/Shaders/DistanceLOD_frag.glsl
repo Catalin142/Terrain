@@ -15,8 +15,8 @@ layout (set = 2, binding = 1) uniform texture2D noiseMap;
 
 vec3 lightDirection = normalize(vec3(10.0, 10.0, 0.0));
 
-//#define BIPLANAR
-#define TRIPLANAR
+#define BIPLANAR
+//#define TRIPLANAR
 
 float sum( vec3 v ) { return v.x+v.y+v.z; }
 vec3 textureNoTile( in vec2 x, int layer)
@@ -44,7 +44,7 @@ vec3 textureNoTile( in vec2 x, int layer)
 
 vec3 sampleTextureArray(vec3 normalVector, int layer)
 {
-    vec3 scaledPos = fragmentPosition * 0.25;
+    vec3 scaledPos = fragmentPosition * (1.0 / 128.0);
 
 #ifdef TRIPLANAR
     vec3 weights = abs(normalVector);
@@ -76,8 +76,8 @@ vec3 sampleTextureArray(vec3 normalVector, int layer)
     // median axis (in x;  yz are following axis)
     ivec3 me = ivec3(3) - mi - ma;
     
-    vec3 x = textureNoTile(vec2(scaledPos[ma.y], scaledPos[ma.z]), layer);
-    vec3 y = textureNoTile(vec2(scaledPos[ma.y], scaledPos[ma.z]), layer);
+    vec3 x =  texture(texturePack, vec3(vec2(scaledPos[ma.y], scaledPos[ma.z]), layer)).rgb;
+    vec3 y =  texture(texturePack, vec3(vec2(scaledPos[ma.y], scaledPos[ma.z]), layer)).rgb;
 
     // blend and return
     vec2 m = vec2(n[ma.x], n[me.x]);

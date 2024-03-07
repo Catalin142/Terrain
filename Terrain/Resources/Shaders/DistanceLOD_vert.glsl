@@ -68,7 +68,7 @@ void main()
     position.x += (upLod - (int(position.x) % upLod)) * float(position.z == chunk.Size) * float((int(position.x) % upLod) != 0);
     position.x += (downLod - (int(position.x) % downLod)) * float(position.z == 0.0) * float((int(position.x) % downLod) != 0);
         
-    texCoord = vec2(position.x / (chunk.Size / 32.0), position.z / (chunk.Size / 32.0));
+    texCoord = vec2(position.x / (chunk.Size), position.z / (chunk.Size));
     
     position.x += offset.x;
     position.z += offset.y;
