@@ -36,6 +36,7 @@ VulkanTexture::~VulkanTexture()
 void VulkanTexture::loadTextures()
 {
 	std::vector<std::shared_ptr<VulkanBaseBuffer>> stagingBuffers;
+
 	for (uint32_t layer = 0; layer < m_Specification.LayerCount; layer++)
 	{
 		TextureInformation currentInfo{};
@@ -48,12 +49,12 @@ void VulkanTexture::loadTextures()
 		else
 			m_Info = currentInfo;
 
+		m_Info.mipCount = m_Specification.GenerateMips ? VkUtils::calculateNumberOfMips(m_Info.Width, m_Info.Height) : 1;
+
 		if (m_VulkanImage == nullptr)
 		{
 			if (m_Specification.Channles != 0)
 				m_Info.Channels = m_Specification.Channles;
-
-			m_Info.mipCount = m_Specification.GenerateMips ? VkUtils::calculateNumberOfMips(m_Info.Width, m_Info.Height) : 1;
 
 			ImageSpecification imgSpec;
 			imgSpec.Width = m_Info.Width;
@@ -64,7 +65,7 @@ void VulkanTexture::loadTextures()
 			imgSpec.Tiling = VK_IMAGE_TILING_OPTIMAL;
 			imgSpec.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
 			imgSpec.UsageFlags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-			imgSpec.CreateSampler = m_Specification.CreateSampler;
+			imgSpec.CreateSampler = false;
 			imgSpec.LayerCount = m_Specification.LayerCount;
 
 			m_VulkanImage = std::make_shared<VulkanImage>(imgSpec);
@@ -107,6 +108,15 @@ void VulkanTexture::loadTextures()
 		VkUtils::transitionImageLayout(m_VulkanImage->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	else
 		this->GenerateMips();
+
+	if (m_Specification.CreateSampler)
+	{
+		SamplerSpecification samplerSpec{};
+		samplerSpec.MaxAnisotropy = m_Specification.MaxAnisotropy;
+		samplerSpec.Mips = m_Info.mipCount;
+
+		m_VulkanSampler = std::make_shared<VulkanSampler>(samplerSpec);
+	}
 }
 
 void VulkanTexture::GenerateMips()
@@ -194,35 +204,4 @@ void VulkanTexture::GenerateMips()
 		1, &barrier);
 
 	VkUtils::endSingleTimeCommand(commandBuffer);
-}
-
-VulkanSampler::VulkanSampler(SamplerSpecification spec)
-{
-	m_Specification = spec;
-	 
-	VkSamplerCreateInfo samplerInfo{};
-	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	samplerInfo.magFilter = m_Specification.magFilter;
-	samplerInfo.minFilter = m_Specification.minFilter;
-	samplerInfo.addressModeU = m_Specification.addresMode;
-	samplerInfo.addressModeV = m_Specification.addresMode;
-	samplerInfo.addressModeW = m_Specification.addresMode;
-	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	samplerInfo.anisotropyEnable = VK_FALSE;
-	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-	samplerInfo.unnormalizedCoordinates = VK_FALSE;
-	samplerInfo.compareEnable = VK_FALSE;
-	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	samplerInfo.mipLodBias = 0.0f;
-	samplerInfo.maxLod = float(m_Specification.Mips - 1);
-	samplerInfo.minLod = 0.0f;
-
-	if (vkCreateSampler(VulkanDevice::getVulkanDevice(), &samplerInfo, nullptr, &m_Sampler) != VK_SUCCESS)
-		assert(false);
-}
-
-VulkanSampler::~VulkanSampler()
-{
-	vkDestroySampler(VulkanDevice::getVulkanDevice(), m_Sampler, nullptr);
 }

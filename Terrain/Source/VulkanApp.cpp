@@ -78,6 +78,7 @@ void VulkanApp::onCreate()
 			TextureSpecification texSpec{};
 			texSpec.CreateSampler = true;
 			texSpec.GenerateMips = true;
+			texSpec.MaxAnisotropy = 16.0f;
 			texSpec.Channles = 4;
 			texSpec.LayerCount = filepaths.size();
 			texSpec.Filepath = filepaths;

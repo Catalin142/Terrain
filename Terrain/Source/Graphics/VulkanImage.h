@@ -12,6 +12,8 @@ struct ImageSpecification
 	uint32_t Mips = 1;
 	uint32_t LayerCount = 1;
 
+	float MaxAnisotropy = 0.0f;
+
 	VkFormat Format = VK_FORMAT_UNDEFINED;
 	VkImageTiling Tiling = VK_IMAGE_TILING_OPTIMAL;
 	VkImageUsageFlags UsageFlags;
@@ -77,4 +79,26 @@ public:
 private:
 	ImageViewSpecification m_Specification;
 	VkImageView m_ImageView = VK_NULL_HANDLE;
+};
+
+struct SamplerSpecification
+{
+	VkFilter magFilter = VK_FILTER_LINEAR, minFilter = VK_FILTER_LINEAR;
+	VkSamplerAddressMode addresMode = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	uint32_t Mips = 1;
+
+	float MaxAnisotropy = 0.0f;
+};
+
+class VulkanSampler
+{
+public:
+	VulkanSampler(SamplerSpecification spec);
+	~VulkanSampler();
+
+	VkSampler Get() { return m_Sampler; }
+
+private:
+	VkSampler m_Sampler;
+	SamplerSpecification m_Specification;
 };

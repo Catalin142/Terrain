@@ -174,6 +174,11 @@ void VulkanImage::createSampler()
 	VulkanDevice* device = VulkanDevice::getVulkanContext();
 
 	samplerInfo.anisotropyEnable = VK_FALSE;
+	if (m_Specification.MaxAnisotropy != 0.0f)
+	{
+		samplerInfo.anisotropyEnable = VK_TRUE;
+		samplerInfo.maxAnisotropy = m_Specification.MaxAnisotropy;
+	}
 	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
 	samplerInfo.unnormalizedCoordinates = VK_FALSE;
 	samplerInfo.compareEnable = VK_FALSE;
@@ -244,4 +249,44 @@ VulkanImageView::~VulkanImageView()
 	if (m_ImageView != VK_NULL_HANDLE)
 		vkDestroyImageView(VulkanDevice::getVulkanDevice(), m_ImageView, nullptr);
 }
+
+
+VulkanSampler::VulkanSampler(SamplerSpecification spec)
+{
+	m_Specification = spec;
+
+	VkSamplerCreateInfo samplerInfo{};
+	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	samplerInfo.magFilter = m_Specification.magFilter;
+	samplerInfo.minFilter = m_Specification.minFilter;
+	samplerInfo.addressModeU = m_Specification.addresMode;
+	samplerInfo.addressModeV = m_Specification.addresMode;
+	samplerInfo.addressModeW = m_Specification.addresMode;
+	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+
+	samplerInfo.anisotropyEnable = VK_FALSE;
+	if (m_Specification.MaxAnisotropy != 0.0f)
+	{
+		samplerInfo.anisotropyEnable = VK_TRUE;
+		samplerInfo.maxAnisotropy = m_Specification.MaxAnisotropy;
+	}
+
+	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+	samplerInfo.unnormalizedCoordinates = VK_FALSE;
+	samplerInfo.compareEnable = VK_FALSE;
+	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	samplerInfo.mipLodBias = 0.0f;
+	samplerInfo.maxLod = float(m_Specification.Mips - 1);
+	samplerInfo.minLod = 0.0f;
+
+	if (vkCreateSampler(VulkanDevice::getVulkanDevice(), &samplerInfo, nullptr, &m_Sampler) != VK_SUCCESS)
+		assert(false);
+}
+
+VulkanSampler::~VulkanSampler()
+{
+	vkDestroySampler(VulkanDevice::getVulkanDevice(), m_Sampler, nullptr);
+}
+
 

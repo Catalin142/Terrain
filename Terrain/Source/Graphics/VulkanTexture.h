@@ -23,6 +23,8 @@ struct TextureSpecification
 	uint32_t GenerateMips = false;
 	bool CreateSampler = true;
 
+	float MaxAnisotropy = 0.0f;
+
 	uint32_t LayerCount = 1;
 	std::vector<std::string> Filepath;
 };
@@ -35,7 +37,7 @@ public:
 
 	VkImage getVkImage() { return m_VulkanImage->getVkImage(); }
 	VkImageView getVkImageView() { return m_VulkanImage->getVkImageView(); }
-	VkSampler getVkSampler() { return m_VulkanImage->getVkSampler(); }
+	VkSampler getVkSampler() { return m_VulkanSampler == nullptr ? VK_NULL_HANDLE : m_VulkanSampler->Get(); }
 
 	const TextureInformation& getInfo() { return m_Info; }
 
@@ -45,26 +47,7 @@ private:
 
 private:
 	std::shared_ptr<VulkanImage> m_VulkanImage = nullptr;
+	std::shared_ptr<VulkanSampler> m_VulkanSampler = nullptr;
 	TextureInformation m_Info{};
 	TextureSpecification m_Specification{};
-};
-
-struct SamplerSpecification
-{
-	VkFilter magFilter = VK_FILTER_LINEAR, minFilter = VK_FILTER_LINEAR;
-	VkSamplerAddressMode addresMode = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	uint32_t Mips = 1;
-};
-
-class VulkanSampler
-{
-public:
-	VulkanSampler(SamplerSpecification spec);
-	~VulkanSampler();
-
-	VkSampler Get() { return m_Sampler; }
-
-private:
-	VkSampler m_Sampler;
-	SamplerSpecification m_Specification;
 };
