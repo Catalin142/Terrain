@@ -44,7 +44,7 @@ vec3 textureNoTile( in vec2 x, int layer)
 
 vec3 sampleTextureArray(vec3 normalVector, int layer)
 {
-    vec3 scaledPos = fragmentPosition * (1.0 / 4.0);
+    vec3 scaledPos = fragmentPosition * (1.0 / 2.0);
 
 #ifdef TRIPLANAR
     vec3 weights = abs(normalVector);
@@ -76,15 +76,14 @@ vec3 sampleTextureArray(vec3 normalVector, int layer)
     // median axis (in x;  yz are following axis)
     ivec3 me = ivec3(3) - mi - ma;
     
-    vec3 x =  textureNoTile(vec2(scaledPos[ma.y], scaledPos[ma.z]), layer);
-    vec3 y =  textureNoTile(vec2(scaledPos[ma.y], scaledPos[ma.z]), layer);
+    vec3 x =  texture(texturePack, vec3(vec2(scaledPos[ma.y], scaledPos[ma.z]), layer)).rgb;
+    vec3 y =  texture(texturePack, vec3(vec2(scaledPos[ma.y], scaledPos[ma.z]), layer)).rgb;
 
     // blend and return
     vec2 m = vec2(n[ma.x], n[me.x]);
     // optional - add local support (prevents discontinuty)
     //m = clamp((m - 0.5773) / (1.0 - 0.5773), 0.0, 1.0);
-	//return ((x * m.x + y * m.y) / (m.x + m.y)).rgb;
-    return texture(texturePack, vec3(texCoord, 0)).xyz;
+	return ((x * m.x + y * m.y) / (m.x + m.y)).rgb;
 #endif
 }
 

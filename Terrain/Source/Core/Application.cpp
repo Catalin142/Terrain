@@ -1,6 +1,6 @@
 #include "Application.h"
 
-#include "Graphics/VulkanRenderer.h"
+#include "Graphics/Vulkan/VulkanRenderer.h"
 
 #include "Instrumentor.h"
 
@@ -35,7 +35,7 @@ void Application::Run()
 {
 	onCreate();
 
-	float begTime = glfwGetTime();
+	float begTime = (float)glfwGetTime();
 	float endTime = begTime;
 
 	while (m_Window->isOpened())
@@ -57,7 +57,7 @@ void Application::Run()
 			onResize();
 		}
 
-		begTime = glfwGetTime();
+		begTime = (float)glfwGetTime();
 		Time::deltaTime = (begTime - endTime);
 		endTime = begTime;
 

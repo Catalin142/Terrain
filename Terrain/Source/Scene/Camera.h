@@ -31,11 +31,12 @@ public:
 
 	const glm::vec3& getPosition() const { return m_Position; }
 
-private:
 	glm::vec3 Right() const;
 	glm::vec3 Up() const;
 	glm::vec3 Forward() const;
 	glm::quat Orientation() const;
+
+	float getYaw() { return m_Yaw; }
 
 private:
 	CameraRenderMatrices m_CameraRenderMatrices;

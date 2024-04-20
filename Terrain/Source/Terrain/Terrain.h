@@ -1,8 +1,8 @@
 #pragma once
 
 #include "TerrainChunk.h"
-#include "Graphics/VulkanImage.h"
-#include "Graphics/VulkanTexture.h"
+#include "Graphics/Vulkan/VulkanImage.h"
+#include "Graphics/Vulkan/VulkanTexture.h"
 
 #include "glm/glm.hpp"
 
@@ -11,12 +11,14 @@
 #include <memory>
 
 class DistanceLOD;
+class QuadTreeLOD;
 
 // 128 = 64m
 
 enum class LODTechnique
 {
 	DISTANCE_BASED,
+	QUAD_TREE,
 
 	NONE
 };
@@ -28,7 +30,7 @@ struct LODLevel
 
 struct TerrainInfo
 {
-	glm::vec2 TerrainSize{ 0.0 };
+	glm::vec2 TerrainSize{ 0.0f };
 	float HeightMultiplier = 0.0f;
 	uint32_t MinimumChunkSize = 128;
 };
@@ -52,7 +54,10 @@ public:
 	const std::vector<TerrainChunk>& getChunksToRender(const glm::vec3& cameraPosition);
 
 	LODTechnique getCurrentTechnique() { return m_CurrentLODTechnique; }
+	void setTechnique(LODTechnique tech);
+
 	const std::shared_ptr<DistanceLOD>& getDistanceLODTechnique() { return m_DistanceLOD; }
+	const std::shared_ptr<QuadTreeLOD>& getQuadTreeLODTechnique() { return m_QuadTreeLOD; }
 
 	TerrainInfo getInfo() { return m_Specification.Info; }
 	void setHeightMultiplier(float mul) { m_Specification.Info.HeightMultiplier = mul; }
@@ -62,7 +67,6 @@ public:
 	const std::shared_ptr<VulkanImage>& getCompositionMap() { return m_Specification.CompositionMap; }
 	const std::shared_ptr<VulkanTexture>& getTerrainTextures() { return m_Specification.TerrainTextures; }
 
-	std::shared_ptr<DistanceLOD> m_DistanceLOD;
 private:
 	TerrainSpecification m_Specification;
 
@@ -70,4 +74,7 @@ private:
 
 	std::vector<TerrainChunk> m_ChunksToRender;
 	std::vector<LODLevel> m_LodLevelMap;
+
+	std::shared_ptr<DistanceLOD> m_DistanceLOD;
+	std::shared_ptr<QuadTreeLOD> m_QuadTreeLOD;
 };

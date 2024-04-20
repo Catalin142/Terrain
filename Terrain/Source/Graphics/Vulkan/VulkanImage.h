@@ -2,6 +2,7 @@
 
 #include "VulkanBaseBuffer.h"
 
+#include <vector>
 #include <vulkan/vulkan.h>
 
 struct ImageSpecification
@@ -21,6 +22,7 @@ struct ImageSpecification
 	
 	bool Transfer = false;
 	bool CreateSampler = false;
+	bool ImageViewOnMips = false;
 };
 
 class VulkanImage
@@ -37,7 +39,7 @@ public:
 	void Resize(uint32_t width, uint32_t height);
 
 	VkImage getVkImage() const { return m_Image; }
-	VkImageView getVkImageView() const { return m_ImageView; }
+	VkImageView getVkImageView(uint32_t mip = 0) const { return m_ImageViews[mip]; }
 	VkSampler getVkSampler() const { return m_Sampler; }
 
 	const ImageSpecification& getSpecification() { return m_Specification; }
@@ -52,7 +54,7 @@ private:
 	ImageSpecification m_Specification;
 
 	VkImage m_Image = nullptr;
-	VkImageView m_ImageView;
+	std::vector<VkImageView> m_ImageViews;
 	VkDeviceMemory m_DeviceMemory = nullptr;
 	VkSampler m_Sampler = nullptr;
 };

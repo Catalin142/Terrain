@@ -3,6 +3,7 @@
 #include <vulkan/vulkan.h>
 
 #define MAXIMUM_NUMBER_OF_SETS_PER_STAGE 8
+#define MAXIMUM_ARRAY_ELEMENTS 32
 
 enum class ShaderStage : uint32_t
 {
@@ -31,6 +32,8 @@ struct ShaderInput
 	std::string DebugName;
 
 	uint32_t Set;
+	uint32_t Count;
+	uint32_t Index = 0;
 	uint32_t Binding;
 	ShaderStage Stage;
 	ShaderInputType Type;

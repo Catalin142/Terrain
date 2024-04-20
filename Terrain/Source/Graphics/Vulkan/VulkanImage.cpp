@@ -17,8 +17,8 @@ static uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags memFla
 		}
 	}
 
-	std::cerr << "Nu s a gasit memorie\n";
 	assert(false);
+	return 0;
 }
 
 VulkanImage::VulkanImage(const ImageSpecification& spec) : m_Specification(spec)
@@ -37,7 +37,7 @@ void VulkanImage::Create()
 
 	if (m_Specification.UsageFlags & VK_IMAGE_USAGE_STORAGE_BIT)
 	{
-		VkUtils::transitionImageLayout(m_Image, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }, VK_IMAGE_LAYOUT_UNDEFINED,
+		VkUtils::transitionImageLayout(m_Image, { VK_IMAGE_ASPECT_COLOR_BIT, 0, m_Specification.Mips, 0, 1 }, VK_IMAGE_LAYOUT_UNDEFINED,
 			VK_IMAGE_LAYOUT_GENERAL);
 
 		VkCommandBuffer commandBuffer = VkUtils::beginSingleTimeCommand();
@@ -46,7 +46,7 @@ void VulkanImage::Create()
 		imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
 		imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
 		imageMemoryBarrier.image = m_Image;
-		imageMemoryBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+		imageMemoryBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, m_Specification.Mips, 0, 1 };
 		imageMemoryBarrier.srcAccessMask = 0;
 		imageMemoryBarrier.dstAccessMask = 0;
 		imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -75,13 +75,15 @@ void VulkanImage::Release()
 	vkDestroyImage(device, m_Image, nullptr);
 	vkFreeMemory(device, m_DeviceMemory, nullptr);
 
-	vkDestroyImageView(device, m_ImageView, nullptr);
+	for (uint32_t mip = 0; mip < m_ImageViews.size(); mip++)
+		vkDestroyImageView(device, m_ImageViews[mip], nullptr);
 
 	if (m_Specification.CreateSampler)
 		vkDestroySampler(device, m_Sampler, nullptr);
 
+	m_ImageViews.clear();
+
 	m_Image = nullptr;
-	m_ImageView = nullptr;
 	m_Sampler = nullptr;
 	m_DeviceMemory = nullptr;
 }
@@ -207,10 +209,35 @@ void VulkanImage::createView()
 
 	VkDevice device = VulkanDevice::getVulkanDevice();
 
-	if (vkCreateImageView(device, &viewInfo, nullptr, &m_ImageView) != VK_SUCCESS)
+	if (vkCreateImageView(device, &viewInfo, nullptr, &m_ImageViews.emplace_back()) != VK_SUCCESS)
 	{
 		std::cerr << "failed to create image view!\n";
 		assert(false);
+	}
+	
+	if (!m_Specification.ImageViewOnMips)
+		return;
+
+	for (uint32_t mip = 1; mip < m_Specification.Mips; mip++)
+	{
+		VkImageViewCreateInfo viewInfo{};
+		viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		viewInfo.image = m_Image;
+		viewInfo.viewType = m_Specification.LayerCount > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
+		viewInfo.format = m_Specification.Format;
+		viewInfo.subresourceRange.aspectMask = m_Specification.Aspect;
+		viewInfo.subresourceRange.baseMipLevel = mip;
+		viewInfo.subresourceRange.levelCount = 1;
+		viewInfo.subresourceRange.baseArrayLayer = 0;
+		viewInfo.subresourceRange.layerCount = m_Specification.LayerCount;
+
+		VkDevice device = VulkanDevice::getVulkanDevice();
+
+		if (vkCreateImageView(device, &viewInfo, nullptr, &m_ImageViews.emplace_back()) != VK_SUCCESS)
+		{
+			std::cerr << "failed to create image view!\n";
+			assert(false);
+		}
 	}
 }
 

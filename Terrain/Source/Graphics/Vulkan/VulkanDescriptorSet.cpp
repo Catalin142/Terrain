@@ -61,24 +61,25 @@ void VulkanDescriptorSet::Create()
 
 			std::vector<VkWriteDescriptorSet> writeDescriptorSets;
 			for (const ShaderInput& input : inputs)
-				writeDescriptorSets.emplace_back(getWriteDescriptorSet(input, descSet, frameIndex));
+				for (uint32_t index = 0; index < input.Count; index++)
+					writeDescriptorSets.emplace_back(getWriteDescriptorSet(input, index, descSet, frameIndex));
 			
 			vkUpdateDescriptorSets(VulkanDevice::getVulkanDevice(), (uint32_t)writeDescriptorSets.size(), writeDescriptorSets.data(), 0, nullptr);
 		}
 	}
 }
 
-void VulkanDescriptorSet::bindInput(uint32_t set, uint32_t binding, const std::shared_ptr<VulkanUniformBuffer>& buffer)
+void VulkanDescriptorSet::bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanUniformBuffer>& buffer)
 {
 	VkDescriptorBufferInfo bufferInfo{};
 	bufferInfo.buffer = buffer->getBuffer();
 	bufferInfo.offset = 0;
 	bufferInfo.range = buffer->getSize();
 
-	m_DescriptorBindings.UniformBufferInfos[getHash(set, binding)] = bufferInfo;
+	m_DescriptorBindings.UniformBufferInfos[getHash(set, binding, index)] = bufferInfo;
 }
 
-void VulkanDescriptorSet::bindInput(uint32_t set, uint32_t binding, const std::shared_ptr<VulkanUniformBufferSet>& bufferSet)
+void VulkanDescriptorSet::bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanUniformBufferSet>& bufferSet)
 {
 	for (uint32_t frame = 0; frame < bufferSet->getFrameCount(); frame++)
 	{
@@ -88,38 +89,38 @@ void VulkanDescriptorSet::bindInput(uint32_t set, uint32_t binding, const std::s
 		bufferInfo.offset = 0;
 		bufferInfo.range = bufferSet->getBufferSize();
 
-		m_DescriptorBindings.UniformBufferSetInfos[getHash(set, binding)].push_back(bufferInfo);
+		m_DescriptorBindings.UniformBufferSetInfos[getHash(set, binding, index)].push_back(bufferInfo);
 	}
 }
 
-void VulkanDescriptorSet::bindInput(uint32_t set, uint32_t binding, const std::shared_ptr<VulkanTexture>& texture)
+void VulkanDescriptorSet::bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanTexture>& texture)
 {
 	VkDescriptorImageInfo imageInfo{};
 	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	imageInfo.imageView = texture->getVkImageView();
 	imageInfo.sampler = texture->getVkSampler();
 
-	m_DescriptorBindings.ImageInfos[getHash(set, binding)] = imageInfo;
+	m_DescriptorBindings.ImageInfos[getHash(set, binding, index)] = imageInfo;
 }
 
-void VulkanDescriptorSet::bindInput(uint32_t set, uint32_t binding, const std::shared_ptr<VulkanImage>& image)
+void VulkanDescriptorSet::bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanImage>& image, uint32_t mip)
 {
 	VkDescriptorImageInfo imageInfo{};
 	imageInfo.imageLayout = image->getSpecification().UsageFlags & VK_IMAGE_USAGE_STORAGE_BIT ? 
 		VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	imageInfo.imageView = image->getVkImageView();
+	imageInfo.imageView = image->getVkImageView(mip);
 	imageInfo.sampler = image->getVkSampler();
 
-	m_DescriptorBindings.ImageInfos[getHash(set, binding)] = imageInfo;
+	m_DescriptorBindings.ImageInfos[getHash(set, binding, index)] = imageInfo;
 }
 
 
-void VulkanDescriptorSet::bindInput(uint32_t set, uint32_t binding, const std::shared_ptr<VulkanSampler>& sampler)
+void VulkanDescriptorSet::bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanSampler>& sampler)
 {
 	VkDescriptorImageInfo samplerInfo{};
 	samplerInfo.sampler = sampler->Get();
 
-	m_DescriptorBindings.ImageInfos[getHash(set, binding)] = samplerInfo;
+	m_DescriptorBindings.ImageInfos[getHash(set, binding, index)] = samplerInfo;
 }
 
 std::vector<VkDescriptorSet> VulkanDescriptorSet::getDescriptorSet(uint32_t frameIndex)
@@ -128,45 +129,45 @@ std::vector<VkDescriptorSet> VulkanDescriptorSet::getDescriptorSet(uint32_t fram
 	return m_DescriptorSets[frameIndex];
 }
 
-VkWriteDescriptorSet VulkanDescriptorSet::getWriteDescriptorSet(const ShaderInput& input, VkDescriptorSet set, uint32_t frame = 0)
+VkWriteDescriptorSet VulkanDescriptorSet::getWriteDescriptorSet(const ShaderInput& input, uint32_t index, VkDescriptorSet set, uint32_t frame = 0)
 {
 	VkWriteDescriptorSet descriptorWrite{};
 	descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	descriptorWrite.dstSet = set;
 	descriptorWrite.dstBinding = input.Binding;
-	descriptorWrite.dstArrayElement = 0;
+	descriptorWrite.dstArrayElement = index;
 	descriptorWrite.descriptorCount = 1;
 
 	switch (input.Type)
 	{
 	case ShaderInputType::UNIFORM_BUFFER:
 		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		descriptorWrite.pBufferInfo = &m_DescriptorBindings.UniformBufferInfos[getHash(input.Set, input.Binding)];
+		descriptorWrite.pBufferInfo = &m_DescriptorBindings.UniformBufferInfos[getHash(input.Set, input.Binding, index)];
 		break;
 
 	case ShaderInputType::UNIFORM_BUFFER_SET:
 		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		descriptorWrite.pBufferInfo = &m_DescriptorBindings.UniformBufferSetInfos[getHash(input.Set, input.Binding)][frame];
+		descriptorWrite.pBufferInfo = &m_DescriptorBindings.UniformBufferSetInfos[getHash(input.Set, input.Binding, index)][frame];
 		break;
 
 	case ShaderInputType::COMBINED_IMAGE_SAMPLER:
 		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		descriptorWrite.pImageInfo = &m_DescriptorBindings.ImageInfos[getHash(input.Set, input.Binding)];
+		descriptorWrite.pImageInfo = &m_DescriptorBindings.ImageInfos[getHash(input.Set, input.Binding, index)];
 		break;
 
 	case ShaderInputType::TEXTURE:
 		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-		descriptorWrite.pImageInfo = &m_DescriptorBindings.ImageInfos[getHash(input.Set, input.Binding)];
+		descriptorWrite.pImageInfo = &m_DescriptorBindings.ImageInfos[getHash(input.Set, input.Binding, index)];
 		break;
 
 	case ShaderInputType::SAMPLER:
 		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
-		descriptorWrite.pImageInfo = &m_DescriptorBindings.ImageInfos[getHash(input.Set, input.Binding)];
+		descriptorWrite.pImageInfo = &m_DescriptorBindings.ImageInfos[getHash(input.Set, input.Binding, index)];
 		break;
 
 	case ShaderInputType::STORAGE_IMAGE:
 		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		descriptorWrite.pImageInfo = &m_DescriptorBindings.ImageInfos[getHash(input.Set, input.Binding)];
+		descriptorWrite.pImageInfo = &m_DescriptorBindings.ImageInfos[getHash(input.Set, input.Binding, index)];
 		break;
 
 	default:
@@ -174,11 +175,9 @@ VkWriteDescriptorSet VulkanDescriptorSet::getWriteDescriptorSet(const ShaderInpu
 	}
 
 	return descriptorWrite;
-
-
 }
 
-uint32_t VulkanDescriptorSet::getHash(uint32_t set, uint32_t binding)
+uint32_t VulkanDescriptorSet::getHash(uint32_t set, uint32_t binding, uint32_t index)
 {
-	return set * MAXIMUM_NUMBER_OF_SETS_PER_STAGE + binding;
+	return (index * MAXIMUM_NUMBER_OF_SETS_PER_STAGE * MAXIMUM_ARRAY_ELEMENTS) + set * MAXIMUM_NUMBER_OF_SETS_PER_STAGE + binding;
 }

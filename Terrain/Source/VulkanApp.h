@@ -5,14 +5,15 @@
 #include <array>
 
 #include "Core/Application.h"
-#include "Graphics/VulkanUniformBuffer.h"
-#include "Graphics/VulkanTexture.h"
-#include "Graphics/VulkanBuffer.h"
-#include "Graphics/VulkanVertexBufferLayout.h"
-#include "Graphics/VulkanRenderCommandBuffer.h"
-#include "Graphics/VulkanComputePipeline.h"
-#include "Graphics/VulkanRenderer.h"
-#include "Graphics/VulkanImgui.h"
+#include "Graphics/Vulkan/VulkanUniformBuffer.h"
+#include "Graphics/Vulkan/VulkanTexture.h"
+#include "Graphics/Vulkan/VulkanBuffer.h"
+#include "Graphics/Vulkan/VulkanVertexBufferLayout.h"
+#include "Graphics/Vulkan/VulkanRenderCommandBuffer.h"
+#include "Graphics/Vulkan/VulkanComputePipeline.h"
+#include "Graphics/Vulkan/VulkanRenderer.h"
+#include "Graphics/Vulkan/VulkanImgui.h"
+#include "Graphics/VirtualTexture.h"
 
 #include "Renderer/TerrainRenderer.h"
 
@@ -22,9 +23,19 @@
 #include "Scene/Camera.h"
 #include "GUI/TerrainGenerationGUI.h"
 
+#include "Terrain/Container/TerrainQuadTree.h"
+
 #include <thread>
 
 #define MAX_FRAMES_IN_FLIGHT 2
+
+struct CameraCompParams
+{
+	glm::vec2 position;
+	glm::vec2 forward;
+	glm::vec2 right;
+	float fov;
+};
 
 struct noiseParams
 {
@@ -34,6 +45,13 @@ struct noiseParams
 	float gain = 0.5f;
 	float lacunarity = 2.0f;
 	float padding[2];
+};
+
+struct nodeParams
+{
+	glm::vec2 position;
+	glm::vec2 size;
+	int lod;
 };
 
 class VulkanApp : public Application
@@ -64,8 +82,10 @@ private:
 	std::shared_ptr<VulkanSampler> m_Sampler;
 	std::shared_ptr<TerrainGenerationGUI> TerrainGUI;
 
-	Camera cam{45.0f, 1600.0f / 900.0f, 0.1f, 1000000000.0f};
+	Camera cam{45.0f, 1600.0f / 900.0f, 0.1f, 10000.0f};
 	bool Wireframe = false;
+
+	TerrainQuadTree* terrainQuadTree;
 
 	std::thread* thread;
 	bool presed = false;

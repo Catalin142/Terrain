@@ -17,6 +17,7 @@ uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags memFlags)
 	}
 
 	assert(false);
+	return 0;
 }
 
 VulkanBaseBuffer::VulkanBaseBuffer(const BufferProperties& props) : m_Properties(props)

@@ -14,6 +14,7 @@ struct TerrainChunk
 {
     vec2 Offset;
     int Size;
+    int Lod;
 };
 
 layout(set = 0, binding = 0) uniform ChunksUniformBufferSet
@@ -21,17 +22,15 @@ layout(set = 0, binding = 0) uniform ChunksUniformBufferSet
     TerrainChunk chunk[8 * 8];
 } Chunks;
 
-layout(set = 0, binding = 1) uniform LodMapUniformBufferSet
-{
-    int lod[128 * 128];
-} lodMap;
-
-layout(set = 0, binding = 2) uniform TerrainInfoUniformBuffer
+layout(set = 0, binding = 1) uniform TerrainInfoUniformBuffer
 {
     vec2 Size;
     float heightMultiplier;
     int minimumChunkSize;
 } terrainInfo;
+
+
+layout (set = 0, binding = 2, r8ui) uniform readonly uimage2D LODMap;
 
 layout (set = 1, binding = 0) uniform sampler terrainSampler;
 layout (set = 1, binding = 1) uniform texture2D heightMap;
@@ -40,7 +39,7 @@ int getLod(int posX, int posY)
 {
     posX = clamp(posX, 0, (int(terrainInfo.Size.x) / terrainInfo.minimumChunkSize) - 1);
     posY = clamp(posY, 0, (int(terrainInfo.Size.y) / terrainInfo.minimumChunkSize) - 1);
-    return lodMap.lod[posY * (int(terrainInfo.Size.x) / terrainInfo.minimumChunkSize) + posX];
+    return int(imageLoad(LODMap, ivec2(posX, posY)).r);
 }
 
 void main() 
@@ -49,30 +48,32 @@ void main()
     TerrainChunk chunk = Chunks.chunk[gl_InstanceIndex];
     vec2 offset = chunk.Offset;
     
-    int chunkSizePlusOne = chunk.Size + 1;
-    position.x = floor(gl_VertexIndex / chunkSizePlusOne);
-    position.z = gl_VertexIndex % chunkSizePlusOne;
+    float multiplier = float(chunk.Size) / terrainInfo.minimumChunkSize;
 
-    ivec2 chunkPosition = ivec2(int(offset.x) / chunk.Size, int(offset.y) / chunk.Size);
-    int currentLod = getLod(chunkPosition.x, chunkPosition.y);
-    int upLod      = getLod(chunkPosition.x, chunkPosition.y + 1);
+    int chunkSizePlusOne = terrainInfo.minimumChunkSize + 1;
+    position.x = floor(gl_VertexIndex / chunkSizePlusOne) * multiplier;
+    position.z = gl_VertexIndex % chunkSizePlusOne * multiplier;
+
+    ivec2 chunkPosition = ivec2((offset.x) / terrainInfo.minimumChunkSize, (offset.y) / terrainInfo.minimumChunkSize);
+
+    int chunkFarOffset = chunk.Size / terrainInfo.minimumChunkSize;
+    int currentLod = chunk.Lod;
+    int upLod      = getLod(chunkPosition.x, chunkPosition.y + chunkFarOffset);
     int downLod    = getLod(chunkPosition.x, chunkPosition.y - 1);
-    int rightLod   = getLod(chunkPosition.x + 1, chunkPosition.y);
+    int rightLod   = getLod(chunkPosition.x + chunkFarOffset, chunkPosition.y);
     int leftLod    = getLod(chunkPosition.x - 1, chunkPosition.y);
     
-    float quadsPerChunk = (chunk.Size / currentLod);
-
     // stiching patches
     position.z += (rightLod - (int(position.z) % rightLod)) * float(position.x == chunk.Size) * float((int(position.z) % rightLod) != 0);
     position.z += (leftLod - (int(position.z) % leftLod)) * float(position.x == 0.0) * float((int(position.z) % leftLod) != 0);
     position.x += (upLod - (int(position.x) % upLod)) * float(position.z == chunk.Size) * float((int(position.x) % upLod) != 0);
     position.x += (downLod - (int(position.x) % downLod)) * float(position.z == 0.0) * float((int(position.x) % downLod) != 0);
         
-    texCoord = vec2(position.x / (chunk.Size), position.z / (chunk.Size));
+    texCoord = vec2(position.x / terrainInfo.minimumChunkSize, position.z / terrainInfo.minimumChunkSize);
     
     position.x += offset.x;
     position.z += offset.y;
-    
+
     vec2 dynamicTexCoord = vec2(position.x / terrainInfo.Size.x, position.z / terrainInfo.Size.y);
     
     position.y = (-texture(sampler2D(heightMap, terrainSampler), dynamicTexCoord).r) * terrainInfo.heightMultiplier;

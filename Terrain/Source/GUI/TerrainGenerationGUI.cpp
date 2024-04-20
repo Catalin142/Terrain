@@ -2,8 +2,9 @@
 
 #include <backends/imgui_impl_vulkan.h>
 
-TerrainGenerationGUI::TerrainGenerationGUI(const std::shared_ptr<TerrainGenerator>& generator, uint32_t width, ImVec2 pos) :
-	m_Generator(generator), Width(width), Position(pos)
+TerrainGenerationGUI::TerrainGenerationGUI(const std::shared_ptr<TerrainGenerator>& generator, const std::shared_ptr<Terrain>& terrain,
+	uint32_t width, ImVec2 pos) :
+	m_Generator(generator), Width(width), Position(pos), m_Terrain(terrain)
 { 
 	m_Sampler = std::make_shared<VulkanSampler>(SamplerSpecification{});
 
@@ -15,12 +16,17 @@ TerrainGenerationGUI::TerrainGenerationGUI(const std::shared_ptr<TerrainGenerato
 
 	m_CompositionMapDescriptor = ImGui_ImplVulkan_AddTexture(m_Sampler->Get(),
 		m_Generator->getCompositionMap()->getVkImageView(), VK_IMAGE_LAYOUT_GENERAL);
+
+	m_LODTechniques["QuadTree"] = LODTechnique::QUAD_TREE;
+	m_LODTechniques["Distance"] = LODTechnique::DISTANCE_BASED;
+	m_LODNames.push_back("QuadTree");
+	m_LODNames.push_back("Distance");
 }
 
 void TerrainGenerationGUI::Render()
 {
 	ImGui::SetNextWindowPos(Position);
-	ImGui::SetNextWindowSizeConstraints(ImVec2(Width, -1.0f), ImVec2(Width, FLT_MAX));
+	ImGui::SetNextWindowSizeConstraints(ImVec2((float)Width, -1.0f), ImVec2((float)Width, FLT_MAX));
 	ImGui::Begin("Terrain Generation", 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize);
 
 	if (ImGui::CollapsingHeader("Height map"))
@@ -66,6 +72,29 @@ void TerrainGenerationGUI::Render()
 		float size = (float)Width / 5.0f;
 		if (ImGui::Button("Reset", ImVec2(size, 20.0f)))
 			m_Generator->notifyChange();
+	}
+
+	if (ImGui::CollapsingHeader("Terrain LOD"))
+	{
+		static std::string currentItem = "Distance";
+
+		if (ImGui::BeginCombo("##combo", currentItem.c_str())) 
+		{
+			for (size_t n = 0; n < m_LODNames.size(); n++)
+			{
+				bool isSelected = (currentItem == m_LODNames[n]);
+				
+				if (ImGui::Selectable(m_LODNames[n].c_str(), isSelected))
+				{
+					currentItem = m_LODNames[n];
+					m_Terrain->setTechnique(m_LODTechniques[currentItem]);
+				}
+				
+				if (isSelected)
+					ImGui::SetItemDefaultFocus(); 			
+			}
+			ImGui::EndCombo();
+		}
 	}
 
 	ImGui::End();

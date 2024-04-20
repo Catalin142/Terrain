@@ -10,7 +10,7 @@ VulkanComputePipeline::VulkanComputePipeline(const std::shared_ptr<VulkanShader>
 
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	pipelineLayoutInfo.setLayoutCount = shader->getDescriptorSetLayouts().size();
+	pipelineLayoutInfo.setLayoutCount = (uint32_t)shader->getDescriptorSetLayouts().size();
 	pipelineLayoutInfo.pSetLayouts = shader->getDescriptorSetLayouts().data();
 
 	VkPushConstantRange range{};

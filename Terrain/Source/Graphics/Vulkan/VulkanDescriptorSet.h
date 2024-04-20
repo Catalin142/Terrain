@@ -24,19 +24,19 @@ public:
 
 	void Create();
 
-	void bindInput(uint32_t set, uint32_t binding, const std::shared_ptr<VulkanUniformBuffer>& buffer);
-	void bindInput(uint32_t set, uint32_t binding, const std::shared_ptr<VulkanUniformBufferSet>& bufferSet);
-	void bindInput(uint32_t set, uint32_t binding, const std::shared_ptr<VulkanTexture>& texture);
-	void bindInput(uint32_t set, uint32_t binding, const std::shared_ptr<VulkanImage>& image);
-	void bindInput(uint32_t set, uint32_t binding, const std::shared_ptr<VulkanSampler>& sampler);
+	void bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanUniformBuffer>& buffer);
+	void bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanUniformBufferSet>& bufferSet);
+	void bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanTexture>& texture);
+	void bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanImage>& image, uint32_t mip = 0);
+	void bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanSampler>& sampler);
 
 	std::vector<VkDescriptorSet> getDescriptorSet(uint32_t frameIndex);
 	uint32_t getNumberOfSets() { return m_Shader->getNumberOfSets(); }
 	
-	VkWriteDescriptorSet getWriteDescriptorSet(const ShaderInput& input, VkDescriptorSet set, uint32_t frame);
+	VkWriteDescriptorSet getWriteDescriptorSet(const ShaderInput& input, uint32_t index, VkDescriptorSet set, uint32_t frame);
 
 private:
-	uint32_t getHash(uint32_t set, uint32_t binding);
+	uint32_t getHash(uint32_t set, uint32_t binding, uint32_t index);
 
 private:
 	std::shared_ptr<VulkanShader> m_Shader;

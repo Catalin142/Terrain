@@ -1,10 +1,10 @@
 #include "TerrainGenerator.h"
 
-#include "Graphics/VulkanRenderer.h"
+#include "Graphics/Vulkan/VulkanRenderer.h"
 
 TerrainGenerator::TerrainGenerator(uint32_t width, uint32_t height) : m_Width(width), m_Height(height)
 {
-	m_UniformBuffer = std::make_shared<VulkanUniformBuffer>(sizeof(glm::vec4));
+	m_UniformBuffer = std::make_shared<VulkanUniformBuffer>((uint32_t)sizeof(glm::vec4));
 	createShaders();
 	createImages();
 	createCompute();
@@ -174,17 +174,17 @@ void TerrainGenerator::createCompute()
 	{
 		m_NoiseGenerationPass = std::make_shared<VulkanComputePass>();
 		m_NoiseGenerationPass->DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("_TerrainGenerator"));
-		m_NoiseGenerationPass->DescriptorSet->bindInput(0, 0, m_Noise);
+		m_NoiseGenerationPass->DescriptorSet->bindInput(0, 0, 0, m_Noise);
 		m_NoiseGenerationPass->DescriptorSet->Create();
 		m_NoiseGenerationPass->Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader("_TerrainGenerator"), 
-			sizeof(GenerationParameters));
+			uint32_t(sizeof(GenerationParameters)));
 	}
 
 	{
 		m_NormalComputePass = std::make_shared<VulkanComputePass>();
 		m_NormalComputePass->DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("_NormalCompute"));
-		m_NormalComputePass->DescriptorSet->bindInput(0, 0, m_Noise);
-		m_NormalComputePass->DescriptorSet->bindInput(0, 1, m_Normals);
+		m_NormalComputePass->DescriptorSet->bindInput(0, 0, 0, m_Noise);
+		m_NormalComputePass->DescriptorSet->bindInput(0, 1, 0, m_Normals);
 		m_NormalComputePass->DescriptorSet->Create();
 		m_NormalComputePass->Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader("_NormalCompute"));
 	}
@@ -192,8 +192,8 @@ void TerrainGenerator::createCompute()
 	{
 		m_CompositionPass = std::make_shared<VulkanComputePass>();
 		m_CompositionPass->DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("_CompositionCompute"));
-		m_CompositionPass->DescriptorSet->bindInput(0, 0, m_Normals);
-		m_CompositionPass->DescriptorSet->bindInput(0, 1, m_Composition);
+		m_CompositionPass->DescriptorSet->bindInput(0, 0, 0, m_Normals);
+		m_CompositionPass->DescriptorSet->bindInput(0, 1, 0, m_Composition);
 		m_CompositionPass->DescriptorSet->Create();
 		m_CompositionPass->Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader("_CompositionCompute"));
 	}
@@ -201,10 +201,10 @@ void TerrainGenerator::createCompute()
 	{
 		m_HydraulicErosionPass = std::make_shared<VulkanComputePass>();
 		m_HydraulicErosionPass->DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("_HydraulicErostionCompute"));
-		m_HydraulicErosionPass->DescriptorSet->bindInput(0, 0, m_Noise);
-		m_HydraulicErosionPass->DescriptorSet->bindInput(1, 0, m_UniformBuffer);
+		m_HydraulicErosionPass->DescriptorSet->bindInput(0, 0, 0, m_Noise);
+		m_HydraulicErosionPass->DescriptorSet->bindInput(1, 0, 0, m_UniformBuffer);
 		m_HydraulicErosionPass->DescriptorSet->Create();
 		m_HydraulicErosionPass->Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader("_HydraulicErostionCompute"),
-			sizeof(HydraulicErosionParameters));
+			uint32_t(sizeof(HydraulicErosionParameters)));
 	}
 }

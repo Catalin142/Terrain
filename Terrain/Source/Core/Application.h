@@ -1,9 +1,9 @@
 #pragma once
 
 #include "Window.h"
-#include "Graphics/VulkanDevice.h"
-#include "Graphics/VulkanSwapchain.h"
-#include "Graphics/VulkanImgui.h"
+#include "Graphics/Vulkan/VulkanDevice.h"
+#include "Graphics/Vulkan/VulkanSwapchain.h"
+#include "Graphics/Vulkan/VulkanImgui.h"
 
 #include <memory>
 

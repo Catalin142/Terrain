@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Graphics/VulkanImage.h"
-#include "Graphics/VulkanPass.h"
+#include "Graphics/Vulkan/VulkanImage.h"
+#include "Graphics/Vulkan/VulkanPass.h"
 
 #include <memory>
 #include <array>

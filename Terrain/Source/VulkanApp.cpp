@@ -6,7 +6,7 @@
 
 #include "Core/Instrumentor.h"
 
-#include "Graphics/VulkanUtils.h"
+#include "Graphics/Vulkan/VulkanUtils.h"
 #include <imgui.h>
 
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -22,7 +22,7 @@
 #include <GLFW/glfw3.h>
 
 #include "stb_image/std_image.h"
-#include "Graphics/VulkanShader.h"
+#include "Graphics/Vulkan/VulkanShader.h"
 #include "Terrain/Techniques/DistanceLOD.h"
 #include <backends/imgui_impl_vulkan.h>
 
@@ -70,17 +70,16 @@ void VulkanApp::onCreate()
 
 		{
 			std::vector<std::string> filepaths = {
-				"Resources/Img/grs.png",
-				"Resources/Img/grs.png",
-				"Resources/Img/grs.png",
+				"Resources/Img/grass1.png",
+				"Resources/Img/slope1.png",
+				"Resources/Img/rock1.png",
 			};
 
 			TextureSpecification texSpec{};
 			texSpec.CreateSampler = true;
 			texSpec.GenerateMips = true;
-			texSpec.MaxAnisotropy = 16.0f;
 			texSpec.Channles = 4;
-			texSpec.LayerCount = filepaths.size();
+			texSpec.LayerCount = (uint32_t)filepaths.size();
 			texSpec.Filepath = filepaths;
 			terrainSpec.TerrainTextures = std::make_shared<VulkanTexture>(texSpec);
 		}
@@ -92,8 +91,20 @@ void VulkanApp::onCreate()
 
 		m_Sampler = std::make_shared<VulkanSampler>(SamplerSpecification{});
 
-		TerrainGUI = std::make_shared<TerrainGenerationGUI>(m_TerrainGenerator, 300, ImVec2(1290.0f, 10.0f));
-		m_TerrainRenderer = std::make_shared<TerrainRenderer>(m_Output);
+		TerrainGUI = std::make_shared<TerrainGenerationGUI>(m_TerrainGenerator, m_Terrain, 300, ImVec2(1290.0f, 10.0f));
+		m_TerrainRenderer = std::make_shared<TerrainRenderer>(m_Output, m_Terrain);
+	}
+
+	{
+		TerrainQuadTreeProperties terrainQuadProps;
+		terrainQuadProps.Size = { 1024, 1024 };
+		terrainQuadProps.MaxLod = 4;
+		terrainQuadProps.LodDistance = 32;
+		terrainQuadTree = new TerrainQuadTree(terrainQuadProps);
+		
+		/*
+		quadTreeDesc = ImGui_ImplVulkan_AddTexture(m_Sampler->Get(),
+			quadTreeVisualization->getVkImageView(), VK_IMAGE_LAYOUT_GENERAL);*/
 	}
 
 	createFinalPass();
@@ -143,18 +154,39 @@ void VulkanApp::onUpdate()
 	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_2))
 		m_TerrainRenderer->setWireframe(false);
 
+	terrainQuadTree->insertPlayer({ cam.getPosition().x, cam.getPosition().z });
+
+
 	CommandBuffer->Begin();
 	VkCommandBuffer commandBuffer = CommandBuffer->getCurrentCommandBuffer();
 	m_TerrainGenerator->Generate(CommandBuffer);
 
+
 	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_3))
 		m_TerrainGenerator->runHydraulicErosion(CommandBuffer);
+
+	/*CameraCompParams compParams;
+
+	compParams.forward = glm::vec2(cam.Forward().x, cam.Forward().z);
+	compParams.position = glm::vec2(cam.getPosition().x / 1024.0f * 100.0f, cam.getPosition().z / 1024.0f * 100.0f);
+	compParams.fov = 45.0f;
+	compParams.right = glm::vec2(cam.Right().x, cam.Right().z);*/
+
+	glm::vec2 cameraPosition = { (cam.getPosition().x), (cam.getPosition().z) };
+
+	std::vector<TerrainChunk> chunksToRender;
+	chunksToRender.push_back(TerrainChunk{ glm::clamp(cameraPosition - 512.0f, glm::vec2(0.0f, 0.0f), glm::vec2(0.0f, 0.0f)), 1024, 8 });
+	chunksToRender.push_back(TerrainChunk{ glm::clamp(cameraPosition - 256.0f, glm::vec2(0.0f, 0.0f), glm::vec2(1024.0f - 512.0f, 1024.0f - 512.0f)), 512, 4 });
+	chunksToRender.push_back(TerrainChunk{ glm::clamp(cameraPosition - 128.0f, glm::vec2(0.0f, 0.0f), glm::vec2(1024.0f - 256.0f, 1024.0f - 256.0f)), 256, 2 });
+	chunksToRender.push_back(TerrainChunk{ glm::clamp(cameraPosition - 64.0f, glm::vec2(0.0f, 0.0f), glm::vec2(1024.0f - 128.0f, 1024.0f - 128.0f)), 128, 1});
+
+	//m_TerrainRenderer->m_TerrainChunksSet->setData(chunksToRender.data(), (uint32_t)chunksToRender.size() * sizeof(TerrainChunk), VulkanRenderer::getCurrentFrame());
 
 	// Geometry pass
 	{
 		CommandBuffer->beginQuery("GeometryPass");
 		m_TerrainRenderer->setRenderCommandBuffer(CommandBuffer);
-		m_TerrainRenderer->renderTerrain(cam, m_Terrain);
+		m_TerrainRenderer->Render(cam);
 		CommandBuffer->endQuery("GeometryPass");
 	}
 
@@ -188,6 +220,12 @@ void VulkanApp::onUpdate()
 
 		TerrainGUI->Render();
 
+		/*ImGui::Begin("quadtree");
+
+		ImGui::Image(quadTreeDesc, ImVec2{ 256, 256 });
+
+		ImGui::End();*/
+
 		m_Terrain->setHeightMultiplier(100.0f);
 
 		endImGuiFrame();
@@ -196,6 +234,10 @@ void VulkanApp::onUpdate()
 		VulkanRenderer::endRenderPass(CommandBuffer);
 		CommandBuffer->endQuery("PresentPass");
 	}
+
+	VkClearColorValue colorQuad = { 0.0f, 0.0f, 0.0f, 1.0f };
+	VkImageSubresourceRange range{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+	//vkCmdClearColorImage(commandBuffer, quadTreeVisualization->getVkImage(), VK_IMAGE_LAYOUT_GENERAL, &colorQuad, 1, &range);
 
 	CommandBuffer->End();
 	CommandBuffer->Submit();
@@ -212,8 +254,8 @@ void VulkanApp::onResize()
 	{
 		std::shared_ptr<VulkanDescriptorSet> DescriptorSet;
 		DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("FinalShader"));
-		DescriptorSet->bindInput(0, 0, m_Sampler);
-		DescriptorSet->bindInput(0, 1, m_Output->getImage(0));
+		DescriptorSet->bindInput(0, 0, 0, m_Sampler);
+		DescriptorSet->bindInput(0, 1, 0, m_Output->getImage(0));
 		DescriptorSet->Create();
 		m_FinalPass->DescriptorSet = DescriptorSet;
 	}
@@ -252,8 +294,8 @@ void VulkanApp::createFinalPass()
 	{
 		std::shared_ptr<VulkanDescriptorSet> DescriptorSet;
 		DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("FinalShader"));
-		DescriptorSet->bindInput(0, 0, m_Sampler);
-		DescriptorSet->bindInput(0, 1, m_Output->getImage(0));
+		DescriptorSet->bindInput(0, 0, 0, m_Sampler);
+		DescriptorSet->bindInput(0, 1, 0, m_Output->getImage(0));
 		DescriptorSet->Create();
 		m_FinalPass->DescriptorSet = DescriptorSet;
 	}

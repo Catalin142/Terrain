@@ -52,7 +52,9 @@ static VkDescriptorType getInputType(const ShaderInputType& type)
 
 static std::vector<uint32_t> readCachedShaderData(const std::string& filepath)
 {
-	FILE* f = fopen(filepath.c_str(), "rb");
+	FILE* f;
+	fopen_s(&f, filepath.c_str(), "rb");
+
 	if (!f)
 	{
 		std::cerr << "FIsierul " << filepath << " nu exista\n";
@@ -73,7 +75,8 @@ static std::vector<uint32_t> readCachedShaderData(const std::string& filepath)
 
 static void writeShaderBinary(void* data, uint32_t size, const std::string& path)
 {
-	FILE* file = fopen(path.c_str(), "wb");
+	FILE* file;
+	fopen_s(&file, path.c_str(), "wb");
 	if (!file)
 		assert(false);
 	fwrite(data, sizeof(uint32_t), size, file);
@@ -84,7 +87,7 @@ VulkanShaderStage::VulkanShaderStage(ShaderStage stage, const std::string& filep
 {
 	std::vector<uint32_t> data;
 
-	size_t lastD = filepath.find_last_of('\/');
+	size_t lastD = filepath.find_last_of('/');
 	std::string directoryPath = std::string(filepath.begin(), filepath.begin() + (lastD != std::string::npos ? lastD : 0));
 	std::string shaderName = std::string(filepath.begin(), filepath.begin() + filepath.find_last_of('.'));
 
@@ -101,7 +104,7 @@ VulkanShaderStage::VulkanShaderStage(ShaderStage stage, const std::string& filep
 		std::filesystem::create_directories(CACHE_FILEPATH + directoryPath);
 
 	if (!std::filesystem::exists(cacheFilepath))
-		writeShaderBinary(data.data(), data.size(), cacheFilepath);
+		writeShaderBinary(data.data(), (uint32_t)data.size(), cacheFilepath);
 
 	m_Input = VulkanShaderCompiler::Reflect(stage, data);
 
@@ -128,7 +131,7 @@ void VulkanShaderStage::Recompile()
 
 	std::string shaderName = std::string(m_Filepath.begin(), m_Filepath.begin() + m_Filepath.find_last_of('.'));
 	std::string cacheFilepath = CACHE_FILEPATH + shaderName + ".spv";
-	writeShaderBinary(data.data(), data.size(), cacheFilepath);
+	writeShaderBinary(data.data(), (uint32_t)data.size(), cacheFilepath);
 
 	m_Input = VulkanShaderCompiler::Reflect(m_Stage, data);
 
@@ -235,7 +238,7 @@ std::map<uint32_t, std::vector<VkDescriptorSetLayoutBinding>> VulkanShader::getD
 			VkDescriptorSetLayoutBinding layoutBinding{};
 			layoutBinding.binding = i.Binding;
 			layoutBinding.descriptorType = getInputType(i.Type);
-			layoutBinding.descriptorCount = 1;
+			layoutBinding.descriptorCount = i.Count;
 			layoutBinding.stageFlags = getStage(i.Stage);
 			layoutBinding.pImmutableSamplers = nullptr;
 			inputs[i.DebugName] = layoutBinding;
@@ -357,6 +360,7 @@ std::vector<ShaderInput> VulkanShaderCompiler::Reflect(ShaderStage stage, const 
 		uniformBufferInput.DebugName = uniformBuffer.name;
 		uniformBufferInput.Set = compiler.get_decoration(uniformBuffer.id, spv::DecorationDescriptorSet);
 		uniformBufferInput.Binding = compiler.get_decoration(uniformBuffer.id, spv::DecorationBinding);
+		uniformBufferInput.Count = compiler.get_type(uniformBuffer.type_id).array[0] == 0 ? 1 : compiler.get_type(uniformBuffer.type_id).array[0];
 
 		if (uniformBuffer.name.find("Set") != std::string::npos)
 			uniformBufferInput.Type = ShaderInputType::UNIFORM_BUFFER_SET;
@@ -374,6 +378,7 @@ std::vector<ShaderInput> VulkanShaderCompiler::Reflect(ShaderStage stage, const 
 		sampleImageInput.DebugName = sampler.name;
 		sampleImageInput.Set = compiler.get_decoration(sampler.id, spv::DecorationDescriptorSet);
 		sampleImageInput.Binding = compiler.get_decoration(sampler.id, spv::DecorationBinding);
+		sampleImageInput.Count = compiler.get_type(sampler.type_id).array[0] == 0 ? 1 : compiler.get_type(sampler.type_id).array[0];
 		sampleImageInput.Type = ShaderInputType::COMBINED_IMAGE_SAMPLER;
 
 		shaderInput.push_back(sampleImageInput);
@@ -386,6 +391,7 @@ std::vector<ShaderInput> VulkanShaderCompiler::Reflect(ShaderStage stage, const 
 		sampleImageInput.DebugName = texture.name;
 		sampleImageInput.Set = compiler.get_decoration(texture.id, spv::DecorationDescriptorSet);
 		sampleImageInput.Binding = compiler.get_decoration(texture.id, spv::DecorationBinding);
+		sampleImageInput.Count = compiler.get_type(texture.type_id).array[0] == 0 ? 1 : compiler.get_type(texture.type_id).array[0];
 		sampleImageInput.Type = ShaderInputType::TEXTURE;
 
 		shaderInput.push_back(sampleImageInput);
@@ -398,6 +404,7 @@ std::vector<ShaderInput> VulkanShaderCompiler::Reflect(ShaderStage stage, const 
 		sampleImageInput.DebugName = sampler.name;
 		sampleImageInput.Set = compiler.get_decoration(sampler.id, spv::DecorationDescriptorSet);
 		sampleImageInput.Binding = compiler.get_decoration(sampler.id, spv::DecorationBinding);
+		sampleImageInput.Count = compiler.get_type(sampler.type_id).array[0] == 0 ? 1 : compiler.get_type(sampler.type_id).array[0];
 		sampleImageInput.Type = ShaderInputType::SAMPLER;
 
 		shaderInput.push_back(sampleImageInput);
@@ -410,6 +417,7 @@ std::vector<ShaderInput> VulkanShaderCompiler::Reflect(ShaderStage stage, const 
 		sampleImageInput.DebugName = sampler.name;
 		sampleImageInput.Set = compiler.get_decoration(sampler.id, spv::DecorationDescriptorSet);
 		sampleImageInput.Binding = compiler.get_decoration(sampler.id, spv::DecorationBinding);
+		sampleImageInput.Count = compiler.get_type(sampler.type_id).array[0] == 0 ? 1 : compiler.get_type(sampler.type_id).array[0];
 		sampleImageInput.Type = ShaderInputType::STORAGE_IMAGE;
 
 		shaderInput.push_back(sampleImageInput);

@@ -2,15 +2,47 @@
 
 #include "Terrain/Techniques/DistanceLOD.h"
 
-#include "Graphics/VulkanRenderer.h"
-#include "Graphics/VulkanDevice.h"
-#include "Graphics/VulkanUtils.h"
+#include "Graphics/Vulkan/VulkanRenderer.h"
+#include "Graphics/Vulkan/VulkanDevice.h"
+#include "Graphics/Vulkan/VulkanUtils.h"
 
 #include <cassert>
 
-TerrainRenderer::TerrainRenderer(const std::shared_ptr<VulkanFramebuffer>& targetFramebuffer) : m_TargetFramebuffer(targetFramebuffer)
+struct LODComputeConstants
+{
+	int32_t leavesCount;
+	int32_t terrinSize;
+};
+
+
+TerrainRenderer::TerrainRenderer(const std::shared_ptr<VulkanFramebuffer>& targetFramebuffer,
+	const std::shared_ptr<Terrain>& terrain) : m_TargetFramebuffer(targetFramebuffer), m_Terrain(terrain)
 {
 	initializeBuffers();
+
+	// Lod Map
+	{
+		std::shared_ptr<VulkanShader>& lodCompute = ShaderManager::createShader("_LODCompute");
+		lodCompute->addShaderStage(ShaderStage::COMPUTE, "Terrain/LODMap_comp.glsl");
+		lodCompute->createDescriptorSetLayouts();
+
+		ImageSpecification LODMapSpecification;
+		LODMapSpecification.Width = uint32_t(terrain->getInfo().TerrainSize.x) / terrain->getInfo().MinimumChunkSize;
+		LODMapSpecification.Height = uint32_t(terrain->getInfo().TerrainSize.x) / terrain->getInfo().MinimumChunkSize;
+		LODMapSpecification.Format = VK_FORMAT_R8_UINT;
+		LODMapSpecification.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+		LODMapSpecification.UsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+		m_LODMap = std::make_shared<VulkanImage>(LODMapSpecification);
+		m_LODMap->Create();
+
+		m_LODMapComputePass = std::make_shared<VulkanComputePass>();
+		m_LODMapComputePass->DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("_LODCompute"));
+		m_LODMapComputePass->DescriptorSet->bindInput(0, 0, 0, m_LODMap);
+		m_LODMapComputePass->DescriptorSet->bindInput(0, 1, 0, m_TerrainChunksSet);
+		m_LODMapComputePass->DescriptorSet->Create();
+		m_LODMapComputePass->Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader("_LODCompute"),
+			uint32_t(sizeof(LODComputeConstants)));
+	}
 
 	SamplerSpecification terrainSamplerSpec{};
 	terrainSamplerSpec.addresMode = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
@@ -24,34 +56,22 @@ TerrainRenderer::TerrainRenderer(const std::shared_ptr<VulkanFramebuffer>& targe
 	texSpec.CreateSampler = false;
 	texSpec.GenerateMips = false;
 	texSpec.Channles = 4;
-	texSpec.LayerCount = filepaths.size();
+	texSpec.LayerCount = (uint32_t)filepaths.size();
 	texSpec.Filepath = filepaths;
 	m_NoiseMap = std::make_shared<VulkanTexture>(texSpec);
+
+	initializeRenderPass();
 }
 
-void TerrainRenderer::renderTerrain(const Camera& camera, const std::shared_ptr<Terrain>& terrain)
+void TerrainRenderer::Render(const Camera& camera)
 {
-	if (m_LastTechniqueUsed != terrain->getCurrentTechnique() || terrain != m_Terrain)
-	{
-		m_Terrain = terrain;
-		m_LastTechniqueUsed = m_Terrain->getCurrentTechnique();
-		initializeRenderPass();
-	}
-
 	uint32_t currentFrame = VulkanRenderer::getCurrentFrame();
-
-	switch (m_Terrain->getCurrentTechnique())
-	{
-	case LODTechnique::DISTANCE_BASED:
-		renderDistanceLOD(camera);
-		break;
-	}
+	renderTerrain(camera);
 }
 
 void TerrainRenderer::setTargetFramebuffer(const std::shared_ptr<VulkanFramebuffer>& targetFramebuffer)
 {
 	m_TargetFramebuffer = targetFramebuffer;
-	m_LastTechniqueUsed = LODTechnique::NONE;
 }
 
 void TerrainRenderer::setWireframe(bool wireframe)
@@ -68,56 +88,47 @@ void TerrainRenderer::initializeBuffers()
 	uint32_t framesInFlight = VulkanRenderer::getFramesInFlight();
 
 	// TODO: Get rid of hard coded values
-	m_TerrainChunksSet = std::make_shared<VulkanUniformBufferSet>(8 * 8 * sizeof(TerrainChunk), framesInFlight);
-	m_LodMapSet = std::make_shared<VulkanUniformBufferSet>(128 * 128 * sizeof(LODLevel), framesInFlight);
-	m_TerrainInfo = std::make_shared<VulkanUniformBuffer>(4 * sizeof(float));
+	m_TerrainChunksSet = std::make_shared<VulkanUniformBufferSet>(uint32_t(8 * 8 * sizeof(TerrainChunk)), framesInFlight);
+	m_TerrainInfo = std::make_shared<VulkanUniformBuffer>((uint32_t)sizeof(TerrainInfo));
 }
 
 void TerrainRenderer::initializeRenderPass()
 {
 	vkDeviceWaitIdle(VulkanDevice::getVulkanDevice());
-	switch (m_Terrain->getCurrentTechnique())
-	{
-	case LODTechnique::DISTANCE_BASED:
-		createDistanceLODRenderPass();
-		break;
-	}
+	createRenderPass();
 }
 
-void TerrainRenderer::createDistanceLODRenderPass()
+void TerrainRenderer::createRenderPass()
 {
-	if (m_Terrain->getDistanceLODTechnique() == nullptr)
-		assert(false);
-
 	m_TerrainRenderPass = std::make_shared<RenderPass>();
 
 	{
-		std::shared_ptr<VulkanShader>& mainShader = ShaderManager::createShader("DistanceLODShader");
-		mainShader->addShaderStage(ShaderStage::VERTEX, "DistanceLOD_vert.glsl");
-		mainShader->addShaderStage(ShaderStage::FRAGMENT, "DistanceLOD_frag.glsl");
+		std::shared_ptr<VulkanShader>& mainShader = ShaderManager::createShader("_TerrainQuadShader");
+		mainShader->addShaderStage(ShaderStage::VERTEX, "Terrain/TerrainQuad_vert.glsl");
+		mainShader->addShaderStage(ShaderStage::FRAGMENT, "Terrain/TerrainQuad_frag.glsl");
 		mainShader->createDescriptorSetLayouts();
 	}
 	{
 		std::shared_ptr<VulkanDescriptorSet> DescriptorSet;
-		DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("DistanceLODShader"));
-		DescriptorSet->bindInput(0, 0, m_TerrainChunksSet);
-		DescriptorSet->bindInput(0, 1, m_LodMapSet);
-		DescriptorSet->bindInput(0, 2, m_TerrainInfo);
-		DescriptorSet->bindInput(1, 0, m_TerrainSampler);
-		DescriptorSet->bindInput(1, 1, m_Terrain->getHeightMap());
-		DescriptorSet->bindInput(1, 2, m_Terrain->getCompositionMap());
-		DescriptorSet->bindInput(1, 3, m_Terrain->getNormalMap());
-		DescriptorSet->bindInput(2, 0, m_Terrain->getTerrainTextures());
-		DescriptorSet->bindInput(2, 1, m_NoiseMap);
+		DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("_TerrainQuadShader"));
+		DescriptorSet->bindInput(0, 0, 0, m_TerrainChunksSet);
+		DescriptorSet->bindInput(0, 1, 0, m_TerrainInfo);
+		DescriptorSet->bindInput(0, 2, 0, m_LODMap);
+		DescriptorSet->bindInput(1, 0, 0, m_TerrainSampler);
+		DescriptorSet->bindInput(1, 1, 0, m_Terrain->getHeightMap());
+		DescriptorSet->bindInput(1, 2, 0, m_Terrain->getCompositionMap());
+		DescriptorSet->bindInput(1, 3, 0, m_Terrain->getNormalMap());
+		DescriptorSet->bindInput(2, 0, 0, m_Terrain->getTerrainTextures());
+		DescriptorSet->bindInput(2, 1, 0, m_NoiseMap);
 
 		DescriptorSet->Create();
 		m_TerrainRenderPass->DescriptorSet = DescriptorSet;
 	}
 
-	createDistanceLODPipeline();
+	createPipeline();
 }
 
-void TerrainRenderer::createDistanceLODPipeline()
+void TerrainRenderer::createPipeline()
 {
 	PipelineSpecification spec{};
 	spec.Framebuffer = m_TargetFramebuffer;
@@ -125,7 +136,7 @@ void TerrainRenderer::createDistanceLODPipeline()
 	spec.depthWrite = true;
 	spec.Wireframe = m_InWireframe;
 	spec.Culling = true;
-	spec.Shader = ShaderManager::getShader("DistanceLODShader");
+	spec.Shader = ShaderManager::getShader("_TerrainQuadShader");
 	spec.vertexBufferLayout = VulkanVertexBufferLayout{};
 	spec.depthCompareFunction = DepthCompare::LESS;
 
@@ -140,19 +151,30 @@ void TerrainRenderer::createDistanceLODPipeline()
 #endif
 }
 
-void TerrainRenderer::renderDistanceLOD(const Camera& camera)
+void TerrainRenderer::renderTerrain(const Camera& camera)
 {
 	std::vector<TerrainChunk> chunksToRender = m_Terrain->getChunksToRender(camera.getPosition());
-
-	const std::shared_ptr<DistanceLOD>& distanceLOD = m_Terrain->getDistanceLODTechnique();
 
 	uint32_t m_CurrentFrame = VulkanRenderer::getCurrentFrame();
 
 	m_TerrainChunksSet->setData(chunksToRender.data(), chunksToRender.size() * sizeof(TerrainChunk), m_CurrentFrame);
-	m_LodMapSet->setData(distanceLOD->getLodMap().data(), chunksToRender.size() * sizeof(LODLevel), m_CurrentFrame);
+
+	// compute LODMap in compute shader
+	{
+		LODComputeConstants LODpc;
+		LODpc.leavesCount = (int32_t)chunksToRender.size();
+		LODpc.terrinSize = m_Terrain->getInfo().MinimumChunkSize;
+
+		VulkanRenderer::dispatchCompute(m_RenderCommandBuffer, m_LODMapComputePass, { 1, 1, 1 },
+			sizeof(LODComputeConstants), &LODpc);
+
+		m_LODMapComputePass->Pipeline->imageMemoryBarrier(m_RenderCommandBuffer, m_LODMap, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+	}
 
 	TerrainInfo terrainInfo = m_Terrain->getInfo();
-	m_TerrainInfo->setData(&terrainInfo, 4 * sizeof(float));
+	//terrainInfo.CamPos = { camera.getPosition().x, camera.getPosition().z };
+	m_TerrainInfo->setData(&terrainInfo, sizeof(TerrainInfo));
 
 	VkCommandBuffer commandBuffer = m_RenderCommandBuffer->getCurrentCommandBuffer();
 
@@ -164,15 +186,32 @@ void TerrainRenderer::renderDistanceLOD(const Camera& camera)
 		sizeof(CameraRenderMatrices), &matrices);
 
 	uint32_t instanceCount = 0;
-	for (const LODProperties& props : distanceLOD->getLODProperties())
+	switch (m_Terrain->getCurrentTechnique())
 	{
-		if (props.CurrentCount)
+	case LODTechnique::DISTANCE_BASED:
+
+		for (const LODRange& props : m_Terrain->getDistanceLODTechnique()->getLODs())
 		{
-			vkCmdBindIndexBuffer(commandBuffer, props.IndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(commandBuffer, uint32_t(props.IndicesCount), props.CurrentCount, 0, 0, instanceCount);
-			instanceCount += props.CurrentCount;
+			if (props.CurrentCount)
+			{
+				TerrainChunkIndexBuffer idxBuffer = getLOD(props.LOD);
+
+				vkCmdBindIndexBuffer(commandBuffer, idxBuffer.IndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+				vkCmdDrawIndexed(commandBuffer, uint32_t(idxBuffer.IndicesCount), props.CurrentCount, 0, 0, instanceCount);
+				instanceCount += props.CurrentCount;
+			}
 		}
+
+		break;
+
+	case LODTechnique::QUAD_TREE:
+		TerrainChunkIndexBuffer idxBuffer = getLOD(1);
+
+		vkCmdBindIndexBuffer(commandBuffer, idxBuffer.IndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+		vkCmdDrawIndexed(commandBuffer, idxBuffer.IndicesCount, (uint32_t)chunksToRender.size(), 0, 0, 0);
+		break;
 	}
+
 
 
 #if DEBUG_TERRAIN_NORMALS == 1
@@ -196,6 +235,25 @@ void TerrainRenderer::renderDistanceLOD(const Camera& camera)
 
 	VulkanRenderer::endRenderPass(m_RenderCommandBuffer);
 
+}
+
+const TerrainChunkIndexBuffer& TerrainRenderer::getLOD(uint8_t lod)
+{
+	if (m_LODIndexBuffer.find(lod) != m_LODIndexBuffer.end())
+		return m_LODIndexBuffer[lod];
+
+	uint32_t vertCount = m_Terrain->getInfo().MinimumChunkSize + 1;
+	std::vector<uint32_t> indices = TerrainChunk::generateIndices(lod, vertCount);
+
+	TerrainChunkIndexBuffer current;
+
+	current.IndicesCount = (uint32_t)indices.size();
+	current.IndexBuffer = std::make_shared<VulkanBuffer>(indices.data(), (uint32_t)(sizeof(indices[0]) * (uint32_t)indices.size()),
+		BufferType::INDEX, BufferUsage::STATIC);
+	
+	m_LODIndexBuffer[lod] = current;
+
+	return m_LODIndexBuffer[lod];
 }
 
 #if DEBUG_TERRAIN_NORMALS == 1

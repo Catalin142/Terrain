@@ -4,7 +4,7 @@
 #include <iostream>
 #include <format>
 
-#include "Graphics/VulkanDevice.h"
+#include "Graphics/Vulkan/VulkanDevice.h"
 
 ProfilerGUI::ProfilerGUI(const std::string& name, uint32_t sampleCount) : m_SampleCount(sampleCount), m_Name(name)
 { }
