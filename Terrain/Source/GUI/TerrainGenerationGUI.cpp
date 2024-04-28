@@ -19,8 +19,10 @@ TerrainGenerationGUI::TerrainGenerationGUI(const std::shared_ptr<TerrainGenerato
 
 	m_LODTechniques["QuadTree"] = LODTechnique::QUAD_TREE;
 	m_LODTechniques["Distance"] = LODTechnique::DISTANCE_BASED;
+	m_LODTechniques["SinkingCircle"] = LODTechnique::SINKING_CIRCLE;
 	m_LODNames.push_back("QuadTree");
 	m_LODNames.push_back("Distance");
+	m_LODNames.push_back("SinkingCircle");
 }
 
 void TerrainGenerationGUI::Render()

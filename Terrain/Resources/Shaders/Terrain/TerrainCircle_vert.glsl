@@ -25,10 +25,14 @@ layout(set = 0, binding = 0) uniform ChunksUniformBufferSet
 layout(set = 0, binding = 1) uniform TerrainInfoUniformBuffer
 {
     vec2 Size;
-    vec2 CamPos;
     float heightMultiplier;
     int minimumChunkSize;
 } terrainInfo;
+
+layout(set = 0, binding = 2) uniform CameraPositionBuffer
+{
+    vec2 Position;
+} cameraInfo;
 
 layout (set = 1, binding = 0) uniform sampler terrainSampler;
 layout (set = 1, binding = 1) uniform texture2D heightMap;
@@ -57,25 +61,23 @@ void main()
     vec2 dynamicTexCoord = vec2(position.x / terrainInfo.Size.x, position.z / terrainInfo.Size.y);
     
     vec2 camPos;
-    camPos.x = int(clamp(terrainInfo.CamPos.x, 0.0, 1024.0));
-    camPos.y = int(clamp(terrainInfo.CamPos.y, 0.0, 1024.0));
-    
-    camPos.x = int(camPos.x / chunk.Lod / 2) * chunk.Lod * 2;
-    camPos.y = int(camPos.y / chunk.Lod / 2) * chunk.Lod * 2;
+    camPos.x = clamp(cameraInfo.Position.x, 0.0, terrainInfo.Size.x);
+    camPos.y = clamp(cameraInfo.Position.y, 0.0, terrainInfo.Size.x);
 
     float dist = distance(position.xz, camPos);
 
     float sinkValue = 0.0;
-    sinkValue = mix(0.0, chunk.Size, 0.01 * ((chunk.Size / 4.0 - dist) / (chunk.Size / 4.0)) * int(chunk.Lod != 1 && dist < chunk.Size / 4.0));
+    sinkValue = mix(0.0, chunk.Size, 0.01 * ((chunk.Size / 4.0 - dist) / (chunk.Size / 4.0)) * float(chunk.Size != terrainInfo.minimumChunkSize
+        && dist < chunk.Size / 4.0));
 
     position.y = (-texture(sampler2D(heightMap, terrainSampler), dynamicTexCoord).r) * terrainInfo.heightMultiplier + sinkValue;
     
     gl_Position = Camera.Projection * Camera.View * position;
 
-    float outsideCircle = float(dist > chunk.Size / 2 && chunk.Size != terrainInfo.Size.x);
-    float underGroud = float(sinkValue > chunk.Size * 0.001);
+    float outsideCircle = float(dist < chunk.Size / 2 || chunk.Size == terrainInfo.Size.x);
+    float underGroud = float(sinkValue < chunk.Size * 0.001);
     
-    gl_Position.w = outsideCircle * underGroud;
+    gl_Position.w *= (underGroud * outsideCircle);
 
     fragmentPosition = position.xyz;
 

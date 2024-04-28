@@ -12,6 +12,7 @@
 
 class DistanceLOD;
 class QuadTreeLOD;
+class SinkingLOD;
 
 // 128 = 64m
 
@@ -19,6 +20,7 @@ enum class LODTechnique
 {
 	DISTANCE_BASED,
 	QUAD_TREE,
+	SINKING_CIRCLE,
 
 	NONE
 };
@@ -58,6 +60,7 @@ public:
 
 	const std::shared_ptr<DistanceLOD>& getDistanceLODTechnique() { return m_DistanceLOD; }
 	const std::shared_ptr<QuadTreeLOD>& getQuadTreeLODTechnique() { return m_QuadTreeLOD; }
+	const std::shared_ptr<SinkingLOD>& getSinkingCircleLODTechnique() { return m_SinkingCircleLOD; }
 
 	TerrainInfo getInfo() { return m_Specification.Info; }
 	void setHeightMultiplier(float mul) { m_Specification.Info.HeightMultiplier = mul; }
@@ -77,4 +80,5 @@ private:
 
 	std::shared_ptr<DistanceLOD> m_DistanceLOD;
 	std::shared_ptr<QuadTreeLOD> m_QuadTreeLOD;
+	std::shared_ptr<SinkingLOD> m_SinkingCircleLOD;
 };

@@ -2,6 +2,7 @@
 
 #include "Techniques/DistanceLOD.h"
 #include "Techniques/QuadTreeLOD.h"
+#include "Techniques/SinkingLOD.h"
 
 Terrain::Terrain(const TerrainSpecification& spec) : m_Specification(spec)
 {
@@ -20,6 +21,10 @@ const std::vector<TerrainChunk>& Terrain::getChunksToRender(const glm::vec3& cam
 
 	case LODTechnique::QUAD_TREE:
 		m_QuadTreeLOD->getChunksToRender(m_ChunksToRender, cameraPosition);
+		break;
+
+	case LODTechnique::SINKING_CIRCLE:
+		m_SinkingCircleLOD->getChunksToRender(m_ChunksToRender, cameraPosition);
 	}
 
 	return m_ChunksToRender;
@@ -49,6 +54,13 @@ void Terrain::setTechnique(LODTechnique tech)
 
 		m_DistanceLOD.reset();
 		m_QuadTreeLOD = std::make_shared<QuadTreeLOD>(m_Specification);
+
+		break;
+
+	case LODTechnique::SINKING_CIRCLE:
+
+		m_SinkingCircleLOD.reset();
+		m_SinkingCircleLOD = std::make_shared<SinkingLOD>(m_Specification);
 
 		break;
 	}

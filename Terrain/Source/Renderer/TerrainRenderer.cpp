@@ -90,22 +90,26 @@ void TerrainRenderer::initializeBuffers()
 	// TODO: Get rid of hard coded values
 	m_TerrainChunksSet = std::make_shared<VulkanUniformBufferSet>(uint32_t(8 * 8 * sizeof(TerrainChunk)), framesInFlight);
 	m_TerrainInfo = std::make_shared<VulkanUniformBuffer>((uint32_t)sizeof(TerrainInfo));
+	m_CameraInfo = std::make_shared<VulkanUniformBuffer>((uint32_t)sizeof(glm::vec4));
 }
 
 void TerrainRenderer::initializeRenderPass()
 {
 	vkDeviceWaitIdle(VulkanDevice::getVulkanDevice());
-	createRenderPass();
+	
+	// TODO: Destory the one that is not used
+	createQuadRenderPass();
+	createCircleRenderPass();
 }
 
-void TerrainRenderer::createRenderPass()
+void TerrainRenderer::createQuadRenderPass()
 {
-	m_TerrainRenderPass = std::make_shared<RenderPass>();
+	m_TerrainQuadRenderPass = std::make_shared<RenderPass>();
 
 	{
 		std::shared_ptr<VulkanShader>& mainShader = ShaderManager::createShader("_TerrainQuadShader");
 		mainShader->addShaderStage(ShaderStage::VERTEX, "Terrain/TerrainQuad_vert.glsl");
-		mainShader->addShaderStage(ShaderStage::FRAGMENT, "Terrain/TerrainQuad_frag.glsl");
+		mainShader->addShaderStage(ShaderStage::FRAGMENT, "Terrain/Terrain_frag.glsl");
 		mainShader->createDescriptorSetLayouts();
 	}
 	{
@@ -122,13 +126,13 @@ void TerrainRenderer::createRenderPass()
 		DescriptorSet->bindInput(2, 1, 0, m_NoiseMap);
 
 		DescriptorSet->Create();
-		m_TerrainRenderPass->DescriptorSet = DescriptorSet;
+		m_TerrainQuadRenderPass->DescriptorSet = DescriptorSet;
 	}
 
-	createPipeline();
+	createQuadPipeline();
 }
 
-void TerrainRenderer::createPipeline()
+void TerrainRenderer::createQuadPipeline()
 {
 	PipelineSpecification spec{};
 	spec.Framebuffer = m_TargetFramebuffer;
@@ -142,9 +146,62 @@ void TerrainRenderer::createPipeline()
 
 	spec.pushConstants.push_back({ sizeof(CameraRenderMatrices), VK_SHADER_STAGE_VERTEX_BIT });
 
-	m_TerrainPipeline = std::make_shared<VulkanPipeline>(spec);
+	m_TerrainQuadPipeline = std::make_shared<VulkanPipeline>(spec);
 
-	m_TerrainRenderPass->Pipeline = m_TerrainPipeline;
+	m_TerrainQuadRenderPass->Pipeline = m_TerrainQuadPipeline;
+
+#if DEBUG_TERRAIN_NORMALS == 1
+	createNormalDebugRenderPass();
+#endif
+}
+
+void TerrainRenderer::createCircleRenderPass()
+{
+	m_TerrainCircleRenderPass = std::make_shared<RenderPass>();
+
+	{
+		std::shared_ptr<VulkanShader>& mainShader = ShaderManager::createShader("_TerrainCircleShader");
+		mainShader->addShaderStage(ShaderStage::VERTEX, "Terrain/TerrainCircle_vert.glsl");
+		mainShader->addShaderStage(ShaderStage::FRAGMENT, "Terrain/Terrain_frag.glsl");
+		mainShader->createDescriptorSetLayouts();
+	}
+	{
+		std::shared_ptr<VulkanDescriptorSet> DescriptorSet;
+		DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("_TerrainCircleShader"));
+		DescriptorSet->bindInput(0, 0, 0, m_TerrainChunksSet);
+		DescriptorSet->bindInput(0, 1, 0, m_TerrainInfo);
+		DescriptorSet->bindInput(0, 2, 0, m_CameraInfo);
+		DescriptorSet->bindInput(1, 0, 0, m_TerrainSampler);
+		DescriptorSet->bindInput(1, 1, 0, m_Terrain->getHeightMap());
+		DescriptorSet->bindInput(1, 2, 0, m_Terrain->getCompositionMap());
+		DescriptorSet->bindInput(1, 3, 0, m_Terrain->getNormalMap());
+		DescriptorSet->bindInput(2, 0, 0, m_Terrain->getTerrainTextures());
+		DescriptorSet->bindInput(2, 1, 0, m_NoiseMap);
+
+		DescriptorSet->Create();
+		m_TerrainCircleRenderPass->DescriptorSet = DescriptorSet;
+	}
+
+	createCirclePipeline();
+}
+
+void TerrainRenderer::createCirclePipeline()
+{
+	PipelineSpecification spec{};
+	spec.Framebuffer = m_TargetFramebuffer;
+	spec.depthTest = true;
+	spec.depthWrite = true;
+	spec.Wireframe = m_InWireframe;
+	spec.Culling = true;
+	spec.Shader = ShaderManager::getShader("_TerrainCircleShader");
+	spec.vertexBufferLayout = VulkanVertexBufferLayout{};
+	spec.depthCompareFunction = DepthCompare::LESS;
+
+	spec.pushConstants.push_back({ sizeof(CameraRenderMatrices), VK_SHADER_STAGE_VERTEX_BIT });
+
+	m_TerrainCirclePipeline = std::make_shared<VulkanPipeline>(spec);
+
+	m_TerrainCircleRenderPass->Pipeline = m_TerrainCirclePipeline;
 
 #if DEBUG_TERRAIN_NORMALS == 1
 	createNormalDebugRenderPass();
@@ -160,6 +217,7 @@ void TerrainRenderer::renderTerrain(const Camera& camera)
 	m_TerrainChunksSet->setData(chunksToRender.data(), chunksToRender.size() * sizeof(TerrainChunk), m_CurrentFrame);
 
 	// compute LODMap in compute shader
+	if (m_Terrain->getCurrentTechnique() != LODTechnique::SINKING_CIRCLE)
 	{
 		LODComputeConstants LODpc;
 		LODpc.leavesCount = (int32_t)chunksToRender.size();
@@ -176,13 +234,20 @@ void TerrainRenderer::renderTerrain(const Camera& camera)
 	//terrainInfo.CamPos = { camera.getPosition().x, camera.getPosition().z };
 	m_TerrainInfo->setData(&terrainInfo, sizeof(TerrainInfo));
 
+	glm::vec4 cameraPos = { camera.getPosition().x, camera.getPosition().z, 0.0f, 0.0f};
+	m_CameraInfo->setData(&cameraPos, sizeof(cameraPos));
+
 	VkCommandBuffer commandBuffer = m_RenderCommandBuffer->getCurrentCommandBuffer();
 
-	VulkanRenderer::beginRenderPass(m_RenderCommandBuffer, m_TerrainRenderPass);
-	VulkanRenderer::preparePipeline(m_RenderCommandBuffer, m_TerrainRenderPass);
+	std::shared_ptr<RenderPass> currentPass = m_TerrainQuadRenderPass;
+	if (m_Terrain->getCurrentTechnique() == LODTechnique::SINKING_CIRCLE)
+		currentPass = m_TerrainCircleRenderPass;
+
+	VulkanRenderer::beginRenderPass(m_RenderCommandBuffer, currentPass);
+	VulkanRenderer::preparePipeline(m_RenderCommandBuffer, currentPass);
 
 	CameraRenderMatrices matrices = camera.getRenderMatrices();
-	vkCmdPushConstants(commandBuffer, m_TerrainRenderPass->Pipeline->getVkPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0,
+	vkCmdPushConstants(commandBuffer, currentPass->Pipeline->getVkPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0,
 		sizeof(CameraRenderMatrices), &matrices);
 
 	uint32_t instanceCount = 0;
@@ -194,7 +259,7 @@ void TerrainRenderer::renderTerrain(const Camera& camera)
 		{
 			if (props.CurrentCount)
 			{
-				TerrainChunkIndexBuffer idxBuffer = getLOD(props.LOD);
+				TerrainChunkIndexBuffer idxBuffer = getChunkIndexBufferLOD(props.LOD);
 
 				vkCmdBindIndexBuffer(commandBuffer, idxBuffer.IndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
 				vkCmdDrawIndexed(commandBuffer, uint32_t(idxBuffer.IndicesCount), props.CurrentCount, 0, 0, instanceCount);
@@ -204,11 +269,13 @@ void TerrainRenderer::renderTerrain(const Camera& camera)
 
 		break;
 
+	case LODTechnique::SINKING_CIRCLE:
 	case LODTechnique::QUAD_TREE:
-		TerrainChunkIndexBuffer idxBuffer = getLOD(1);
+		TerrainChunkIndexBuffer idxBuffer = getChunkIndexBufferLOD(1);
 
 		vkCmdBindIndexBuffer(commandBuffer, idxBuffer.IndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
 		vkCmdDrawIndexed(commandBuffer, idxBuffer.IndicesCount, (uint32_t)chunksToRender.size(), 0, 0, 0);
+
 		break;
 	}
 
@@ -237,7 +304,7 @@ void TerrainRenderer::renderTerrain(const Camera& camera)
 
 }
 
-const TerrainChunkIndexBuffer& TerrainRenderer::getLOD(uint8_t lod)
+const TerrainChunkIndexBuffer& TerrainRenderer::getChunkIndexBufferLOD(uint8_t lod)
 {
 	if (m_LODIndexBuffer.find(lod) != m_LODIndexBuffer.end())
 		return m_LODIndexBuffer[lod];
@@ -259,38 +326,36 @@ const TerrainChunkIndexBuffer& TerrainRenderer::getLOD(uint8_t lod)
 #if DEBUG_TERRAIN_NORMALS == 1
 void TerrainRenderer::createNormalDebugRenderPass()
 {
-	{
-		std::shared_ptr<VulkanShader>& mainShader = ShaderManager::createShader("debugNormals");
-		mainShader->addShaderStage(ShaderStage::VERTEX, "Debug/TerrainNormals_vert.glsl");
-		mainShader->addShaderStage(ShaderStage::GEOMETRY, "Debug/TerrainNormals_geom.glsl");
-		mainShader->addShaderStage(ShaderStage::FRAGMENT, "Debug/TerrainNormals_frag.glsl");
-		mainShader->createDescriptorSetLayouts();
+	std::shared_ptr<VulkanShader>& mainShader = ShaderManager::createShader("debugNormals");
+	mainShader->addShaderStage(ShaderStage::VERTEX, "Debug/TerrainNormals_vert.glsl");
+	mainShader->addShaderStage(ShaderStage::GEOMETRY, "Debug/TerrainNormals_geom.glsl");
+	mainShader->addShaderStage(ShaderStage::FRAGMENT, "Debug/TerrainNormals_frag.glsl");
+	mainShader->createDescriptorSetLayouts();
 
-		std::shared_ptr<VulkanDescriptorSet> DescriptorSet;
-		DescriptorSet = std::make_shared<VulkanDescriptorSet>(mainShader);
-		DescriptorSet->bindInput(0, 0, m_TerrainChunksSet);
-		DescriptorSet->bindInput(0, 1, m_TerrainInfo);
-		DescriptorSet->bindInput(1, 0, m_TerrainSampler);
-		DescriptorSet->bindInput(1, 1, m_Terrain->getHeightMap());
-		DescriptorSet->bindInput(1, 2, m_Terrain->getNormalMap());
-		DescriptorSet->Create();
+	std::shared_ptr<VulkanDescriptorSet> DescriptorSet;
+	DescriptorSet = std::make_shared<VulkanDescriptorSet>(mainShader);
+	DescriptorSet->bindInput(0, 0, m_TerrainChunksSet);
+	DescriptorSet->bindInput(0, 1, m_TerrainInfo);
+	DescriptorSet->bindInput(1, 0, m_TerrainSampler);
+	DescriptorSet->bindInput(1, 1, m_Terrain->getHeightMap());
+	DescriptorSet->bindInput(1, 2, m_Terrain->getNormalMap());
+	DescriptorSet->Create();
 
-		PipelineSpecification spec{};
-		spec.lineWidth = 1.0f;
-		spec.Framebuffer = m_TargetFramebuffer;
-		spec.Shader = mainShader;
-		spec.depthTest = true;
-		spec.depthCompareFunction = DepthCompare::LESS;
-		spec.vertexBufferLayout = VulkanVertexBufferLayout{};
+	PipelineSpecification spec{};
+	spec.lineWidth = 1.0f;
+	spec.Framebuffer = m_TargetFramebuffer;
+	spec.Shader = mainShader;
+	spec.depthTest = true;
+	spec.depthCompareFunction = DepthCompare::LESS;
+	spec.vertexBufferLayout = VulkanVertexBufferLayout{};
 
-		spec.pushConstants.push_back({ sizeof(CameraRenderMatrices),
-			VkShaderStageFlagBits(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT) });
+	spec.pushConstants.push_back({ sizeof(CameraRenderMatrices),
+		VkShaderStageFlagBits(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT) });
 
-		std::shared_ptr<VulkanPipeline> pipelineDebug = std::make_shared<VulkanPipeline>(spec);
+	std::shared_ptr<VulkanPipeline> pipelineDebug = std::make_shared<VulkanPipeline>(spec);
 
-		m_NormalsDebugRenderPass = std::make_shared<RenderPass>();
-		m_NormalsDebugRenderPass->DescriptorSet = DescriptorSet;
-		m_NormalsDebugRenderPass->Pipeline = pipelineDebug;
-	}
+	m_NormalsDebugRenderPass = std::make_shared<RenderPass>();
+	m_NormalsDebugRenderPass->DescriptorSet = DescriptorSet;
+	m_NormalsDebugRenderPass->Pipeline = pipelineDebug;
 }
 #endif

@@ -29,7 +29,6 @@ layout(set = 0, binding = 1) uniform TerrainInfoUniformBuffer
     int minimumChunkSize;
 } terrainInfo;
 
-
 layout (set = 0, binding = 2, r8ui) uniform readonly uimage2D LODMap;
 
 layout (set = 1, binding = 0) uniform sampler terrainSampler;
@@ -64,10 +63,10 @@ void main()
     int leftLod    = getLod(chunkPosition.x - 1, chunkPosition.y);
     
     // stiching patches
-    position.z += (rightLod - (int(position.z) % rightLod)) * float(position.x == chunk.Size) * float((int(position.z) % rightLod) != 0);
-    position.z += (leftLod - (int(position.z) % leftLod)) * float(position.x == 0.0) * float((int(position.z) % leftLod) != 0);
-    position.x += (upLod - (int(position.x) % upLod)) * float(position.z == chunk.Size) * float((int(position.x) % upLod) != 0);
-    position.x += (downLod - (int(position.x) % downLod)) * float(position.z == 0.0) * float((int(position.x) % downLod) != 0);
+    position.z += (rightLod - float(int(position.z) % rightLod)) * float(position.x == chunk.Size) * float((int(position.z) % rightLod) != 0);
+    position.z += (leftLod - float(int(position.z) % leftLod)) * float(position.x == 0.0) * float((int(position.z) % leftLod) != 0);
+    position.x += (upLod - float(int(position.x) % upLod)) * float(position.z == chunk.Size) * float((int(position.x) % upLod) != 0);
+    position.x += (downLod - float(int(position.x) % downLod)) * float(position.z == 0.0) * float((int(position.x) % downLod) != 0);
         
     texCoord = vec2(position.x / terrainInfo.minimumChunkSize, position.z / terrainInfo.minimumChunkSize);
     

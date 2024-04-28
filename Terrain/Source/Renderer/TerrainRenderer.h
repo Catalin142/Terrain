@@ -33,21 +33,24 @@ public:
 	
 	void setTargetFramebuffer(const std::shared_ptr<VulkanFramebuffer>& targetFramebuffer);
 
-	const std::shared_ptr<VulkanImage> getOutput() { return m_TerrainRenderPass->Pipeline->getTargetFramebuffer()->getImage(0); }
+	const std::shared_ptr<VulkanImage> getOutput() { return m_TerrainQuadRenderPass->Pipeline->getTargetFramebuffer()->getImage(0); }
 
 	void setWireframe(bool wireframe);
-	std::shared_ptr<VulkanUniformBufferSet> m_TerrainChunksSet;
 
 private:
 	void initializeBuffers();
 
 	void initializeRenderPass();
 
-	void createRenderPass();
-	void createPipeline();
+	void createQuadRenderPass();
+	void createQuadPipeline();
+
+	void createCircleRenderPass();
+	void createCirclePipeline();
+
 	void renderTerrain(const Camera& camera);
 
-	const TerrainChunkIndexBuffer& getLOD(uint8_t lod);
+	const TerrainChunkIndexBuffer& getChunkIndexBufferLOD(uint8_t lod);
 
 private:
 	std::shared_ptr<Terrain> m_Terrain;
@@ -56,8 +59,11 @@ private:
 	std::shared_ptr<VulkanFramebuffer> m_TargetFramebuffer;
 	std::shared_ptr<VulkanRenderCommandBuffer> m_RenderCommandBuffer;
 
-	std::shared_ptr<RenderPass> m_TerrainRenderPass;
-	std::shared_ptr<VulkanPipeline> m_TerrainPipeline;
+	std::shared_ptr<RenderPass> m_TerrainQuadRenderPass;
+	std::shared_ptr<VulkanPipeline> m_TerrainQuadPipeline;
+
+	std::shared_ptr<RenderPass> m_TerrainCircleRenderPass;
+	std::shared_ptr<VulkanPipeline> m_TerrainCirclePipeline;
 
 	// LOD Map
 	std::shared_ptr<VulkanImage> m_LODMap;
@@ -65,6 +71,8 @@ private:
 	//
 
 	std::shared_ptr<VulkanUniformBuffer> m_TerrainInfo;
+	std::shared_ptr<VulkanUniformBuffer> m_CameraInfo;
+	std::shared_ptr<VulkanUniformBufferSet> m_TerrainChunksSet;
 
 	bool m_InWireframe = false;
 
