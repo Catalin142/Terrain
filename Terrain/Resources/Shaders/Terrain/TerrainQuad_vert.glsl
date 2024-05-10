@@ -68,8 +68,8 @@ void main()
     position.x += (upLod - float(int(position.x) % upLod)) * float(position.z == chunk.Size) * float((int(position.x) % upLod) != 0);
     position.x += (downLod - float(int(position.x) % downLod)) * float(position.z == 0.0) * float((int(position.x) % downLod) != 0);
         
-    texCoord = vec2(position.x / terrainInfo.minimumChunkSize, position.z / terrainInfo.minimumChunkSize);
-    
+    texCoord = vec2(position.x, position.z);
+
     position.x += offset.x;
     position.z += offset.y;
 

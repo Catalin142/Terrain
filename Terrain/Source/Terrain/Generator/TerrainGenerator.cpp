@@ -161,7 +161,7 @@ void TerrainGenerator::createImages()
 		ImageSpecification compositionSpecification;
 		compositionSpecification.Width = m_Width;
 		compositionSpecification.Height = m_Height;
-		compositionSpecification.Format = VK_FORMAT_R8G8B8A8_UNORM;
+		compositionSpecification.Format = VK_FORMAT_R8_UINT;
 		compositionSpecification.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
 		compositionSpecification.UsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 		m_Composition = std::make_shared<VulkanImage>(compositionSpecification);

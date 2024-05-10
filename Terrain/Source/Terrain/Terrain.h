@@ -43,6 +43,7 @@ struct TerrainSpecification
 	std::shared_ptr<VulkanImage> NormalMap;
 	std::shared_ptr<VulkanImage> CompositionMap;
 	std::shared_ptr<VulkanTexture> TerrainTextures;
+	std::shared_ptr<VulkanTexture> NormalTextures;
 
 	TerrainInfo Info;
 };
@@ -69,6 +70,7 @@ public:
 	const std::shared_ptr<VulkanImage>& getNormalMap() { return m_Specification.NormalMap; }
 	const std::shared_ptr<VulkanImage>& getCompositionMap() { return m_Specification.CompositionMap; }
 	const std::shared_ptr<VulkanTexture>& getTerrainTextures() { return m_Specification.TerrainTextures; }
+	const std::shared_ptr<VulkanTexture>& getNormalTextures() { return m_Specification.NormalTextures; }
 
 private:
 	TerrainSpecification m_Specification;

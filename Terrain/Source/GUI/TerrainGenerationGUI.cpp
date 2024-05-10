@@ -14,9 +14,6 @@ TerrainGenerationGUI::TerrainGenerationGUI(const std::shared_ptr<TerrainGenerato
 	m_NormalMapDescriptor = ImGui_ImplVulkan_AddTexture(m_Sampler->Get(),
 		m_Generator->getNormalMap()->getVkImageView(), VK_IMAGE_LAYOUT_GENERAL);
 
-	m_CompositionMapDescriptor = ImGui_ImplVulkan_AddTexture(m_Sampler->Get(),
-		m_Generator->getCompositionMap()->getVkImageView(), VK_IMAGE_LAYOUT_GENERAL);
-
 	m_LODTechniques["QuadTree"] = LODTechnique::QUAD_TREE;
 	m_LODTechniques["Distance"] = LODTechnique::DISTANCE_BASED;
 	m_LODTechniques["SinkingCircle"] = LODTechnique::SINKING_CIRCLE;
@@ -52,8 +49,6 @@ void TerrainGenerationGUI::Render()
 			ImGui::Image(m_HeightMapDescriptor, ImVec2{ size, size });
 			ImGui::SameLine();
 			ImGui::Image(m_NormalMapDescriptor, ImVec2{ size, size });
-			ImGui::SameLine();
-			ImGui::Image(m_CompositionMapDescriptor, ImVec2{ size, size });
 		}
 	}
 

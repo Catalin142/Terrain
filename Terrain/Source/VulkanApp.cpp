@@ -70,9 +70,10 @@ void VulkanApp::onCreate()
 
 		{
 			std::vector<std::string> filepaths = {
-				"Resources/Img/grass1.png",
-				"Resources/Img/slope1.png",
-				"Resources/Img/rock1.png",
+				"Resources/Textures/Terrain/grass_d2.png",
+				"Resources/Textures/Terrain/slope_d.png",
+				"Resources/Textures/Terrain/mountain_d.png",
+				"Resources/Textures/Terrain/snow_d.png",
 			};
 
 			TextureSpecification texSpec{};
@@ -82,6 +83,22 @@ void VulkanApp::onCreate()
 			texSpec.LayerCount = (uint32_t)filepaths.size();
 			texSpec.Filepath = filepaths;
 			terrainSpec.TerrainTextures = std::make_shared<VulkanTexture>(texSpec);
+		}
+		{
+			std::vector<std::string> filepaths = {
+				"Resources/Textures/Terrain/forest_n.png",
+				"Resources/Textures/Terrain/slope_n.png",
+				"Resources/Textures/Terrain/mountain_n.png",
+				"Resources/Textures/Terrain/snow_n.png",
+			};
+
+			TextureSpecification texSpec{};
+			texSpec.CreateSampler = true;
+			texSpec.GenerateMips = true;
+			texSpec.Channles = 4;
+			texSpec.LayerCount = (uint32_t)filepaths.size();
+			texSpec.Filepath = filepaths;
+			terrainSpec.NormalTextures = std::make_shared<VulkanTexture>(texSpec);
 		}
 
 		terrainSpec.Info.TerrainSize = { 1024.0, 1024.0 };

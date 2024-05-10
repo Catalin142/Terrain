@@ -94,7 +94,10 @@ VulkanShaderStage::VulkanShaderStage(ShaderStage stage, const std::string& filep
 	std::string codeFilepath = SOURCE_FILEPATH + filepath;
 	std::string cacheFilepath = CACHE_FILEPATH + shaderName + ".spv";
 
-	if (std::filesystem::exists(cacheFilepath))
+	std::filesystem::file_time_type lastModifiedCache = std::filesystem::last_write_time(cacheFilepath);
+	std::filesystem::file_time_type lastModifiedShader = std::filesystem::last_write_time(codeFilepath);
+
+	if (std::filesystem::exists(cacheFilepath) && lastModifiedShader <= lastModifiedCache)
 		data = readCachedShaderData(cacheFilepath);
 
 	else

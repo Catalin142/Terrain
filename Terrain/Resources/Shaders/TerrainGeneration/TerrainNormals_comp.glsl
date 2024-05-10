@@ -34,5 +34,5 @@ void main()
 	normal.y = -normal.y;
 	normal.z = -normal.z;
 
-	imageStore(normalMap, texel, vec4(normal, height));
+	imageStore(normalMap, texel, vec4(normal, (0.5 * (height / 5.0) + 0.5)));
 }

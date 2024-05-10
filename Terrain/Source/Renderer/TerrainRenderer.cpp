@@ -123,7 +123,8 @@ void TerrainRenderer::createQuadRenderPass()
 		DescriptorSet->bindInput(1, 2, 0, m_Terrain->getCompositionMap());
 		DescriptorSet->bindInput(1, 3, 0, m_Terrain->getNormalMap());
 		DescriptorSet->bindInput(2, 0, 0, m_Terrain->getTerrainTextures());
-		DescriptorSet->bindInput(2, 1, 0, m_NoiseMap);
+		DescriptorSet->bindInput(2, 1, 0, m_Terrain->getNormalTextures());
+		DescriptorSet->bindInput(2, 2, 0, m_NoiseMap);
 
 		DescriptorSet->Create();
 		m_TerrainQuadRenderPass->DescriptorSet = DescriptorSet;
@@ -176,7 +177,8 @@ void TerrainRenderer::createCircleRenderPass()
 		DescriptorSet->bindInput(1, 2, 0, m_Terrain->getCompositionMap());
 		DescriptorSet->bindInput(1, 3, 0, m_Terrain->getNormalMap());
 		DescriptorSet->bindInput(2, 0, 0, m_Terrain->getTerrainTextures());
-		DescriptorSet->bindInput(2, 1, 0, m_NoiseMap);
+		DescriptorSet->bindInput(2, 1, 0, m_Terrain->getNormalTextures());
+		DescriptorSet->bindInput(2, 2, 0, m_NoiseMap);
 
 		DescriptorSet->Create();
 		m_TerrainCircleRenderPass->DescriptorSet = DescriptorSet;
@@ -289,12 +291,14 @@ void TerrainRenderer::renderTerrain(const Camera& camera)
 		sizeof(CameraRenderMatrices), &matrices);
 
 	instanceCount = 0;
-	for (const LODProperties& props : m_Terrain->m_DistanceLOD->getLODProperties())
+	for (const LODRange& props : m_Terrain->getDistanceLODTechnique()->getLODs())
 	{
 		if (props.CurrentCount)
 		{
-			vkCmdBindIndexBuffer(commandBuffer, props.IndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(commandBuffer, uint32_t(props.IndicesCount), props.CurrentCount, 0, 0, instanceCount);
+			TerrainChunkIndexBuffer idxBuffer = getChunkIndexBufferLOD(props.LOD);
+
+			vkCmdBindIndexBuffer(commandBuffer, idxBuffer.IndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+			vkCmdDrawIndexed(commandBuffer, uint32_t(idxBuffer.IndicesCount), props.CurrentCount, 0, 0, instanceCount);
 			instanceCount += props.CurrentCount;
 		}
 	}
@@ -334,11 +338,11 @@ void TerrainRenderer::createNormalDebugRenderPass()
 
 	std::shared_ptr<VulkanDescriptorSet> DescriptorSet;
 	DescriptorSet = std::make_shared<VulkanDescriptorSet>(mainShader);
-	DescriptorSet->bindInput(0, 0, m_TerrainChunksSet);
-	DescriptorSet->bindInput(0, 1, m_TerrainInfo);
-	DescriptorSet->bindInput(1, 0, m_TerrainSampler);
-	DescriptorSet->bindInput(1, 1, m_Terrain->getHeightMap());
-	DescriptorSet->bindInput(1, 2, m_Terrain->getNormalMap());
+	DescriptorSet->bindInput(0, 0, 0, m_TerrainChunksSet);
+	DescriptorSet->bindInput(0, 1, 0, m_TerrainInfo);
+	DescriptorSet->bindInput(1, 0, 0, m_TerrainSampler);
+	DescriptorSet->bindInput(1, 1, 0, m_Terrain->getHeightMap());
+	DescriptorSet->bindInput(1, 2, 0, m_Terrain->getNormalMap());
 	DescriptorSet->Create();
 
 	PipelineSpecification spec{};
