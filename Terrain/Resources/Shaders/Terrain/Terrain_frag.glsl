@@ -3,8 +3,12 @@
 layout(location = 0) in vec2 fragTexCoord;
 layout(location = 1) in vec2 texCoord;
 layout(location = 2) in vec3 fragmentPosition;
+layout(location = 3) flat in int go;
+layout(location = 4) flat in ivec2 quadPosition;
 
 layout(location = 0) out vec4 outColor;
+
+precision highp float;
 
 layout (set = 1, binding = 0) uniform sampler terrainSampler;
 layout (set = 1, binding = 2, r8ui) uniform readonly uimage2D Composition;
@@ -105,122 +109,97 @@ float hash1(uint value) {
     value ^= value << 13;
     value ^= value >> 17;
     value ^= value << 5;
-    return float(value % 360);
+    return (float(value % 360));
 }
 
-uint hash(uint value) {
-    value ^= value << 13;
-    value ^= value >> 17;
-    value ^= value << 5;
-    return value % 15;
+float rand(vec2 co){
+    return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+vec2 rotateUV(vec2 uv, float rotation, vec2 mid)
+{
+    return vec2(
+      cos(rotation) * (uv.x - mid.x) + sin(rotation) * (uv.y - mid.y) + mid.x,
+      cos(rotation) * (uv.y - mid.y) - sin(rotation) * (uv.x - mid.x) + mid.y
+    );
+}
+
+float checkers( in vec2 p )
+{
+    vec2 q = floor(p);
+    return mod(q.x + q.y, 15.);
+}
+
+vec2 randomRotateUV(vec2 uv, vec2 position)
+{
+    return rotateUV(uv, radians(rand(position) * 360.0), vec2(0.0, 0.0));
+}
+
+vec4 sampleRotatedUV(sampler2DArray tex, vec2 uv, int layer, vec2 ddx, vec2 ddy)
+{
+     return textureGrad(tex, vec3(fract(uv), layer), ddx, ddy);
+}
+
+vec3 getFinalColor() 
+{
+    ivec2 intPos = ivec2(fragmentPosition.x, fragmentPosition.z);
+    vec2 flooredUV = floor(fragmentPosition.xz);
+
+    int layerTR = int(imageLoad(Composition, intPos + ivec2(1, 1)).r);
+    int layerTL = int(imageLoad(Composition, intPos + ivec2(0, 1)).r);
+    int layerBR = int(imageLoad(Composition, intPos + ivec2(0, 0)).r);
+    int layerBL = int(imageLoad(Composition, intPos + ivec2(1, 0)).r);
+
+    vec2 ddx = dFdx(fragmentPosition.xz);
+    vec2 ddy = dFdy(fragmentPosition.xz);
+
+    //https://advances.realtimerendering.com/s2023/Etienne(ATVI)-Large%20Scale%20Terrain%20Rendering%20with%20notes%20(Advances%202023).pdf
+    vec2 rotatedCoordTR = randomRotateUV(texCoord, flooredUV + vec2(1.0, 1.0));
+    vec2 rotatedCoordTL = randomRotateUV(texCoord, flooredUV + vec2(0.0, 1.0));
+    vec2 rotatedCoordBR = randomRotateUV(texCoord, flooredUV + vec2(0.0, 0.0));
+    vec2 rotatedCoordBL = randomRotateUV(texCoord, flooredUV + vec2(1.0, 0.0));
+    
+    vec3 colorTR = sampleRotatedUV(texturePack, rotatedCoordTR, layerTR, ddx, ddy).rgb;
+    vec3 colorTL = sampleRotatedUV(texturePack, rotatedCoordTL, layerTL, ddx, ddy).rgb;
+    vec3 colorBR = sampleRotatedUV(texturePack, rotatedCoordBR, layerBR, ddx, ddy).rgb;
+    vec3 colorBL = sampleRotatedUV(texturePack, rotatedCoordBL, layerBL, ddx, ddy).rgb;
+
+    vec4 normalHeightTR = sampleRotatedUV(normalPack, rotatedCoordTR, layerTR, ddx, ddy);
+    vec4 normalHeightTL = sampleRotatedUV(normalPack, rotatedCoordTL, layerTL, ddx, ddy);
+    vec4 normalHeightBR = sampleRotatedUV(normalPack, rotatedCoordBR, layerBR, ddx, ddy);
+    vec4 normalHeightBL = sampleRotatedUV(normalPack, rotatedCoordBL, layerBL, ddx, ddy);
+
+    float tTR = normalHeightTR.w * (1.0 - distance(fragmentPosition.xz, flooredUV + vec2(1, 1)));
+    float tTL = normalHeightTL.w * (1.0 - distance(fragmentPosition.xz, flooredUV + vec2(0, 1)));
+    float tBR = normalHeightBR.w * (1.0 - distance(fragmentPosition.xz, flooredUV + vec2(0, 0)));
+    float tBL = normalHeightBL.w * (1.0 - distance(fragmentPosition.xz, flooredUV + vec2(1, 0)));
+
+    vec3 finalColor = heightblend(colorTR, tTR, colorTL, tTL, colorBR, tBR, colorBL, tBL);
+    
+    vec3 normal = texture(sampler2D(Normals, terrainSampler), fragTexCoord).xyz;
+
+    vec3 tangentX = normalize(cross(normal, vec3(0.0, -1.0, 0.0)));
+    vec3 bitangentX = normalize(cross(tangentX, normal));
+    mat3 tbnX = mat3(tangentX, bitangentX, normal);
+
+    vec3 finalNormal = heightblend(normalHeightTR.xyz * tbnX, tTR, 
+                                   normalHeightTL.xyz * tbnX, tTL, 
+                                   normalHeightBR.xyz * tbnX, tBR, 
+                                   normalHeightBL.xyz * tbnX, tBL);
+
+    float intensity = max(dot(normalHeightTR.xyz * tbnX, lightDirection) * 2.0, 0.4);
+
+    return finalColor * intensity;
 }
 
 void main() 
 {
-    ivec2 fPos = ivec2(fragmentPosition.x, fragmentPosition.z);
+    vec3 finalColor = getFinalColor();
 
-    int layerTR = int(imageLoad(Composition, fPos + ivec2(1, 1)).r);
-    int layerTL = int(imageLoad(Composition, fPos + ivec2(0, 1)).r);
-    int layerBR = int(imageLoad(Composition, fPos + ivec2(0, 0)).r);
-    int layerBL = int(imageLoad(Composition, fPos + ivec2(1, 0)).r);
+    //vec3 sampColor = heightblend(vec3(fract(rotatedCoord1.xy), 0.0), height1 * t1, 
+    //vec3(fract(rotatedCoord2.xy), 0.0), height2 * t2, 
+    //vec3(fract(rotatedCoord3.xy), 0.0), height3 * t3, 
+    //vec3(fract(rotatedCoord4.xy), 0.0), height4 * t4);
 
-    float rotations[15] = {radians(73.9), radians(47.6), radians(33.9), radians(91.7), radians(156.9), radians(189.7), 
-    radians(211.1), radians(253.2), radians(198.3), radians(311.9), radians(169.2), radians(122.7), radians(237.2), radians(133.3), radians(69.3)};
-
-    //vec4 composition = texture(sampler2D(Composition, terrainSampler), fragTexCoord);
-    vec3 normal = texture(sampler2D(Normals, terrainSampler), fragTexCoord).xyz;
-
-    //https://advances.realtimerendering.com/s2023/Etienne(ATVI)-Large%20Scale%20Terrain%20Rendering%20with%20notes%20(Advances%202023).pdf
-    //uint rotation1 = ( ( int ( ( fPos.x + 1 ) * 0.25 ) % 2 ) + 3 * ( ( int ( ( fPos.y + 1 ) * 0.25 ) % 2 ) ) % 4 ) & 0xF;
-    //uint rotation1 = ( ( int ( ( fPos.x + 1 ) * 0.5 ) ) + 3 * ( ( int ( ( fPos.y + 1 ) * 0.5 )  )  ) ) ;
-    //uint rotation1 = ( ( ( 7 *  int ( ( fPos.x + 1 ) * 0.5 ) % 4  ) +  3 * ( ( int ( ( fPos.y + 1) * 0.5 ) % 4  )  ) ) ) ;
-    uint rotation1 = int((fPos.x + 1)* 0.5) * 17 + int((fPos.y + 1)* 0.5);
-   // uint rotation1 = (( int (( fPos.x + 1 ) * 0.25 ) % 2 ) + 3 * ( int (( fPos.y + 1 ) * 0.25 ) % 2 ) % 4 ) & 15;
-    //mat2 rot1 = mat2(cos((rotations[hash(rotation1)])),  sin((rotations[hash(rotation1)])),
-    //                -sin((rotations[hash(rotation1)])),  cos((rotations[hash(rotation1)])));
-
-    mat2 rot1 = mat2(cos((hash1(rotation1))),  sin((hash1(rotation1))),
-                    -sin((hash1(rotation1))),  cos((hash1(rotation1))));
-
-    vec2 rotatedCoord1 = texCoord * rot1;
-    
-    //uint rotation2 = ( ( int ( ( fPos.x ) * 0.25 ) % 2 ) + 3 * ( ( int ( ( fPos.y + 1 ) * 0.25 ) % 2 ) ) % 4 ) & 0xF;
-    //uint rotation2 = ( ( ( 7 *  int ( ( fPos.x ) * 0.5 )   ) +  ( ( int ( ( fPos.y + 1) * 0.5 )   )  ) ) ) & 15;
-    uint rotation2 = int((fPos.x) * 0.5)* 17 + int((fPos.y + 1)* 0.5);
-    mat2 rot2 = mat2(cos((hash1(rotation2))),  sin((hash1(rotation2))),
-                    -sin((hash1(rotation2))),  cos((hash1(rotation2))));
-
-    vec2 rotatedCoord2 = texCoord * rot2;
-    
-    //uint rotation3 = ( ( int ( ( fPos.x ) * 0.25 ) % 2 ) + 3 * ( ( int ( ( fPos.y ) * 0.25 ) % 2 ) ) % 4 ) & 0xF;
-    //uint rotation3 = ( ( ( 7 *  int ( ( fPos.x ) * 0.5 )   ) +  ( ( int ( ( fPos.y ) * 0.5 )   )  ) ) ) & 15;
-    uint rotation3 = int((fPos.x)* 0.5 )* 17 + int((fPos.y)* 0.5);
-    mat2 rot3 = mat2(cos((hash1(rotation3))),  sin((hash1(rotation3))),
-                    -sin((hash1(rotation3))),  cos((hash1(rotation3))));
-
-    vec2 rotatedCoord3 = texCoord * rot3;
-    
-    //uint rotation4 = ( ( int ( ( fPos.x + 1 ) * 0.25 ) % 2 ) + 3 * ( ( int ( ( fPos.y ) * 0.25 ) % 2 ) ) % 4 ) & 0xF;
-    //uint rotation4 = ( ( ( 7 *  int ( ( fPos.x + 1 ) * 0.5 )   ) +  ( ( int ( ( fPos.y ) * 0.5 )  )  ) ) ) & 15;
-    uint rotation4 = int((fPos.x + 1) * 0.5 )* 17 + int((fPos.y)* 0.5);
-    mat2 rot4 = mat2(cos((hash1(rotation4))),  sin((hash1(rotation4))),
-                    -sin((hash1(rotation4))),  cos((hash1(rotation4))));
-
-    vec2 rotatedCoord4 = texCoord * rot4;
-
-    vec3 color1 = texture(texturePack, vec3(rotatedCoord1.xy, layerTR)).rgb;
-    vec3 color2 = texture(texturePack, vec3(rotatedCoord2.xy, layerTL)).rgb;
-    vec3 color3 = texture(texturePack, vec3(rotatedCoord3.xy, layerBR)).rgb;
-    vec3 color4 = texture(texturePack, vec3(rotatedCoord4.xy, layerBL)).rgb;
-
-    float height1 = texture(normalPack, vec3(rotatedCoord1.xy, layerTR)).a;
-    float height2 = texture(normalPack, vec3(rotatedCoord2.xy, layerTL)).a;
-    float height3 = texture(normalPack, vec3(rotatedCoord3.xy, layerBR)).a;
-    float height4 = texture(normalPack, vec3(rotatedCoord4.xy, layerBL)).a;
-
-    //vec3 normals = texture(normalPack, vec3(texCoord.xy, layer)).rgb;
-    //vec3 normals1 = texture(normalPack, vec3(texCoord.xy, layerup)).rgb;
-    //vec3 normals2 = texture(normalPack, vec3(texCoord.xy, layerdown)).rgb;
-    //vec3 normals3 = texture(normalPack, vec3(texCoord.xy, layerleft)).rgb;
-    //vec3 normals4 = texture(normalPack, vec3(texCoord.xy, layerright)).rgb;
-    
-    //vec3 axis = sign(normal);
-    //vec3 colorn = texture(normalPack, vec3(texCoord.xy, layer)).xyz;
-    //vec3 tangent = normalize(cross(colorn, normal));
-    //vec3 bitangent = normalize(cross(tangent, colorn)) * normal;
-    //mat3 tbn = mat3(tangent, bitangent, colorn);
-
-
-    //vec3 color1n = normal * texture(normalPack, vec3(texCoord.xy, layerup)).rgb;
-    //vec3 color2n = normal * texture(normalPack, vec3(texCoord.xy, layerdown)).rgb;
-    //vec3 color3n = normal * texture(normalPack, vec3(texCoord.xy, layerleft)).rgb;
-    //vec3 color4n = normal * texture(normalPack, vec3(texCoord.xy, layerright)).rgb;
-
-    //vec3 slopeTexColor = composition.y * sampleTextureArray(normal, 1);
-    //vec3 rockTexColor  = composition.z * sampleTextureArray(normal, 2);
-    //vec3 snowTexColor  = composition.w * vec3(1.0, 1.0, 1.0);
-    
-    // OPTIMIZE OPTIMIZE OPTIMIZE OPTIMIZE OPTIMIZE OPTIMIZE OPTIMIZE OPTIMIZE OPTIMIZE OPTIMIZE !!! 
-
-    //colorn = tbn * blendTerrain(normal3s, heights);
-
-    //vec3 finalColor = (color + color1 + color2 + color3 + color4) / 5;
-    //vec3 normal = colorn;
-
-    float outheight = 0;
-    
-    float t1 = clamp(1.0 - distance(fragmentPosition.xz, vec2(fPos) + vec2(1, 1)), 0.0, 1.0);
-    float t2 = clamp(1.0 - distance(fragmentPosition.xz, vec2(fPos) + vec2(0, 1)), 0.0, 1.0);
-    float t3 = clamp(1.0 - distance(fragmentPosition.xz, vec2(fPos) + vec2(0, 0)), 0.0, 1.0);
-    float t4 = clamp(1.0 - distance(fragmentPosition.xz, vec2(fPos) + vec2(1, 0)), 0.0, 1.0);
-
-    vec3 finalColor = heightblend(color1, height1 * t1, color2, height2 * t2, color3, height3 * t3, color4, height4 * t4);
-
-    float intensity = max(dot(normal, lightDirection) * 2.0, 0.4);
-
-    // TODO add height based blending!!
-
-    //outColor = vec4(vec3(float(hash(rotation1)) / 15.0, float(hash(rotation1)) / 15.0, float(hash(rotation1)) / 15.0) * intensity, 1.0);
-    outColor = vec4(finalColor * intensity, 1.0);
-    outColor.a = 1.0;
+    outColor = vec4(finalColor, 1.0);
 }

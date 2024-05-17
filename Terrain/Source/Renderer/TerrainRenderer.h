@@ -26,7 +26,7 @@ public:
 	TerrainRenderer(const std::shared_ptr<VulkanFramebuffer>& targetFramebuffer, const std::shared_ptr<Terrain>& terrain);
 	~TerrainRenderer() = default;
 
-	void Render(const Camera& camera);
+	void Render(const Camera& camera, bool go);
 
 	void setRenderCommandBuffer(const std::shared_ptr<VulkanRenderCommandBuffer>& renderCommandBuffer) 
 	{ m_RenderCommandBuffer = renderCommandBuffer; }
@@ -48,7 +48,7 @@ private:
 	void createCircleRenderPass();
 	void createCirclePipeline();
 
-	void renderTerrain(const Camera& camera);
+	void renderTerrain(const Camera& camera, bool go);
 
 	const TerrainChunkIndexBuffer& getChunkIndexBufferLOD(uint8_t lod);
 

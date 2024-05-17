@@ -35,6 +35,8 @@ struct TerrainInfo
 	glm::vec2 TerrainSize{ 0.0f };
 	float HeightMultiplier = 0.0f;
 	uint32_t MinimumChunkSize = 128;
+	int go = 0;
+	int padding[3];
 };
 
 struct TerrainSpecification

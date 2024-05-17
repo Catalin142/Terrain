@@ -20,7 +20,7 @@ void main()
 
 	float slope = 1.0 - abs(normal.y);
 	
-	uvec4 color;
+	ivec4 color;
 
 	if (height <= 0.1 && slope < 0.1)
 		color.r = GRASS;

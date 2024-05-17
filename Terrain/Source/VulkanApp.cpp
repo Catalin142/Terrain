@@ -80,13 +80,14 @@ void VulkanApp::onCreate()
 			texSpec.CreateSampler = true;
 			texSpec.GenerateMips = true;
 			texSpec.Channles = 4;
+			texSpec.MaxAnisotropy = 2.0;
 			texSpec.LayerCount = (uint32_t)filepaths.size();
 			texSpec.Filepath = filepaths;
 			terrainSpec.TerrainTextures = std::make_shared<VulkanTexture>(texSpec);
 		}
 		{
 			std::vector<std::string> filepaths = {
-				"Resources/Textures/Terrain/forest_n.png",
+				"Resources/Textures/Terrain/grass_n2.png",
 				"Resources/Textures/Terrain/slope_n.png",
 				"Resources/Textures/Terrain/mountain_n.png",
 				"Resources/Textures/Terrain/snow_n.png",
@@ -191,7 +192,10 @@ void VulkanApp::onUpdate()
 	{
 		CommandBuffer->beginQuery("GeometryPass");
 		m_TerrainRenderer->setRenderCommandBuffer(CommandBuffer);
-		m_TerrainRenderer->Render(cam);
+		if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_TAB))	
+			m_TerrainRenderer->Render(cam, 1);
+		else
+			m_TerrainRenderer->Render(cam, 0);
 		CommandBuffer->endQuery("GeometryPass");
 	}
 
