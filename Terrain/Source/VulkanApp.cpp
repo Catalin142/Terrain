@@ -80,7 +80,6 @@ void VulkanApp::onCreate()
 			texSpec.CreateSampler = true;
 			texSpec.GenerateMips = true;
 			texSpec.Channles = 4;
-			texSpec.MaxAnisotropy = 2.0;
 			texSpec.LayerCount = (uint32_t)filepaths.size();
 			texSpec.Filepath = filepaths;
 			terrainSpec.TerrainTextures = std::make_shared<VulkanTexture>(texSpec);

@@ -5,6 +5,7 @@ layout(location = 1) out vec2 texCoord;
 layout(location = 2) out vec3 fragmentPosition;
 layout(location = 3) flat out int go;
 layout(location = 4) flat out ivec2 quadPosition;
+layout(location = 5) out vec3 normal;
 
 layout(push_constant) uniform CameraPushConstant
 {
@@ -36,6 +37,8 @@ layout (set = 0, binding = 2, r8ui) uniform readonly uimage2D LODMap;
 
 layout (set = 1, binding = 0) uniform sampler terrainSampler;
 layout (set = 1, binding = 1) uniform texture2D heightMap;
+
+layout (set = 1, binding = 3) uniform texture2D Normals;
 
 int getLod(int posX, int posY)
 {
@@ -87,4 +90,6 @@ void main()
     quadPosition = ivec2(fragmentPosition.xz);
 
     fragTexCoord = dynamicTexCoord;
+    
+    normal = texture(sampler2D(Normals, terrainSampler), dynamicTexCoord).xyz;
 }

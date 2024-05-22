@@ -5,6 +5,7 @@ layout(location = 1) in vec2 texCoord;
 layout(location = 2) in vec3 fragmentPosition;
 layout(location = 3) flat in int go;
 layout(location = 4) flat in ivec2 quadPosition;
+layout(location = 5) in vec3 normal;
 
 layout(location = 0) out vec4 outColor;
 
@@ -12,40 +13,17 @@ precision highp float;
 
 layout (set = 1, binding = 0) uniform sampler terrainSampler;
 layout (set = 1, binding = 2, r8ui) uniform readonly uimage2D Composition;
-layout (set = 1, binding = 3) uniform texture2D Normals;
 
 layout (set = 2, binding = 0) uniform sampler2DArray texturePack;
 layout (set = 2, binding = 1) uniform sampler2DArray normalPack;
 layout (set = 2, binding = 2) uniform texture2D noiseMap;
 
-vec3 lightDirection = normalize(vec3(10.0, 10.0, 0.0));
+vec3 lightDirection = normalize(vec3(100.0, 50.0, 0.0));
 
 //#define BIPLANAR
 //#define TRIPLANAR
 
 //float sum( vec3 v ) { return v.x+v.y+v.z; }
-//vec3 textureNoTile( in vec2 x, int layer)
-//{
-//    float k = texture(sampler2D(noiseMap, terrainSampler), 0.0025*x ).x; // cheap (cache friendly) lookup
-//    
-//    vec2 duvdx = dFdx( x );
-//    vec2 duvdy = dFdy( x );
-//    
-//    float l = k*8.0;
-//    float f = fract(l);
-//    
-//    float ia = floor(l+0.5); // suslik's method (see comments)
-//    float ib = floor(l);
-//    f = min(f, 1.0-f)*2.0;
-//    
-//    vec2 offa = sin(vec2(3.0,7.0)*ia); // can replace with any other hash
-//    vec2 offb = sin(vec2(3.0,7.0)*ib); // can replace with any other hash
-//    
-//    vec3 cola = texture(texturePack, vec3(x.xy + offa, layer)).xyz;
-//    vec3 colb = texture(texturePack, vec3(x.xy + offb, layer)).xyz;
-//    
-//    return mix( cola, colb, smoothstep(0.2,0.8,f-0.1*sum(cola-colb)) );
-//}
 //
 //vec3 sampleTextureArray(vec3 normalVector, int layer)
 //{
@@ -95,7 +73,7 @@ vec3 lightDirection = normalize(vec3(10.0, 10.0, 0.0));
 #define HEIGHT_BLEND_FACTOR 0.05
 
 // http://untitledgam.es/2017/01/height-blending-shader/
-vec3 heightblend(vec3 input1, float height1, vec3 input2, float height2, vec3 input3, float height3, vec3 input4, float height4)
+vec3 heightBlend(vec3 input1, float height1, vec3 input2, float height2, vec3 input3, float height3, vec3 input4, float height4)
 {
 	float height_start = max(max(height1, height2), max(height3, height4)) - HEIGHT_BLEND_FACTOR;
 	float b1 = max(height1 - height_start, 0);
@@ -103,13 +81,6 @@ vec3 heightblend(vec3 input1, float height1, vec3 input2, float height2, vec3 in
 	float b3 = max(height3 - height_start, 0);
 	float b4 = max(height4 - height_start, 0);
 	return ((input1 * b1) + (input2 * b2) + (input3 * b3) + (input4 * b4)) / (b1 + b2 + b3 + b4);
-}
-
-float hash1(uint value) {
-    value ^= value << 13;
-    value ^= value >> 17;
-    value ^= value << 5;
-    return (float(value % 360));
 }
 
 float rand(vec2 co){
@@ -124,12 +95,6 @@ vec2 rotateUV(vec2 uv, float rotation, vec2 mid)
     );
 }
 
-float checkers( in vec2 p )
-{
-    vec2 q = floor(p);
-    return mod(q.x + q.y, 15.);
-}
-
 vec2 randomRotateUV(vec2 uv, vec2 position)
 {
     return rotateUV(uv, radians(rand(position) * 360.0), vec2(0.0, 0.0));
@@ -137,27 +102,22 @@ vec2 randomRotateUV(vec2 uv, vec2 position)
 
 vec4 sampleRotatedUV(sampler2DArray tex, vec2 uv, int layer, vec2 ddx, vec2 ddy)
 {
-     return textureGrad(tex, vec3(fract(uv), layer), ddx, ddy);
+     return textureGrad(tex, vec3(uv, layer), ddx, ddy);
 }
 
-vec3 getFinalColor() 
+int layerTR;
+int layerTL;
+int layerBR;
+int layerBL;
+void getFinalColor(vec2 uv, vec3 tangent, vec3 bitangent, vec2 ddx, vec2 ddy, out vec3 outColor, out vec3 outNormal) 
 {
-    ivec2 intPos = ivec2(fragmentPosition.x, fragmentPosition.z);
     vec2 flooredUV = floor(fragmentPosition.xz);
 
-    int layerTR = int(imageLoad(Composition, intPos + ivec2(1, 1)).r);
-    int layerTL = int(imageLoad(Composition, intPos + ivec2(0, 1)).r);
-    int layerBR = int(imageLoad(Composition, intPos + ivec2(0, 0)).r);
-    int layerBL = int(imageLoad(Composition, intPos + ivec2(1, 0)).r);
-
-    vec2 ddx = dFdx(fragmentPosition.xz);
-    vec2 ddy = dFdy(fragmentPosition.xz);
-
     //https://advances.realtimerendering.com/s2023/Etienne(ATVI)-Large%20Scale%20Terrain%20Rendering%20with%20notes%20(Advances%202023).pdf
-    vec2 rotatedCoordTR = randomRotateUV(texCoord, flooredUV + vec2(1.0, 1.0));
-    vec2 rotatedCoordTL = randomRotateUV(texCoord, flooredUV + vec2(0.0, 1.0));
-    vec2 rotatedCoordBR = randomRotateUV(texCoord, flooredUV + vec2(0.0, 0.0));
-    vec2 rotatedCoordBL = randomRotateUV(texCoord, flooredUV + vec2(1.0, 0.0));
+    vec2 rotatedCoordTR = randomRotateUV(uv, flooredUV + vec2(1.0, 1.0));
+    vec2 rotatedCoordTL = randomRotateUV(uv, flooredUV + vec2(0.0, 1.0));
+    vec2 rotatedCoordBR = randomRotateUV(uv, flooredUV + vec2(0.0, 0.0));
+    vec2 rotatedCoordBL = randomRotateUV(uv, flooredUV + vec2(1.0, 0.0));
     
     vec3 colorTR = sampleRotatedUV(texturePack, rotatedCoordTR, layerTR, ddx, ddy).rgb;
     vec3 colorTL = sampleRotatedUV(texturePack, rotatedCoordTL, layerTL, ddx, ddy).rgb;
@@ -174,32 +134,97 @@ vec3 getFinalColor()
     float tBR = normalHeightBR.w * (1.0 - distance(fragmentPosition.xz, flooredUV + vec2(0, 0)));
     float tBL = normalHeightBL.w * (1.0 - distance(fragmentPosition.xz, flooredUV + vec2(1, 0)));
 
-    vec3 finalColor = heightblend(colorTR, tTR, colorTL, tTL, colorBR, tBR, colorBL, tBL);
-    
-    vec3 normal = texture(sampler2D(Normals, terrainSampler), fragTexCoord).xyz;
+    vec3 finalColor = heightBlend(colorTR, tTR, colorTL, tTL, colorBR, tBR, colorBL, tBL);
 
-    vec3 tangentX = normalize(cross(normal, vec3(0.0, -1.0, 0.0)));
-    vec3 bitangentX = normalize(cross(tangentX, normal));
-    mat3 tbnX = mat3(tangentX, bitangentX, normal);
+    mat3 tbn = mat3(tangent, bitangent, normal);
 
-    vec3 finalNormal = heightblend(normalHeightTR.xyz * tbnX, tTR, 
-                                   normalHeightTL.xyz * tbnX, tTL, 
-                                   normalHeightBR.xyz * tbnX, tBR, 
-                                   normalHeightBL.xyz * tbnX, tBL);
+    vec3 finalNormal = heightBlend(normalHeightTR.xyz, tTR, 
+                                   normalHeightTL.xyz, tTL, 
+                                   normalHeightBR.xyz, tBR, 
+                                   normalHeightBL.xyz, tBL);
 
-    float intensity = max(dot(normalHeightTR.xyz * tbnX, lightDirection) * 2.0, 0.4);
-
-    return finalColor * intensity;
+    outNormal = finalNormal * 2.0 - 1.0;
+    outColor = finalColor;
 }
+
+// Gollent_Marcin_Landscape_Creation.pdf
+#define TIGHTEN_TRIPLANR_MAPPING_FACTOR 0.3
 
 void main() 
 {
-    vec3 finalColor = getFinalColor();
 
-    //vec3 sampColor = heightblend(vec3(fract(rotatedCoord1.xy), 0.0), height1 * t1, 
-    //vec3(fract(rotatedCoord2.xy), 0.0), height2 * t2, 
-    //vec3(fract(rotatedCoord3.xy), 0.0), height3 * t3, 
-    //vec3(fract(rotatedCoord4.xy), 0.0), height4 * t4);
+    ivec2 intPos = ivec2(fragmentPosition.x, fragmentPosition.z);
+    layerTR = int(imageLoad(Composition, intPos + ivec2(1, 1)).r);
+    layerTL = int(imageLoad(Composition, intPos + ivec2(0, 1)).r);
+    layerBR = int(imageLoad(Composition, intPos + ivec2(0, 0)).r);
+    layerBL = int(imageLoad(Composition, intPos + ivec2(1, 0)).r);
+    
+    vec3 absNormal = abs(normal);
+    absNormal /= (absNormal.x + absNormal.y + absNormal.z);
+    vec3 weights = absNormal - TIGHTEN_TRIPLANR_MAPPING_FACTOR;
 
-    outColor = vec4(finalColor, 1.0);
+    vec3 finalColorX = vec3(0.0);
+    vec3 finalColorY = vec3(0.0);
+    vec3 finalColorZ = vec3(0.0);
+
+    vec3 finalNormalX = vec3(0.0);
+    vec3 finalNormalY = vec3(0.0);
+    vec3 finalNormalZ = vec3(0.0);
+
+    vec3 axis = sign(normal);
+    vec3 finalWeight = vec3(0.0);
+    
+    vec3 ddx = dFdx(fragmentPosition);
+    vec3 ddy = dFdy(fragmentPosition);
+
+    if (weights.x > 0.0)
+    {
+        vec3 tangent = normalize(cross(normal, vec3(0.0, axis.x, 0.0)));
+        vec3 bitangent = normalize(cross(tangent, normal)) * axis.x;
+        getFinalColor(fragmentPosition.yz, tangent, bitangent, ddx.yz, ddy.yz, finalColorX, finalNormalX);
+        finalWeight.x = absNormal.x;
+    }
+    
+    if (weights.y > 0.0)
+    {
+        vec3 tangent = normalize(cross(normal, vec3(0.0, 0.0, axis.y)));
+        vec3 bitangent = normalize(cross(tangent, normal)) * axis.y;
+        getFinalColor(fragmentPosition.xz, tangent, bitangent, ddx.xz, ddy.xz, finalColorY, finalNormalY);
+        finalWeight.y = absNormal.y;
+   }
+    
+    if (weights.z > 0.0)
+    {
+        vec3 tangent = normalize(cross(normal, vec3(0.0, -axis.z, 0.0)));
+        vec3 bitangent = normalize(-cross(tangent, normal)) * axis.z;
+        getFinalColor(fragmentPosition.xy, tangent, bitangent, ddx.xy, ddy.xy, finalColorZ, finalNormalZ);
+        finalWeight.z = absNormal.z;
+    }
+
+    
+	vec3 blendWeights = pow(abs(normal), vec3(3.0));
+	blendWeights /= dot(blendWeights, vec3(1.0));
+
+	const float threshold = 0.3;
+
+	vec3 finalWeights = vec3(0.0);
+	if(blendWeights.x > threshold) finalWeights.x = blendWeights.x;
+	if(blendWeights.y > threshold) finalWeights.y = blendWeights.y;
+	if(blendWeights.z > threshold) finalWeights.z = blendWeights.z;
+
+	finalWeights /= finalWeights.x + finalWeights.y + finalWeights.z;
+
+    finalWeight /= (finalWeight.x + finalWeight.y + finalWeight.z);
+    weights /= (weights.x + weights.y + weights.z);
+    
+    vec3 normalX = vec3(0.0, finalNormalX.yx);
+    vec3 normalY = vec3(finalNormalY.x, 0.0, finalNormalY.y);
+    vec3 normalZ = vec3(finalNormalZ.xy, 0.0);
+
+    vec3 combinedNormal = finalNormalX * finalWeights.x + finalNormalY * finalWeights.y + finalNormalZ * finalWeights.z + normal;
+
+    float intensity = max(dot(combinedNormal, lightDirection), 0.5);
+
+    vec3 combinedColor = finalColorX * finalWeights.x + finalColorY * finalWeights.y + finalColorZ * finalWeights.z;
+    outColor = vec4((combinedNormal * 0.5 + 0.5), 1.0);
 }
