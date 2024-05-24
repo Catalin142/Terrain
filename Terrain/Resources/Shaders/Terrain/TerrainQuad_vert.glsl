@@ -1,11 +1,8 @@
 #version 460 core
 
-layout(location = 0) out vec2 fragTexCoord;
-layout(location = 1) out vec2 texCoord;
-layout(location = 2) out vec3 fragmentPosition;
-layout(location = 3) flat out int go;
-layout(location = 4) flat out ivec2 quadPosition;
-layout(location = 5) out vec3 normal;
+layout(location = 0) out vec3 fragPos;
+layout(location = 1) out vec2 terrainUV;
+layout(location = 2) flat out vec2 cameraPosition;
 
 layout(push_constant) uniform CameraPushConstant
 {
@@ -30,15 +27,17 @@ layout(set = 0, binding = 1) uniform TerrainInfoUniformBuffer
     vec2 Size;
     float heightMultiplier;
     int minimumChunkSize;
-    int go;
 } terrainInfo;
 
-layout (set = 0, binding = 2, r8ui) uniform readonly uimage2D LODMap;
+layout(set = 0, binding = 2) uniform CameraPositionBuffer
+{
+    vec2 Position;
+} cameraInfo;
+
+layout (set = 0, binding = 3, r8ui) uniform readonly uimage2D LODMap;
 
 layout (set = 1, binding = 0) uniform sampler terrainSampler;
 layout (set = 1, binding = 1) uniform texture2D heightMap;
-
-layout (set = 1, binding = 3) uniform texture2D Normals;
 
 int getLod(int posX, int posY)
 {
@@ -74,22 +73,15 @@ void main()
     position.x += (upLod - float(int(position.x) % upLod)) * float(position.z == chunk.Size) * float((int(position.x) % upLod) != 0);
     position.x += (downLod - float(int(position.x) % downLod)) * float(position.z == 0.0) * float((int(position.x) % downLod) != 0);
         
-    texCoord = vec2(position.x, position.z);
-    
     position.x += offset.x;
     position.z += offset.y;
     
-    vec2 dynamicTexCoord = vec2(position.x / terrainInfo.Size.x, position.z / terrainInfo.Size.y);
+    terrainUV = vec2(position.x / terrainInfo.Size.x, position.z / terrainInfo.Size.y);
     
-    position.y = (-texture(sampler2D(heightMap, terrainSampler), dynamicTexCoord).r) * terrainInfo.heightMultiplier;
-    go = terrainInfo.go;
+    position.y = (-texture(sampler2D(heightMap, terrainSampler), terrainUV).r) * terrainInfo.heightMultiplier;
 
     gl_Position = Camera.Projection * Camera.View * position;
 
-    fragmentPosition = position.xyz;
-    quadPosition = ivec2(fragmentPosition.xz);
-
-    fragTexCoord = dynamicTexCoord;
-    
-    normal = texture(sampler2D(Normals, terrainSampler), dynamicTexCoord).xyz;
+    fragPos = position.xyz;
+    cameraPosition = cameraInfo.Position;
 }

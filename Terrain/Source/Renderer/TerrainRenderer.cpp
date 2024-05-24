@@ -63,10 +63,10 @@ TerrainRenderer::TerrainRenderer(const std::shared_ptr<VulkanFramebuffer>& targe
 	initializeRenderPass();
 }
 
-void TerrainRenderer::Render(const Camera& camera, bool go)
+void TerrainRenderer::Render(const Camera& camera)
 {
 	uint32_t currentFrame = VulkanRenderer::getCurrentFrame();
-	renderTerrain(camera, go);
+	renderTerrain(camera);
 }
 
 void TerrainRenderer::setTargetFramebuffer(const std::shared_ptr<VulkanFramebuffer>& targetFramebuffer)
@@ -117,7 +117,8 @@ void TerrainRenderer::createQuadRenderPass()
 		DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("_TerrainQuadShader"));
 		DescriptorSet->bindInput(0, 0, 0, m_TerrainChunksSet);
 		DescriptorSet->bindInput(0, 1, 0, m_TerrainInfo);
-		DescriptorSet->bindInput(0, 2, 0, m_LODMap);
+		DescriptorSet->bindInput(0, 2, 0, m_CameraInfo);
+		DescriptorSet->bindInput(0, 3, 0, m_LODMap);
 		DescriptorSet->bindInput(1, 0, 0, m_TerrainSampler);
 		DescriptorSet->bindInput(1, 1, 0, m_Terrain->getHeightMap());
 		DescriptorSet->bindInput(1, 2, 0, m_Terrain->getCompositionMap());
@@ -210,7 +211,7 @@ void TerrainRenderer::createCirclePipeline()
 #endif
 }
 
-void TerrainRenderer::renderTerrain(const Camera& camera, bool go)
+void TerrainRenderer::renderTerrain(const Camera& camera)
 {
 	std::vector<TerrainChunk> chunksToRender = m_Terrain->getChunksToRender(camera.getPosition());
 
@@ -233,7 +234,6 @@ void TerrainRenderer::renderTerrain(const Camera& camera, bool go)
 	}
 
 	TerrainInfo terrainInfo = m_Terrain->getInfo();
-	terrainInfo.go = go;
 	//terrainInfo.CamPos = { camera.getPosition().x, camera.getPosition().z };
 	m_TerrainInfo->setData(&terrainInfo, sizeof(TerrainInfo));
 

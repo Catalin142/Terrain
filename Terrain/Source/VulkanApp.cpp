@@ -191,10 +191,7 @@ void VulkanApp::onUpdate()
 	{
 		CommandBuffer->beginQuery("GeometryPass");
 		m_TerrainRenderer->setRenderCommandBuffer(CommandBuffer);
-		if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_TAB))	
-			m_TerrainRenderer->Render(cam, 1);
-		else
-			m_TerrainRenderer->Render(cam, 0);
+		m_TerrainRenderer->Render(cam);
 		CommandBuffer->endQuery("GeometryPass");
 	}
 

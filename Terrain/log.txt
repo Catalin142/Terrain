@@ -59,4 +59,13 @@
 		   - TODO:
 				- Texture bombing
 				- Quad tree lod
+
+23.0.2024 - Normal/Terrain texturing
+		  - Texture Tiling fix
+		  - Conditional Triplanar Mapping
+		  - QuadTree / Sinking Circle
+
+		  - TODO:
+				- Massive terrain generation and disk streaming
+				- Tesselation on visible terrain
 			

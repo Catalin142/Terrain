@@ -1,8 +1,8 @@
 #version 460 core
 
-layout(location = 0) out vec2 fragTexCoord;
-layout(location = 1) out vec2 texCoord;
-layout(location = 2) out vec3 fragmentPosition;
+layout(location = 0) out vec3 fragPos;
+layout(location = 1) out vec2 terrainUV;
+layout(location = 2) flat out vec2 cameraPosition;
 
 layout(push_constant) uniform CameraPushConstant
 {
@@ -36,6 +36,7 @@ layout(set = 0, binding = 2) uniform CameraPositionBuffer
 
 layout (set = 1, binding = 0) uniform sampler terrainSampler;
 layout (set = 1, binding = 1) uniform texture2D heightMap;
+layout (set = 1, binding = 3) uniform texture2D normalMap;
 
 void main() 
 {
@@ -53,12 +54,10 @@ void main()
     position.x = floor(gl_VertexIndex / chunkSizePlusOne) * multiplier;
     position.z = gl_VertexIndex % chunkSizePlusOne * multiplier;
         
-    texCoord = vec2(position.x / terrainInfo.minimumChunkSize, position.z / terrainInfo.minimumChunkSize);
-    
     position.x += offset.x;
     position.z += offset.y;
-
-    vec2 dynamicTexCoord = vec2(position.x / terrainInfo.Size.x, position.z / terrainInfo.Size.y);
+    
+    terrainUV = vec2(position.x / terrainInfo.Size.x, position.z / terrainInfo.Size.y);
     
     vec2 camPos;
     camPos.x = clamp(cameraInfo.Position.x, 0.0, terrainInfo.Size.x);
@@ -70,7 +69,7 @@ void main()
     sinkValue = mix(0.0, chunk.Size, 0.01 * ((chunk.Size / 4.0 - dist) / (chunk.Size / 4.0)) * float(chunk.Size != terrainInfo.minimumChunkSize
         && dist < chunk.Size / 4.0));
 
-    position.y = (-texture(sampler2D(heightMap, terrainSampler), dynamicTexCoord).r) * terrainInfo.heightMultiplier + sinkValue;
+    position.y = (-texture(sampler2D(heightMap, terrainSampler), terrainUV).r) * terrainInfo.heightMultiplier + sinkValue;
     
     gl_Position = Camera.Projection * Camera.View * position;
 
@@ -79,7 +78,6 @@ void main()
     
     gl_Position.w *= (underGroud * outsideCircle);
 
-    fragmentPosition = position.xyz;
-
-    fragTexCoord = dynamicTexCoord;
+    fragPos = position.xyz;
+    cameraPosition = cameraInfo.Position;
 }

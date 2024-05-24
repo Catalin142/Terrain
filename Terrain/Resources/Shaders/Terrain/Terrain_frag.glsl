@@ -1,11 +1,9 @@
 #version 460 core
 
-layout(location = 0) in vec2 fragTexCoord;
-layout(location = 1) in vec2 texCoord;
-layout(location = 2) in vec3 fragmentPosition;
-layout(location = 3) flat in int go;
-layout(location = 4) flat in ivec2 quadPosition;
-layout(location = 5) in vec3 normal;
+
+layout(location = 0) in vec3 fragPos;
+layout(location = 1) in vec2 terrainUV;
+layout(location = 2) flat in vec2 cameraPosition;
 
 layout(location = 0) out vec4 outColor;
 
@@ -13,62 +11,13 @@ precision highp float;
 
 layout (set = 1, binding = 0) uniform sampler terrainSampler;
 layout (set = 1, binding = 2, r8ui) uniform readonly uimage2D Composition;
+layout (set = 1, binding = 3) uniform texture2D normalMap;
 
 layout (set = 2, binding = 0) uniform sampler2DArray texturePack;
 layout (set = 2, binding = 1) uniform sampler2DArray normalPack;
 layout (set = 2, binding = 2) uniform texture2D noiseMap;
 
 vec3 lightDirection = normalize(vec3(100.0, 50.0, 0.0));
-
-//#define BIPLANAR
-//#define TRIPLANAR
-
-//float sum( vec3 v ) { return v.x+v.y+v.z; }
-//
-//vec3 sampleTextureArray(vec3 normalVector, int layer)
-//{
-//    vec3 scaledPos = fragmentPosition * (1.0 / 2.0);
-//
-//#ifdef TRIPLANAR
-//    vec3 weights = abs(normalVector);
-//    weights /= (weights.x + weights.y + weights.z);
-//
-//    vec3 texXY = weights.z * textureNoTile(scaledPos.xy, layer).rgb;
-//    vec3 texXZ = weights.y * textureNoTile(scaledPos.xz, layer).rgb;
-//    vec3 texZY = weights.x * textureNoTile(scaledPos.zy, layer).rgb;
-//
-//    return (texZY + texXZ + texXY);
-//#endif
-//
-//// https://iquilezles.org/articles/biplanar/
-//// https://www.shadertoy.com/view/ws3Bzf
-//#ifdef BIPLANAR
-//    vec3 dpdx = dFdx(scaledPos);
-//    vec3 dpdy = dFdy(scaledPos);
-//    vec3 n = abs(normalVector);
-//
-//    // major axis (in x; yz are following axis)
-//    ivec3 ma = (n.x > n.y && n.x > n.z) ? ivec3(0, 1, 2) :
-//               (n.y > n.z)              ? ivec3(1, 2, 0) :
-//                                          ivec3(2, 0, 1) ;
-//    // minor axis (in x; yz are following axis)
-//    ivec3 mi = (n.x < n.y && n.x < n.z) ? ivec3(0, 1, 2) :
-//               (n.y < n.z)              ? ivec3(1, 2, 0) :
-//                                          ivec3(2, 0, 1) ;
-//        
-//    // median axis (in x;  yz are following axis)
-//    ivec3 me = ivec3(3) - mi - ma;
-//    
-//    vec3 x =  texture(texturePack, vec3(vec2(scaledPos[ma.y], scaledPos[ma.z]), layer)).rgb;
-//    vec3 y =  texture(texturePack, vec3(vec2(scaledPos[ma.y], scaledPos[ma.z]), layer)).rgb;
-//
-//    // blend and return
-//    vec2 m = vec2(n[ma.x], n[me.x]);
-//    // optional - add local support (prevents discontinuty)
-//    //m = clamp((m - 0.5773) / (1.0 - 0.5773), 0.0, 1.0);
-//	return ((x * m.x + y * m.y) / (m.x + m.y)).rgb;
-//#endif
-//}
 
 #define HEIGHT_BLEND_FACTOR 0.05
 
@@ -102,16 +51,12 @@ vec2 randomRotateUV(vec2 uv, vec2 position)
 
 vec4 sampleRotatedUV(sampler2DArray tex, vec2 uv, int layer, vec2 ddx, vec2 ddy)
 {
-     return textureGrad(tex, vec3(uv, layer), ddx, ddy);
+     return textureGrad(tex, vec3(fract(uv), layer), ddx, ddy);
 }
 
-int layerTR;
-int layerTL;
-int layerBR;
-int layerBL;
-void getFinalColor(vec2 uv, vec3 tangent, vec3 bitangent, vec2 ddx, vec2 ddy, out vec3 outColor, out vec3 outNormal) 
+void getPatchAttributes(vec2 uv, vec2 ddx, vec2 ddy, ivec4 surroundingLayers, out vec3 outColor, out vec3 outNormal) 
 {
-    vec2 flooredUV = floor(fragmentPosition.xz);
+    vec2 flooredUV = floor(fragPos.xz);
 
     //https://advances.realtimerendering.com/s2023/Etienne(ATVI)-Large%20Scale%20Terrain%20Rendering%20with%20notes%20(Advances%202023).pdf
     vec2 rotatedCoordTR = randomRotateUV(uv, flooredUV + vec2(1.0, 1.0));
@@ -119,24 +64,22 @@ void getFinalColor(vec2 uv, vec3 tangent, vec3 bitangent, vec2 ddx, vec2 ddy, ou
     vec2 rotatedCoordBR = randomRotateUV(uv, flooredUV + vec2(0.0, 0.0));
     vec2 rotatedCoordBL = randomRotateUV(uv, flooredUV + vec2(1.0, 0.0));
     
-    vec3 colorTR = sampleRotatedUV(texturePack, rotatedCoordTR, layerTR, ddx, ddy).rgb;
-    vec3 colorTL = sampleRotatedUV(texturePack, rotatedCoordTL, layerTL, ddx, ddy).rgb;
-    vec3 colorBR = sampleRotatedUV(texturePack, rotatedCoordBR, layerBR, ddx, ddy).rgb;
-    vec3 colorBL = sampleRotatedUV(texturePack, rotatedCoordBL, layerBL, ddx, ddy).rgb;
+    vec3 colorTR = sampleRotatedUV(texturePack, rotatedCoordTR, surroundingLayers[0], ddx, ddy).rgb;
+    vec3 colorTL = sampleRotatedUV(texturePack, rotatedCoordTL, surroundingLayers[1], ddx, ddy).rgb;
+    vec3 colorBR = sampleRotatedUV(texturePack, rotatedCoordBR, surroundingLayers[2], ddx, ddy).rgb;
+    vec3 colorBL = sampleRotatedUV(texturePack, rotatedCoordBL, surroundingLayers[3], ddx, ddy).rgb;
 
-    vec4 normalHeightTR = sampleRotatedUV(normalPack, rotatedCoordTR, layerTR, ddx, ddy);
-    vec4 normalHeightTL = sampleRotatedUV(normalPack, rotatedCoordTL, layerTL, ddx, ddy);
-    vec4 normalHeightBR = sampleRotatedUV(normalPack, rotatedCoordBR, layerBR, ddx, ddy);
-    vec4 normalHeightBL = sampleRotatedUV(normalPack, rotatedCoordBL, layerBL, ddx, ddy);
+    vec4 normalHeightTR = sampleRotatedUV(normalPack, rotatedCoordTR, surroundingLayers[0], ddx, ddy);
+    vec4 normalHeightTL = sampleRotatedUV(normalPack, rotatedCoordTL, surroundingLayers[1], ddx, ddy);
+    vec4 normalHeightBR = sampleRotatedUV(normalPack, rotatedCoordBR, surroundingLayers[2], ddx, ddy);
+    vec4 normalHeightBL = sampleRotatedUV(normalPack, rotatedCoordBL, surroundingLayers[3], ddx, ddy);
 
-    float tTR = normalHeightTR.w * (1.0 - distance(fragmentPosition.xz, flooredUV + vec2(1, 1)));
-    float tTL = normalHeightTL.w * (1.0 - distance(fragmentPosition.xz, flooredUV + vec2(0, 1)));
-    float tBR = normalHeightBR.w * (1.0 - distance(fragmentPosition.xz, flooredUV + vec2(0, 0)));
-    float tBL = normalHeightBL.w * (1.0 - distance(fragmentPosition.xz, flooredUV + vec2(1, 0)));
+    float tTR = normalHeightTR.w * (1.0 - distance(fragPos.xz, flooredUV + vec2(1, 1)));
+    float tTL = normalHeightTL.w * (1.0 - distance(fragPos.xz, flooredUV + vec2(0, 1)));
+    float tBR = normalHeightBR.w * (1.0 - distance(fragPos.xz, flooredUV + vec2(0, 0)));
+    float tBL = normalHeightBL.w * (1.0 - distance(fragPos.xz, flooredUV + vec2(1, 0)));
 
     vec3 finalColor = heightBlend(colorTR, tTR, colorTL, tTL, colorBR, tBR, colorBL, tBL);
-
-    mat3 tbn = mat3(tangent, bitangent, normal);
 
     vec3 finalNormal = heightBlend(normalHeightTR.xyz, tTR, 
                                    normalHeightTL.xyz, tTL, 
@@ -147,84 +90,95 @@ void getFinalColor(vec2 uv, vec3 tangent, vec3 bitangent, vec2 ddx, vec2 ddy, ou
     outColor = finalColor;
 }
 
-// Gollent_Marcin_Landscape_Creation.pdf
-#define TIGHTEN_TRIPLANR_MAPPING_FACTOR 0.3
-
-void main() 
+ivec4 aquireMaterialIndices(ivec2 pos)
 {
+    ivec4 surroundingLayers;
+    surroundingLayers[0] = int(imageLoad(Composition, pos + ivec2(1, 1)).r);
+    surroundingLayers[1] = int(imageLoad(Composition, pos + ivec2(0, 1)).r);
+    surroundingLayers[2] = int(imageLoad(Composition, pos + ivec2(0, 0)).r);
+    surroundingLayers[3] = int(imageLoad(Composition, pos + ivec2(1, 0)).r);
+    return surroundingLayers;
+}
 
-    ivec2 intPos = ivec2(fragmentPosition.x, fragmentPosition.z);
-    layerTR = int(imageLoad(Composition, intPos + ivec2(1, 1)).r);
-    layerTL = int(imageLoad(Composition, intPos + ivec2(0, 1)).r);
-    layerBR = int(imageLoad(Composition, intPos + ivec2(0, 0)).r);
-    layerBL = int(imageLoad(Composition, intPos + ivec2(1, 0)).r);
+vec3 blendNormals(vec3 worldNormal, vec3 texNormal)
+{
+    vec3 norm = vec3(0.0);
+       
+    float a = 1 / (1 + worldNormal.z);
+    float b = -worldNormal.x * worldNormal.y * a;
     
-    vec3 absNormal = abs(normal);
-    absNormal /= (absNormal.x + absNormal.y + absNormal.z);
-    vec3 weights = absNormal - TIGHTEN_TRIPLANR_MAPPING_FACTOR;
-
-    vec3 finalColorX = vec3(0.0);
-    vec3 finalColorY = vec3(0.0);
-    vec3 finalColorZ = vec3(0.0);
-
-    vec3 finalNormalX = vec3(0.0);
-    vec3 finalNormalY = vec3(0.0);
-    vec3 finalNormalZ = vec3(0.0);
-
-    vec3 axis = sign(normal);
-    vec3 finalWeight = vec3(0.0);
+    vec3 b1 = vec3(1 - worldNormal.x * worldNormal.x * a, b, -worldNormal.x);
+    vec3 b2 = vec3(b, 1 - worldNormal.y * worldNormal.y * a, -worldNormal.y);
+    vec3 b3 = worldNormal;
     
-    vec3 ddx = dFdx(fragmentPosition);
-    vec3 ddy = dFdy(fragmentPosition);
-
-    if (weights.x > 0.0)
+    if (worldNormal.z < -0.9999999) // Handle the singularity
     {
-        vec3 tangent = normalize(cross(normal, vec3(0.0, axis.x, 0.0)));
-        vec3 bitangent = normalize(cross(tangent, normal)) * axis.x;
-        getFinalColor(fragmentPosition.yz, tangent, bitangent, ddx.yz, ddy.yz, finalColorX, finalNormalX);
-        finalWeight.x = absNormal.x;
+        b1 = vec3( 0, -1, 0);
+        b2 = vec3(-1,  0, 0);
     }
     
-    if (weights.y > 0.0)
-    {
-        vec3 tangent = normalize(cross(normal, vec3(0.0, 0.0, axis.y)));
-        vec3 bitangent = normalize(cross(tangent, normal)) * axis.y;
-        getFinalColor(fragmentPosition.xz, tangent, bitangent, ddx.xz, ddy.xz, finalColorY, finalNormalY);
-        finalWeight.y = absNormal.y;
-   }
-    
-    if (weights.z > 0.0)
-    {
-        vec3 tangent = normalize(cross(normal, vec3(0.0, -axis.z, 0.0)));
-        vec3 bitangent = normalize(-cross(tangent, normal)) * axis.z;
-        getFinalColor(fragmentPosition.xy, tangent, bitangent, ddx.xy, ddy.xy, finalColorZ, finalNormalZ);
-        finalWeight.z = absNormal.z;
-    }
+    norm = texNormal.x * b1 + texNormal.y * b2 + texNormal.z * b3;
+    return norm;
+}
 
-    
+void triplanarMapping(ivec4 surroundingLayers, vec3 normal, out vec3 outColor, out vec3 outNormal)
+{
 	vec3 blendWeights = pow(abs(normal), vec3(3.0));
 	blendWeights /= dot(blendWeights, vec3(1.0));
 
-	const float threshold = 0.3;
+	const float threshold = 0.2;
 
 	vec3 finalWeights = vec3(0.0);
-	if(blendWeights.x > threshold) finalWeights.x = blendWeights.x;
-	if(blendWeights.y > threshold) finalWeights.y = blendWeights.y;
-	if(blendWeights.z > threshold) finalWeights.z = blendWeights.z;
 
+    vec3 colorX = vec3(0.0);
+    vec3 colorY = vec3(0.0);
+    vec3 colorZ = vec3(0.0);
+
+    vec3 normalX = vec3(0.0);
+    vec3 normalY = vec3(0.0);
+    vec3 normalZ = vec3(0.0);
+    
+    vec3 ddx = dFdx(fragPos);
+    vec3 ddy = dFdy(fragPos);
+
+    if (blendWeights.x > threshold)
+    {
+        finalWeights.x = blendWeights.x;
+        getPatchAttributes(fragPos.yz, ddx.yz, ddy.yz, surroundingLayers, colorX, normalX);
+    }
+    
+    if (blendWeights.y > threshold)
+    {
+        finalWeights.y = blendWeights.y;
+        getPatchAttributes(fragPos.xz, ddx.xz, ddy.xz, surroundingLayers, colorY, normalY);
+    }
+     
+    if (blendWeights.z > threshold)
+    {
+        finalWeights.z = blendWeights.z;
+        getPatchAttributes(fragPos.xy, ddx.xy, ddy.xy, surroundingLayers, colorZ, normalZ);
+    }
+    
 	finalWeights /= finalWeights.x + finalWeights.y + finalWeights.z;
 
-    finalWeight /= (finalWeight.x + finalWeight.y + finalWeight.z);
-    weights /= (weights.x + weights.y + weights.z);
+    // https://blog.selfshadow.com/publications/blending-in-detail/
+    outNormal = normalX * finalWeights.x + normalY * finalWeights.y + normalZ * finalWeights.z;
+    outNormal = blendNormals(normal, outNormal);
+
+    outColor  = colorX * finalWeights.x + colorY * finalWeights.y + colorZ * finalWeights.z;
+}
+
+void main() 
+{
+    vec3 normal = texture(sampler2D(normalMap, terrainSampler), terrainUV).xyz;
+
+    ivec4 surroundingLayers = aquireMaterialIndices(ivec2(fragPos.x, fragPos.z));
     
-    vec3 normalX = vec3(0.0, finalNormalX.yx);
-    vec3 normalY = vec3(finalNormalY.x, 0.0, finalNormalY.y);
-    vec3 normalZ = vec3(finalNormalZ.xy, 0.0);
+    vec3 finalColor = vec3(0.0);
+    vec3 finalNormal = vec3(0.0);
+    triplanarMapping(surroundingLayers, normal, finalColor, finalNormal);
 
-    vec3 combinedNormal = finalNormalX * finalWeights.x + finalNormalY * finalWeights.y + finalNormalZ * finalWeights.z + normal;
-
-    float intensity = max(dot(combinedNormal, lightDirection), 0.5);
-
-    vec3 combinedColor = finalColorX * finalWeights.x + finalColorY * finalWeights.y + finalColorZ * finalWeights.z;
-    outColor = vec4((combinedNormal * 0.5 + 0.5), 1.0);
+    float intensity = max(dot(finalNormal, -lightDirection), 0.2);
+    
+    outColor = vec4(finalColor * intensity, 1.0);
 }
