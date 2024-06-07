@@ -142,6 +142,8 @@ void VulkanRenderer::preparePipeline(const std::shared_ptr<VulkanRenderCommandBu
 			renderPass->DescriptorSet->getDescriptorSet(m_Swapchain->getCurrentFrame()).data(), 0, nullptr);
 }
 
+static std::mutex queueMutex;
+
 void VulkanRenderer::dispatchCompute(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer, const std::shared_ptr<VulkanComputePass>& computePass, glm::ivec3 workgroups,
 	uint32_t pushConstantSize, void* data)
 {
@@ -163,7 +165,10 @@ void VulkanRenderer::dispatchCompute(const std::shared_ptr<VulkanRenderCommandBu
 	VkSubmitInfo submitInfo{};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-	if (vkQueueSubmit(VulkanDevice::getVulkanContext()->getComputeQueue(), 1, &submitInfo, nullptr) != VK_SUCCESS)
-		assert(false);
+	{
+		std::lock_guard<std::mutex> lock(queueMutex);
+		if (vkQueueSubmit(VulkanDevice::getVulkanContext()->getComputeQueue(), 1, &submitInfo, nullptr) != VK_SUCCESS)
+			assert(false);
+	}
 }
 

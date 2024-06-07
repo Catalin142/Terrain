@@ -21,7 +21,6 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#include "stb_image/std_image.h"
 #include "Graphics/Vulkan/VulkanShader.h"
 #include "Terrain/Techniques/DistanceLOD.h"
 #include <backends/imgui_impl_vulkan.h>
@@ -29,14 +28,16 @@
 #include "GUI/ProfilerGUI.h"
 
 #include <future>
+#include "System/Disk.h"
 
 VulkanApp::VulkanApp(const std::string& title, uint32_t width, uint32_t height) : Application(title, width, height)
 { }
 
+
 void VulkanApp::onCreate()
 {
 	CommandBuffer = std::make_shared<VulkanRenderCommandBuffer>(true);
-	
+
 	{
 		FramebufferSpecification framebufferSpecification;
 		framebufferSpecification.Width = 1600;
@@ -121,6 +122,18 @@ void VulkanApp::onCreate()
 	}
 
 	createFinalPass();
+
+	VirtualTerrainMapSpecification spec{};
+	spec.Filepath.Data = "heightData.tc";
+	spec.Filepath.Table = "heightTable.tb";
+	spec.Format = VK_FORMAT_R16_SFLOAT;
+	spec.PhysicalTextureSize = 1024;
+	VirtualMap = std::make_shared<TerrainVirtualMap>(spec);
+
+	TerrainVirtualSerializer::Deserialize(VirtualMap);
+
+	m_HeightMapDescriptor = ImGui_ImplVulkan_AddTexture(m_Sampler->Get(),
+		VirtualMap->m_PhysicalTexture->getVkImageView(), VK_IMAGE_LAYOUT_GENERAL);
 }
 
 void VulkanApp::onUpdate()
@@ -187,6 +200,8 @@ void VulkanApp::onUpdate()
 
 	glm::vec2 cameraPosition = { (cam.getPosition().x), (cam.getPosition().z) };
 
+	static int xHH = 0, yHH = 0, mipHH = 0;
+
 	// Geometry pass
 	{
 		CommandBuffer->beginQuery("GeometryPass");
@@ -207,7 +222,7 @@ void VulkanApp::onUpdate()
 		CommandBuffer->beginQuery("Imgui");
 		beginImGuiFrame();
 
-		static ProfilerManager manager({10.0f, 10.0f}, 400.0f);
+		static ProfilerManager manager({ 10.0f, 10.0f }, 400.0f);
 		{
 			manager.addProfiler("GPUProfiler", 100);
 			manager["GPUProfiler"]->addProfileValue("TotalGPU", CommandBuffer->getCommandBufferTime(), 0xffff00ff);
@@ -227,6 +242,16 @@ void VulkanApp::onUpdate()
 
 		m_Terrain->setHeightMultiplier(100.0f);
 
+		ImGui::Begin("VirtualHeightMapDebug");
+
+		ImGui::Image(m_HeightMapDescriptor, ImVec2{ 512, 512 });
+
+		ImGui::DragInt("x", &xHH);
+		ImGui::DragInt("y", &yHH);
+		ImGui::DragInt("mip", &mipHH);
+
+		ImGui::End();
+
 		endImGuiFrame();
 		CommandBuffer->endQuery("Imgui");
 
@@ -239,6 +264,14 @@ void VulkanApp::onUpdate()
 
 	CommandBuffer->End();
 	CommandBuffer->Submit();
+
+	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_O))
+		TerrainVirtualSerializer::Serialize(m_TerrainGenerator->getHeightMap(), VirtualMap->m_Specification);
+	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_P))
+	{
+		TerrainVirtualSerializer::Deserialize(VirtualMap);
+	}
+	VirtualMap->updateVirtualMap(m_Terrain->getChunksToRender(cam.getPosition()));
 }
 
 void VulkanApp::onResize()

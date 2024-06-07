@@ -51,7 +51,7 @@ vec2 randomRotateUV(vec2 uv, vec2 position)
 
 vec4 sampleRotatedUV(sampler2DArray tex, vec2 uv, int layer, vec2 ddx, vec2 ddy)
 {
-     return textureGrad(tex, vec3(fract(uv), layer), ddx, ddy);
+     return textureGrad(tex, vec3(uv, layer), ddx, ddy);
 }
 
 void getPatchAttributes(vec2 uv, vec2 ddx, vec2 ddy, ivec4 surroundingLayers, out vec3 outColor, out vec3 outNormal) 
@@ -59,10 +59,10 @@ void getPatchAttributes(vec2 uv, vec2 ddx, vec2 ddy, ivec4 surroundingLayers, ou
     vec2 flooredUV = floor(fragPos.xz);
 
     //https://advances.realtimerendering.com/s2023/Etienne(ATVI)-Large%20Scale%20Terrain%20Rendering%20with%20notes%20(Advances%202023).pdf
-    vec2 rotatedCoordTR = randomRotateUV(uv, flooredUV + vec2(1.0, 1.0));
-    vec2 rotatedCoordTL = randomRotateUV(uv, flooredUV + vec2(0.0, 1.0));
-    vec2 rotatedCoordBR = randomRotateUV(uv, flooredUV + vec2(0.0, 0.0));
-    vec2 rotatedCoordBL = randomRotateUV(uv, flooredUV + vec2(1.0, 0.0));
+    vec2 rotatedCoordTR = fract(randomRotateUV(uv, flooredUV + vec2(1.0, 1.0)));
+    vec2 rotatedCoordTL = fract(randomRotateUV(uv, flooredUV + vec2(0.0, 1.0)));
+    vec2 rotatedCoordBR = fract(randomRotateUV(uv, flooredUV + vec2(0.0, 0.0)));
+    vec2 rotatedCoordBL = fract(randomRotateUV(uv, flooredUV + vec2(1.0, 0.0)));
     
     vec3 colorTR = sampleRotatedUV(texturePack, rotatedCoordTR, surroundingLayers[0], ddx, ddy).rgb;
     vec3 colorTL = sampleRotatedUV(texturePack, rotatedCoordTL, surroundingLayers[1], ddx, ddy).rgb;

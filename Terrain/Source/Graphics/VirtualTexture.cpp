@@ -3,7 +3,7 @@
 VirtualTexture::VirtualTexture(const VirtualTextureSpecification& spec) : m_Specification(spec)
 {
 	{
-		ImageSpecification indirectionSpec{};
+		VulkanImageSpecification indirectionSpec{};
 		// X on PhysicalTexture - 8 bits
 		// Y on PhysicalTexture - 8 bits
 		// Mip - 8 bits
@@ -21,7 +21,7 @@ VirtualTexture::VirtualTexture(const VirtualTextureSpecification& spec) : m_Spec
 	}
 
 	{
-		ImageSpecification physicalSpec{};
+		VulkanImageSpecification physicalSpec{};
 		physicalSpec.Format = VK_FORMAT_R8G8B8A8_SRGB;
 		physicalSpec.Width = m_Specification.PageCountOnAxis * m_Specification.PageSize;
 		physicalSpec.Height = m_Specification.PageCountOnAxis * m_Specification.PageSize;
@@ -36,7 +36,7 @@ VirtualTexture::VirtualTexture(const VirtualTextureSpecification& spec) : m_Spec
 	}
 
 	{
-		ImageSpecification visulizationSpec{};
+		VulkanImageSpecification visulizationSpec{};
 		visulizationSpec.Format = VK_FORMAT_R8G8B8A8_SNORM;
 		visulizationSpec.Width = m_Specification.VirtualTextureSize.x / m_Specification.PageSize;
 		visulizationSpec.Height = m_Specification.VirtualTextureSize.y / m_Specification.PageSize;

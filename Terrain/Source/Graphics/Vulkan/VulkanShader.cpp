@@ -97,17 +97,17 @@ VulkanShaderStage::VulkanShaderStage(ShaderStage stage, const std::string& filep
 	std::filesystem::file_time_type lastModifiedCache = std::filesystem::last_write_time(cacheFilepath);
 	std::filesystem::file_time_type lastModifiedShader = std::filesystem::last_write_time(codeFilepath);
 
+	if (!std::filesystem::exists(CACHE_FILEPATH + directoryPath))
+		std::filesystem::create_directories(CACHE_FILEPATH + directoryPath);
+
 	if (std::filesystem::exists(cacheFilepath) && lastModifiedShader <= lastModifiedCache)
 		data = readCachedShaderData(cacheFilepath);
 
 	else
+	{
 		data = VulkanShaderCompiler::compileVulkanShader(stage, codeFilepath);
-
-	if (!std::filesystem::exists(CACHE_FILEPATH + directoryPath))
-		std::filesystem::create_directories(CACHE_FILEPATH + directoryPath);
-
-	if (!std::filesystem::exists(cacheFilepath))
 		writeShaderBinary(data.data(), (uint32_t)data.size(), cacheFilepath);
+	}
 
 	m_Input = VulkanShaderCompiler::Reflect(stage, data);
 

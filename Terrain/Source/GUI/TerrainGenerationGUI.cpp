@@ -35,9 +35,9 @@ void TerrainGenerationGUI::Render()
 		shouldRegenerate = ImGui::DragInt("Octaves", &m_Generator->Noise.Octaves, 0.3f, 1, 36) || shouldRegenerate;
 		shouldRegenerate = ImGui::DragFloat("Amplitude", &m_Generator->Noise.Amplitude, 0.01f) || shouldRegenerate;
 		shouldRegenerate = ImGui::DragFloat("Frequency", &m_Generator->Noise.Frequency, 0.01f) || shouldRegenerate;
-		shouldRegenerate = ImGui::DragFloat("Gain", &m_Generator->Noise.Gain, 0.01f) || shouldRegenerate;
 		shouldRegenerate = ImGui::DragFloat("Lacunarity", &m_Generator->Noise.Lacunarity, 0.01f) || shouldRegenerate;
-		shouldRegenerate = ImGui::DragFloat("b", &m_Generator->Noise.b, 0.01f) || shouldRegenerate;
+		shouldRegenerate = ImGui::DragFloat("Offset.x", &m_Generator->Noise.Offset.x, 0.5f) || shouldRegenerate;
+		shouldRegenerate = ImGui::DragFloat("Offset.y", &m_Generator->Noise.Offset.y, 0.5f) || shouldRegenerate;
 
 		if (shouldRegenerate)
 			m_Generator->notifyChange();

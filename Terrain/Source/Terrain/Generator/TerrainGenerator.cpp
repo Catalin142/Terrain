@@ -136,18 +136,20 @@ void TerrainGenerator::createShaders()
 void TerrainGenerator::createImages()
 {
 	{
-		ImageSpecification noiseHeightmapSpecification;
+		VulkanImageSpecification noiseHeightmapSpecification;
 		noiseHeightmapSpecification.Width = m_Width;
 		noiseHeightmapSpecification.Height = m_Height;
-		noiseHeightmapSpecification.Format = VK_FORMAT_R32_SFLOAT;
+		noiseHeightmapSpecification.Format = VK_FORMAT_R16_SFLOAT;
 		noiseHeightmapSpecification.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-		noiseHeightmapSpecification.UsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		noiseHeightmapSpecification.UsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+		noiseHeightmapSpecification.MemoryType = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+		noiseHeightmapSpecification.Mips = 4;
 		m_Noise = std::make_shared<VulkanImage>(noiseHeightmapSpecification);
 		m_Noise->Create();
 	}
 
 	{
-		ImageSpecification normalSpecification;
+		VulkanImageSpecification normalSpecification;
 		normalSpecification.Width = m_Width;
 		normalSpecification.Height = m_Height;
 		normalSpecification.Format = VK_FORMAT_R8G8B8A8_SNORM;
@@ -158,7 +160,7 @@ void TerrainGenerator::createImages()
 	}
 
 	{
-		ImageSpecification compositionSpecification;
+		VulkanImageSpecification compositionSpecification;
 		compositionSpecification.Width = m_Width;
 		compositionSpecification.Height = m_Height;
 		compositionSpecification.Format = VK_FORMAT_R8_UINT;

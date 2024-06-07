@@ -12,6 +12,7 @@ enum class BufferType
 	VERTEX,
 	INDEX,
 	INDIRECT,
+	TRANSFER_SRC,
 };
 
 struct BufferProperties

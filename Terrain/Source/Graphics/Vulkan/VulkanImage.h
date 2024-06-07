@@ -2,10 +2,12 @@
 
 #include "VulkanBaseBuffer.h"
 
+#include "glm/glm.hpp"
+
 #include <vector>
 #include <vulkan/vulkan.h>
 
-struct ImageSpecification
+struct VulkanImageSpecification
 {
 	uint32_t Width;
 	uint32_t Height;
@@ -19,6 +21,7 @@ struct ImageSpecification
 	VkImageTiling Tiling = VK_IMAGE_TILING_OPTIMAL;
 	VkImageUsageFlags UsageFlags;
 	VkImageAspectFlags Aspect = VK_IMAGE_ASPECT_NONE;
+	VkMemoryPropertyFlagBits MemoryType = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 	
 	bool Transfer = false;
 	bool CreateSampler = false;
@@ -28,7 +31,7 @@ struct ImageSpecification
 class VulkanImage
 {
 public:
-	VulkanImage(const ImageSpecification& spec);
+	VulkanImage(const VulkanImageSpecification& spec);
 	~VulkanImage();
 
 	VulkanImage(const VulkanImage&) = delete;
@@ -39,11 +42,15 @@ public:
 	void Resize(uint32_t width, uint32_t height);
 
 	VkImage getVkImage() const { return m_Image; }
+	VkDeviceMemory getVkDeviceMemory() const { return m_DeviceMemory; }
 	VkImageView getVkImageView(uint32_t mip = 0) const { return m_ImageViews[mip]; }
 	VkSampler getVkSampler() const { return m_Sampler; }
 
-	const ImageSpecification& getSpecification() { return m_Specification; }
-	void copyBuffer(const VulkanBaseBuffer& buffer, uint32_t layer = 0);
+	const VulkanImageSpecification& getSpecification() { return m_Specification; }
+	void copyBuffer(const VulkanBaseBuffer& buffer, uint32_t layer = 0, const glm::ivec2& offset = glm::ivec2(0, 0));
+	void copyBuffer(VkCommandBuffer cmdBuffer, const VulkanBaseBuffer& buffer, uint32_t layer = 0, const glm::ivec2& offset = glm::ivec2(0, 0));
+
+	void generateMips();
 
 private:
 	void createImage();
@@ -51,7 +58,7 @@ private:
 	void createView();
 
 private:
-	ImageSpecification m_Specification;
+	VulkanImageSpecification m_Specification;
 
 	VkImage m_Image = nullptr;
 	std::vector<VkImageView> m_ImageViews;

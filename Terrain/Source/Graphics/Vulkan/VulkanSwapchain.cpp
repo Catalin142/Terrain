@@ -284,6 +284,8 @@ void VulkanSwapchain::beginFrame()
 		assert(false);
 }
 
+static std::mutex queueMutex;
+
 void VulkanSwapchain::endFrame()
 {
 	VkCommandBuffer commandBuffer = getCommandBuffer(m_currentFrameIndex);
@@ -305,9 +307,12 @@ void VulkanSwapchain::endFrame()
 	submitInfo.pSignalSemaphores = signalSemaphores;
 
 	vkResetFences(device, 1, &m_inFlightFences[m_currentFrameIndex]);
-	if (vkQueueSubmit(VulkanDevice::getVulkanContext()->getGraphicsQueue(), 1, &submitInfo, m_inFlightFences[m_currentFrameIndex]) != VK_SUCCESS)
-		assert(false);
 
+	{
+		std::lock_guard<std::mutex> lock(queueMutex);
+		if (vkQueueSubmit(VulkanDevice::getVulkanContext()->getGraphicsQueue(), 1, &submitInfo, m_inFlightFences[m_currentFrameIndex]) != VK_SUCCESS)
+			assert(false);
+	}
 }
 
 void VulkanSwapchain::presentFrame()

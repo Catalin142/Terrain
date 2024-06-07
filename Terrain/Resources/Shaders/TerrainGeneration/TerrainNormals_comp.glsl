@@ -1,6 +1,6 @@
 #version 450
 
-layout (binding = 0, r32f) uniform readonly image2D heightMap;
+layout (binding = 0, r16f) uniform readonly image2D heightMap;
 layout (binding = 1, rgba8) uniform writeonly image2D normalMap;
 
 int size = imageSize(normalMap).x;

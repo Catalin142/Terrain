@@ -26,6 +26,7 @@
 #include "Terrain/Container/TerrainQuadTree.h"
 
 #include <thread>
+#include "Terrain/TerrainVirtualMap.h"
 
 #define MAX_FRAMES_IN_FLIGHT 2
 
@@ -82,10 +83,13 @@ private:
 	std::shared_ptr<VulkanSampler> m_Sampler;
 	std::shared_ptr<TerrainGenerationGUI> TerrainGUI;
 
+	std::shared_ptr<TerrainVirtualMap> VirtualMap;
+
 	Camera cam{45.0f, 1600.0f / 900.0f, 0.1f, 10000.0f};
 	bool Wireframe = false;
 
 	TerrainQuadTree* terrainQuadTree;
+	VkDescriptorSet m_HeightMapDescriptor;
 
 	std::thread* thread;
 	bool presed = false;

@@ -157,7 +157,7 @@ void VulkanFramebuffer::Create()
 	for (const FramebufferAttachment& colorAttachment : m_Specification.Attachments)
 	{
 		m_Specification.hasAttachments = true;
-		ImageSpecification imgSpec{};
+		VulkanImageSpecification imgSpec{};
 		imgSpec.Samples = m_Specification.Samples;
 		imgSpec.Format = colorAttachment.Format;
 		imgSpec.Width = m_Specification.Width;
@@ -177,7 +177,7 @@ void VulkanFramebuffer::Create()
 	if (m_Specification.DepthAttachment.Format != VK_FORMAT_UNDEFINED)
 	{
 		hasDepth = true;
-		ImageSpecification depthSpec{};
+		VulkanImageSpecification depthSpec{};
 		depthSpec.Samples = m_Specification.Samples;
 		depthSpec.Format = m_Specification.DepthAttachment.Format;
 		depthSpec.Width = m_Specification.Width;

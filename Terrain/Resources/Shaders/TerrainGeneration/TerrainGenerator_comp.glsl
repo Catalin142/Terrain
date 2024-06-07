@@ -4,16 +4,15 @@
 
 // https://gist.github.com/Leslieghf/334b8cd6ed75fb35ae334416627995ee
 
-layout (binding = 0, r32f) uniform writeonly image2D heightMap;
+layout (binding = 0, r16f) uniform writeonly image2D heightMap;
 
 layout (push_constant) uniform noiseParameters
 {
     int octaves;
     float amplitude;
     float frequency;
-    float gain;
     float lacunarity;
-    float b;
+    vec2 offset;
 } params;
 
 
@@ -81,7 +80,8 @@ float domainWarping(vec2 point)
 layout(local_size_x = 8, local_size_y = 8) in;
 void main() 
 {
-    float noise = computeFbm(vec2(gl_GlobalInvocationID.xy / 1024.0), params.octaves);
+    vec2 position = gl_GlobalInvocationID.xy + params.offset;
+    float noise = computeFbm(vec2(position / 1024.0), params.octaves);
     
     ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
 	imageStore(heightMap, pixelCoords, vec4(noise, noise, noise, 1.0));

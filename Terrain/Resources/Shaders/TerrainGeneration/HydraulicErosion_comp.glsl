@@ -2,7 +2,7 @@
 
 // https://www.firespark.de/resources/downloads/implementation%20of%20a%20methode%20for%20hydraulic%20erosion.pdf
 
-layout (binding = 0, r32f) uniform image2D normalMap;
+layout (binding = 0, r16f) uniform image2D heigthMap;
 
 layout (push_constant) uniform erosionParameters
 {
@@ -35,7 +35,7 @@ struct PositionInfo
 
 bool outsideOfMap(vec2 position)
 {
-	float mapSize = float(imageSize(normalMap));
+	float mapSize = float(imageSize(heigthMap));
 	return position.x < 0.0 || position.x >= mapSize || position.y < 0.0 || position.y >= mapSize;
 }
 
@@ -44,10 +44,10 @@ PositionInfo getGradientAndHeight(vec2 position)
 	vec2 cellOffset = fract(position);
 	ivec2 cellGridPosition = ivec2(position);
 
-	float heightTL = imageLoad(normalMap, cellGridPosition).x;
-	float heightTR = float(outsideOfMap(cellGridPosition + vec2(1, 0)) == false) * imageLoad(normalMap, cellGridPosition + ivec2(1, 0)).x;
-	float heightBL = float(outsideOfMap(cellGridPosition + vec2(0, 1)) == false) * imageLoad(normalMap, cellGridPosition + ivec2(0, 1)).x;
-	float heightBR = float(outsideOfMap(cellGridPosition + vec2(1, 1)) == false) * imageLoad(normalMap, cellGridPosition + ivec2(1, 1)).x;
+	float heightTL = imageLoad(heigthMap, cellGridPosition).x;
+	float heightTR = float(outsideOfMap(cellGridPosition + vec2(1, 0)) == false) * imageLoad(heigthMap, cellGridPosition + ivec2(1, 0)).x;
+	float heightBL = float(outsideOfMap(cellGridPosition + vec2(0, 1)) == false) * imageLoad(heigthMap, cellGridPosition + ivec2(0, 1)).x;
+	float heightBR = float(outsideOfMap(cellGridPosition + vec2(1, 1)) == false) * imageLoad(heigthMap, cellGridPosition + ivec2(1, 1)).x;
 
 	vec2 gradient;
 	gradient.x = (heightTR - heightTL) * (1.0 - cellOffset.y) + (heightBR - heightBL) * cellOffset.y;
@@ -132,10 +132,10 @@ void main()
             sediment -= amountToDeposit;
 
 			vec2 off = fract(dopletPosition);
-			imageStore(normalMap, ivec2(dopletPosition), vec4(ghOld.heights[0] + amountToDeposit * (1.0 - off.x) * (1.0 - off.y)));
-			imageStore(normalMap, ivec2(dopletPosition) + ivec2(1, 0), vec4(ghOld.heights[1] + amountToDeposit * off.x * (1.0 - off.y)));
-			imageStore(normalMap, ivec2(dopletPosition) + ivec2(0, 1), vec4(ghOld.heights[2] + amountToDeposit * (1.0 - off.x) * off.y));
-			imageStore(normalMap, ivec2(dopletPosition) + ivec2(1, 1), vec4(ghOld.heights[3] + amountToDeposit * off.x * off.y));
+			imageStore(heigthMap, ivec2(dopletPosition), vec4(ghOld.heights[0] + amountToDeposit * (1.0 - off.x) * (1.0 - off.y)));
+			imageStore(heigthMap, ivec2(dopletPosition) + ivec2(1, 0), vec4(ghOld.heights[1] + amountToDeposit * off.x * (1.0 - off.y)));
+			imageStore(heigthMap, ivec2(dopletPosition) + ivec2(0, 1), vec4(ghOld.heights[2] + amountToDeposit * (1.0 - off.x) * off.y));
+			imageStore(heigthMap, ivec2(dopletPosition) + ivec2(1, 1), vec4(ghOld.heights[3] + amountToDeposit * off.x * off.y));
 		}
 		else
 		{
@@ -145,10 +145,10 @@ void main()
 
             sediment += amountToErode;
 
-			imageStore(normalMap, ivec2(dopletPosition), vec4(ghOld.heights[0] - amountToErode * (1.0 - off.x) * (1.0 - off.y)));
-			imageStore(normalMap, ivec2(dopletPosition) + ivec2(1, 0), vec4(ghOld.heights[1] - amountToErode * off.x * (1.0 - off.y)));
-			imageStore(normalMap, ivec2(dopletPosition) + ivec2(0, 1), vec4(ghOld.heights[2] - amountToErode * (1.0 - off.x) * off.y));
-			imageStore(normalMap, ivec2(dopletPosition) + ivec2(1, 1), vec4(ghOld.heights[3] - amountToErode * off.x * off.y));
+			imageStore(heigthMap, ivec2(dopletPosition), vec4(ghOld.heights[0] - amountToErode * (1.0 - off.x) * (1.0 - off.y)));
+			imageStore(heigthMap, ivec2(dopletPosition) + ivec2(1, 0), vec4(ghOld.heights[1] - amountToErode * off.x * (1.0 - off.y)));
+			imageStore(heigthMap, ivec2(dopletPosition) + ivec2(0, 1), vec4(ghOld.heights[2] - amountToErode * (1.0 - off.x) * off.y));
+			imageStore(heigthMap, ivec2(dopletPosition) + ivec2(1, 1), vec4(ghOld.heights[3] - amountToErode * off.x * off.y));
 		}
 		
 		barrier();
@@ -160,5 +160,5 @@ void main()
 		dopletPosition = newDopletPosition;
 	}
 
-	//imageStore(normalMap, texel, vec4(abs(val), 0.0, 0.0, 0.0));
+	//imageStore(heigthMap, texel, vec4(abs(val), 0.0, 0.0, 0.0));
 }

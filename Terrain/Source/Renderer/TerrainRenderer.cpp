@@ -26,7 +26,7 @@ TerrainRenderer::TerrainRenderer(const std::shared_ptr<VulkanFramebuffer>& targe
 		lodCompute->addShaderStage(ShaderStage::COMPUTE, "Terrain/LODMap_comp.glsl");
 		lodCompute->createDescriptorSetLayouts();
 
-		ImageSpecification LODMapSpecification;
+		VulkanImageSpecification LODMapSpecification;
 		LODMapSpecification.Width = uint32_t(terrain->getInfo().TerrainSize.x) / terrain->getInfo().MinimumChunkSize;
 		LODMapSpecification.Height = uint32_t(terrain->getInfo().TerrainSize.x) / terrain->getInfo().MinimumChunkSize;
 		LODMapSpecification.Format = VK_FORMAT_R8_UINT;

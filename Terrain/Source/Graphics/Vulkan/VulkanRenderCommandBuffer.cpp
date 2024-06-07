@@ -107,6 +107,7 @@ void VulkanRenderCommandBuffer::End()
 		assert(false);
 }
 
+static std::mutex queueMutex;
 void VulkanRenderCommandBuffer::Submit()
 {
 	if (m_OwnedBySwapchain)
@@ -122,9 +123,13 @@ void VulkanRenderCommandBuffer::Submit()
 	VkCommandBuffer commandBuffer = m_CommandBuffers[m_QueryFrame];
 	submitInfo.pCommandBuffers = &commandBuffer;
 
-	if (vkQueueSubmit(VulkanDevice::getVulkanContext()->getGraphicsQueue(), 1, &submitInfo,
-		m_inFlightFences[m_QueryFrame]) != VK_SUCCESS)
-		assert(false);
+
+	{
+		std::lock_guard<std::mutex> lock(queueMutex);
+		if (vkQueueSubmit(VulkanDevice::getVulkanContext()->getGraphicsQueue(), 1, &submitInfo,
+			m_inFlightFences[m_QueryFrame]) != VK_SUCCESS)
+			assert(false);
+	}
 }
 
 void VulkanRenderCommandBuffer::beginQuery(const std::string& name)

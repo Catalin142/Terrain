@@ -6,6 +6,9 @@
 #include <memory>
 #include <set>
 #include <unordered_map>
+#include <thread>
+#include <map>
+#include <mutex>
 
 #include "Core/Window.h"
 #include <vulkan/vulkan.h>
@@ -113,7 +116,12 @@ public:
 
 	static VkCommandPool getGraphicsCommandPool()
 	{
-		return m_Instance->m_CommandPool->getGraphicsCommandPool();
+		std::map<std::thread::id, std::shared_ptr<VulkanCommandPool>>& commandPool = m_Instance->m_CommandPool;
+
+		if (commandPool.find(std::this_thread::get_id()) == commandPool.end())
+			commandPool[std::this_thread::get_id()] = std::make_shared<VulkanCommandPool>();
+
+		return commandPool[std::this_thread::get_id()]->getGraphicsCommandPool();
 	}
 
 	// TODO modify
@@ -148,7 +156,7 @@ private:
 	QueueBundle m_transferQueue;
 	QueueBundle m_computeQueue;
 
-	std::shared_ptr<VulkanCommandPool> m_CommandPool;
+	std::map<std::thread::id, std::shared_ptr<VulkanCommandPool>> m_CommandPool;
 
 	VkPhysicalDeviceFeatures m_physicalDeviceFeatures;
 	VkPhysicalDeviceProperties m_physicalDeviceProperties; 

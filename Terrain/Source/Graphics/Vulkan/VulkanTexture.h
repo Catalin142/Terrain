@@ -43,7 +43,6 @@ public:
 
 private:
 	void loadTextures();
-	void GenerateMips();
 
 private:
 	std::shared_ptr<VulkanImage> m_VulkanImage = nullptr;

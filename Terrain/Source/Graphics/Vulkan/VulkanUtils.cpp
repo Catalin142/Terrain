@@ -5,6 +5,10 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/integer.hpp"
 
+#include <mutex>
+
+static std::mutex queueMutex;
+
 VkCommandBuffer VkUtils::beginSingleTimeCommand()
 {
 	VkCommandBufferAllocateInfo allocInfo{};
@@ -36,7 +40,10 @@ void VkUtils::endSingleTimeCommand(VkCommandBuffer buffer)
 
 	VulkanDevice* deviceContext = VulkanDevice::getVulkanContext();
 
-	vkQueueSubmit(deviceContext->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+	{
+		std::lock_guard<std::mutex> lock(queueMutex);
+		vkQueueSubmit(deviceContext->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+	}
 	vkQueueWaitIdle(deviceContext->getGraphicsQueue());
 
 	vkFreeCommandBuffers(deviceContext->getLogicalDevice(), VulkanDevice::getGraphicsCommandPool(), 1, &buffer);
@@ -62,7 +69,10 @@ void VkUtils::flushCommandBuffer(VkCommandBuffer commandBuffer)
 	if (vkCreateFence(VulkanDevice::getVulkanDevice(), &fenceInfo, nullptr, &fence))
 		assert(false);
 
-	vkQueueSubmit(VulkanDevice::getVulkanContext()->getGraphicsQueue(), 1, &submitInfo, fence);
+	{
+		std::lock_guard<std::mutex> lock(queueMutex);
+		vkQueueSubmit(VulkanDevice::getVulkanContext()->getGraphicsQueue(), 1, &submitInfo, fence);
+	}
 
 	vkWaitForFences(VulkanDevice::getVulkanDevice(), 1, &fence, VK_TRUE, 100000000000);
 	vkDestroyFence(VulkanDevice::getVulkanDevice(), fence, nullptr);

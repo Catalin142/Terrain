@@ -2,40 +2,75 @@
 #include <memory>
 #include <cassert>
 
-VulkanBuffer::VulkanBuffer(void* data, uint32_t size, BufferType type, BufferUsage usage) : m_Type(type)
+VkMemoryPropertyFlags getFlag(BufferUsage usage)
 {
 	switch (usage)
 	{
+	case BufferUsage::STATIC: return VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	case BufferUsage::DYNAMIC: return VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+	}
+}
+
+VulkanBuffer::VulkanBuffer(uint32_t size, BufferType type, BufferUsage usage) : m_Type(type), m_Usage(usage)
+{
+	BufferProperties vertexBufferProps;
+	vertexBufferProps.bufferSize = size;
+	vertexBufferProps.Usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | getUsage();
+	vertexBufferProps.MemProperties = getFlag(usage);
+
+	m_Buffer = std::make_shared<VulkanBaseBuffer>(vertexBufferProps);
+}
+
+VulkanBuffer::VulkanBuffer(void* data, uint32_t size, BufferType type, BufferUsage usage) : m_Type(type), m_Usage(usage)
+{
+	BufferProperties vertexBufferProps;
+	vertexBufferProps.bufferSize = size;
+	vertexBufferProps.Usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | getUsage();
+	vertexBufferProps.MemProperties = getFlag(usage);
+
+	m_Buffer = std::make_shared<VulkanBaseBuffer>(vertexBufferProps);
+
+	setData(data, size);
+}
+
+VulkanBuffer::~VulkanBuffer()
+{
+}
+
+void VulkanBuffer::setData(void* data, uint32_t size)
+{
+	switch (m_Usage)
+	{
 	case BufferUsage::STATIC:
-		createGPUBuffer(data, size);
-		break;
+		setDataGPUBuffer(data, size);
+		return;
 
 	case BufferUsage::DYNAMIC:
-		createGPUCPUBuffer(data, size);
-		break;
+		setDataGPUCPUBuffer(data, size);
+		return;
 
 	default:
 		assert(false);
 	}
 }
 
-VulkanBuffer::~VulkanBuffer()
+void VulkanBuffer::setDataDirect(void* data, uint32_t size)
 {
-	if (m_Storage)
-		delete[] m_Storage;
+	memcpy(m_MappedData, data, (size_t)size);
 }
 
-void VulkanBuffer::setData(void* data, uint32_t size)
+void VulkanBuffer::Map()
 {
-	std::memcpy(m_Storage, data, size);
+	m_Buffer->Map(m_MappedData);
+}
 
-	void* mappedData = nullptr;
-	m_Buffer->Map(mappedData);
-	std::memcpy(mappedData, m_Storage, size);
+void VulkanBuffer::Unmap()
+{
 	m_Buffer->Unmap();
+	m_MappedData = nullptr;
 }
 
-void VulkanBuffer::createGPUBuffer(void* data, uint32_t size)
+void VulkanBuffer::setDataGPUBuffer(void* data, uint32_t size)
 {
 	BufferProperties stagingBufferProps;
 	stagingBufferProps.bufferSize = size;
@@ -50,28 +85,15 @@ void VulkanBuffer::createGPUBuffer(void* data, uint32_t size)
 	memcpy(stagingBufferData, data, (size_t)size);
 	stagingBuffer.Unmap();
 
-	BufferProperties vertexBufferProps;
-	vertexBufferProps.bufferSize = size;
-	vertexBufferProps.Usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | getUsage();
-	vertexBufferProps.MemProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-
-	m_Buffer = std::make_shared<VulkanBaseBuffer>(vertexBufferProps);
 	m_Buffer->Copy(stagingBuffer);
-
 }
 
-void VulkanBuffer::createGPUCPUBuffer(void* data, uint32_t size)
+void VulkanBuffer::setDataGPUCPUBuffer(void* data, uint32_t size)
 {
-	BufferProperties vertexBufferProps;
-	vertexBufferProps.bufferSize = size;
-	vertexBufferProps.Usage = getUsage();
-	vertexBufferProps.MemProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-
-	m_Buffer = std::make_shared<VulkanBaseBuffer>(vertexBufferProps);
-	
-	m_Storage = new uint8_t[size];
-
-	setData(data, size);
+	void* bufferData;
+	m_Buffer->Map(bufferData);
+	memcpy(bufferData, data, (size_t)size);
+	m_Buffer->Unmap();
 }
 
 VkBufferUsageFlags VulkanBuffer::getUsage()
@@ -81,6 +103,7 @@ VkBufferUsageFlags VulkanBuffer::getUsage()
 	case BufferType::VERTEX: return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 	case BufferType::INDEX: return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
 	case BufferType::INDIRECT: return VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+	case BufferType::TRANSFER_SRC: return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 	default: return VK_BUFFER_USAGE_FLAG_BITS_MAX_ENUM;
 
 	}

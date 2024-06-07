@@ -3,6 +3,8 @@
 #include "Graphics/Vulkan/VulkanImage.h"
 #include "Graphics/Vulkan/VulkanPass.h"
 
+#include "glm/glm.hpp"
+
 #include <memory>
 #include <array>
 
@@ -11,9 +13,8 @@ struct GenerationParameters
 	int32_t Octaves = 1;
 	float Amplitude = 0.5f;
 	float Frequency = 0.0f;
-	float Gain = 0.5f;
 	float Lacunarity = 0.2f;
-	float b = 1.0f;
+	glm::vec2 Offset = glm::vec2(0.0);
 	float _padding[1];
 };
 
