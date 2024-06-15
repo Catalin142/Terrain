@@ -55,6 +55,7 @@ public:
 	~Terrain() = default;
 
 	const std::vector<TerrainChunk>& getChunksToRender(const glm::vec3& cameraPosition);
+	const std::vector<TerrainChunk>& getQuadTreeVisitedNodes();
 
 	LODTechnique getCurrentTechnique() { return m_CurrentLODTechnique; }
 	void setTechnique(LODTechnique tech);
@@ -62,6 +63,7 @@ public:
 	const std::shared_ptr<DistanceLOD>& getDistanceLODTechnique() { return m_DistanceLOD; }
 	const std::shared_ptr<QuadTreeLOD>& getQuadTreeLODTechnique() { return m_QuadTreeLOD; }
 	const std::shared_ptr<SinkingLOD>& getSinkingCircleLODTechnique() { return m_SinkingCircleLOD; }
+
 
 	TerrainInfo getInfo() { return m_Specification.Info; }
 	void setHeightMultiplier(float mul) { m_Specification.Info.HeightMultiplier = mul; }

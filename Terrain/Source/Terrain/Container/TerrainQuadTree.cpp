@@ -78,6 +78,8 @@ static bool isClose(const glm::ivec2& nodePosition, int32_t nodeSize, const glm:
 void TerrainQuadTree::insertPlayer(const glm::vec2& playerPosition)
 {
 	m_Leaves.clear();
+	m_VisitedNodes.clear();
+
 	int32_t lastPos = 1;
 
 	m_NodePool[0]->Load = m_Root->Load;
@@ -95,12 +97,13 @@ void TerrainQuadTree::insertPlayer(const glm::vec2& playerPosition)
 		bool divide = containtsPlayer(glm::ivec2(nodeLoad.Offset), nodeLoad.Size, playerPos) ||
 			isClose(glm::ivec2(nodeLoad.Offset), nodeLoad.Size, playerPos, m_Properties.LodDistance);
 
+		m_VisitedNodes.push_back(currentNode->Load);
 		if (!divide || nodeLoad.Lod == 1)
 		{
 			m_Leaves.push_back(currentNode->Load);
 			continue;
 		}
-
+		
 		uint32_t fakePos = lastPos;
 		currentNode->Divide(m_NodePool, fakePos);
 

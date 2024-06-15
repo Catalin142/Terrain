@@ -77,6 +77,8 @@ private:
 	VkCommandPool m_ComputeCommandPool;
 };
 
+static std::mutex graphicsMutex;
+
 class VulkanDevice
 {
 public:

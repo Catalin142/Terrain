@@ -30,6 +30,20 @@ const std::vector<TerrainChunk>& Terrain::getChunksToRender(const glm::vec3& cam
 	return m_ChunksToRender;
 }
 
+const std::vector<TerrainChunk>& Terrain::getQuadTreeVisitedNodes()
+{
+	switch (m_CurrentLODTechnique)
+	{
+	case LODTechnique::QUAD_TREE:
+		return m_QuadTreeLOD->getVisitedNodes();
+		break;
+
+	case LODTechnique::DISTANCE_BASED:
+	case LODTechnique::SINKING_CIRCLE:
+		return std::vector<TerrainChunk>();
+	}
+}
+
 void Terrain::setTechnique(LODTechnique tech)
 {
 	m_CurrentLODTechnique = tech;

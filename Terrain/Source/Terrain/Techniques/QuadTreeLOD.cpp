@@ -25,3 +25,8 @@ void QuadTreeLOD::getChunksToRender(std::vector<TerrainChunk>& chunks, const glm
 
 	chunks = m_TerrainQuadTree->getLeaves();
 }
+
+const std::vector<TerrainChunk>& QuadTreeLOD::getVisitedNodes()
+{
+	return m_TerrainQuadTree->getVisitedNodes();
+}

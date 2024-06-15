@@ -36,6 +36,8 @@ VulkanApp::VulkanApp(const std::string& title, uint32_t width, uint32_t height) 
 
 void VulkanApp::onCreate()
 {
+	TerrainVirtualSerializer::Initialize();
+
 	CommandBuffer = std::make_shared<VulkanRenderCommandBuffer>(true);
 
 	{
@@ -271,7 +273,7 @@ void VulkanApp::onUpdate()
 	{
 		TerrainVirtualSerializer::Deserialize(VirtualMap);
 	}
-	VirtualMap->updateVirtualMap(m_Terrain->getChunksToRender(cam.getPosition()));
+	VirtualMap->updateVirtualMap(m_Terrain->getQuadTreeVisitedNodes());
 }
 
 void VulkanApp::onResize()

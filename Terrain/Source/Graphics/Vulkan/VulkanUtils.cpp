@@ -41,7 +41,7 @@ void VkUtils::endSingleTimeCommand(VkCommandBuffer buffer)
 	VulkanDevice* deviceContext = VulkanDevice::getVulkanContext();
 
 	{
-		std::lock_guard<std::mutex> lock(queueMutex);
+		std::lock_guard<std::mutex> lock(graphicsMutex);
 		vkQueueSubmit(deviceContext->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
 	}
 	vkQueueWaitIdle(deviceContext->getGraphicsQueue());
@@ -70,7 +70,7 @@ void VkUtils::flushCommandBuffer(VkCommandBuffer commandBuffer)
 		assert(false);
 
 	{
-		std::lock_guard<std::mutex> lock(queueMutex);
+		std::lock_guard<std::mutex> lock(graphicsMutex);
 		vkQueueSubmit(VulkanDevice::getVulkanContext()->getGraphicsQueue(), 1, &submitInfo, fence);
 	}
 

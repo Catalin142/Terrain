@@ -152,40 +152,34 @@ TerrainVirtualMap::TerrainVirtualMap(const VirtualTerrainMapSpecification& spec)
 
     m_LastSlotChunk.resize(availableSlots);
 
-    m_LoadThread = std::thread([&]() -> void {
-        while (Running)
-        {
-            std::vector<size_t> taskQueueCopy;
-            {
-                std::lock_guard<std::mutex> lock(mutexVec);
-                std::swap(taskQueueCopy, taskQueue);
-            }
-            std::for_each(std::execution::par, std::begin(taskQueueCopy), std::end(taskQueueCopy), [&](size_t node) -> void {
-                loadNode(node);
-                });
-    
-    
-            //prepareImageLayout(m_AuxiliaryTexture, m_PhysicalTexture);
-            //restoreImageLayout(m_AuxiliaryTexture, m_PhysicalTexture);
-        }
-        });
-
-    m_StagingBuffer = std::make_shared<VulkanBuffer>(128 * 128 * 2, BufferType::TRANSFER_SRC, BufferUsage::DYNAMIC);
+    /* m_LoadThread = std::thread([&]() -> void {
+         while (m_ThreadRunning)
+         {
+             std::vector<size_t> taskQueueCopy;
+             {
+                 std::lock_guard<std::mutex> lock(mutexVec);
+                 std::swap(taskQueueCopy, m_NodesToLoad);
+             }
+             std::for_each(std::execution::par, std::begin(taskQueueCopy), std::end(taskQueueCopy), [&](size_t node) -> void {
+                 loadNode(node);
+                 });
+         }
+         });*/
 }
 
 TerrainVirtualMap::~TerrainVirtualMap()
 {
-    Running = false;
-    m_LoadThread.join();
+    m_ThreadRunning = false;
+    //m_LoadThread.join();
 }
 
 void TerrainVirtualMap::updateVirtualMap(const std::vector<TerrainChunk>& chunks)
 {
     // Search for nodes that need to be loaded/unloaded
-    
+
     m_NodesToUnload = m_ActiveNodes;
     m_NodesToLoad.clear();
-    
+
     // Check for nodes to load / unload
     for (const TerrainChunk& chunk : chunks)
     {
@@ -211,9 +205,10 @@ void TerrainVirtualMap::updateVirtualMap(const std::vector<TerrainChunk>& chunks
                 m_ActiveNodes.insert(chunkHashValue);
             }
             else
-                m_NodesToLoad.insert(chunkHashValue);
+                TerrainVirtualSerializer::loadChunk(this, chunkHashValue, m_Specification.Filepath, m_ChunkProperties[chunkHashValue]);
         }
     }
+
     refreshNodes();
 }
 
@@ -232,82 +227,24 @@ void TerrainVirtualMap::refreshNodes()
         m_AvailableSlots.insert(slot);
     }
 
-
-    for (size_t node : m_NodesToLoad)
-        pushTask(node);
-
     // load nodes
-    prepareImageLayout(m_AuxiliaryTexture, m_PhysicalTexture);
+    //prepareImageLayout(m_AuxiliaryTexture, m_PhysicalTexture);
 
-    std::lock_guard<std::mutex> lock(vectorMutex);
+    // Lock the nodeData vector
+    //std::lock_guard<std::mutex> lock(vectorMutex);
 
-    if (nodeData.size() != 0)
-        m_StagingBuffer->Map();
+    //if (m_NodeData.size() != 0)
+    //    m_StagingBuffer->Map();
 
-    for (auto& ddt : nodeData)
-    {
-        OnFileChunkProperties onFileProps = m_ChunkProperties[ddt.Node];
+    //for (auto& ddt : m_NodeData)
+    //    blitNode(ddt);
 
-        m_StagingBuffer->setDataDirect(ddt.Data.data(), 128 * 128 * 2);
+    //restoreImageLayout(m_AuxiliaryTexture, m_PhysicalTexture);
 
-        VkImageSubresourceRange imgSubresource{};
-        VulkanImageSpecification texSpec = m_AuxiliaryTexture->getSpecification();
-        imgSubresource.aspectMask = texSpec.Aspect;
-        imgSubresource.layerCount = 1;
-        imgSubresource.levelCount = 1;
-        imgSubresource.baseMipLevel = 0;
+    //if (m_NodeData.size() != 0)
+    //    m_StagingBuffer->Unmap();
 
-        VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand(); 
-
-        VkUtils::transitionImageLayout(cmdBuffer, m_AuxiliaryTexture->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        
-        m_AuxiliaryTexture->copyBuffer(cmdBuffer, *m_StagingBuffer->getBaseBuffer());
-
-        VkUtils::transitionImageLayout(cmdBuffer, m_AuxiliaryTexture->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-
-        VkImageBlit blit{};
-
-        int32_t iChunkSize = m_Specification.ChunkSize;
-
-        assert(m_AvailableSlots.size() != 0);
-
-        int32_t availableLoc = *m_AvailableSlots.begin();
-        m_AvailableSlots.erase(availableLoc);
-
-        m_LastChunkSlot[ddt.Node] = availableLoc;
-        m_LastSlotChunk[availableLoc] = ddt.Node;
-
-        int32_t slotsPerRow = m_Specification.PhysicalTextureSize / m_Specification.ChunkSize;
-        int32_t x = availableLoc / slotsPerRow;
-        int32_t y = availableLoc % slotsPerRow;
-
-        blit.srcOffsets[0] = { 0, 0, 0 };
-        blit.srcOffsets[1] = { iChunkSize, iChunkSize, 1 };
-        blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        blit.srcSubresource.mipLevel = 0;
-        blit.srcSubresource.baseArrayLayer = 0;
-        blit.srcSubresource.layerCount = 1;
-        blit.dstOffsets[0] = { x * iChunkSize, y * iChunkSize, 0 };
-        blit.dstOffsets[1] = { (x + 1) * iChunkSize, (y + 1) * iChunkSize, 1 };
-        blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        blit.dstSubresource.mipLevel = 0;
-        blit.dstSubresource.baseArrayLayer = 0;
-        blit.dstSubresource.layerCount = 1;
-
-        vkCmdBlitImage(cmdBuffer,
-            m_AuxiliaryTexture->getVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            m_PhysicalTexture->getVkImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            1, &blit,
-            VK_FILTER_LINEAR);
-
-        VkUtils::flushCommandBuffer(cmdBuffer);
-    }
-    restoreImageLayout(m_AuxiliaryTexture, m_PhysicalTexture);
-
-    if (nodeData.size() != 0)
-        m_StagingBuffer->Unmap();
-
-    nodeData.clear();
+    //m_NodeData.clear();
 }
 
 void TerrainVirtualMap::loadNode(size_t node)
@@ -318,7 +255,7 @@ void TerrainVirtualMap::loadNode(size_t node)
             return;
         m_ActiveNodes.insert(node);
     }
-    
+
     NodeData nd;
     nd.Data.resize(m_ChunkProperties[node].Size);
     TerrainVirtualSerializer::loadChunk(nd.Data, m_Specification.Filepath, m_ChunkProperties[node]);
@@ -326,7 +263,7 @@ void TerrainVirtualMap::loadNode(size_t node)
 
     {
         std::lock_guard<std::mutex> lock(vectorMutex);
-        nodeData.push_back(nd);
+        m_NodeData.push_back(nd);
     }
 
     /*VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
@@ -369,13 +306,112 @@ void TerrainVirtualMap::loadNode(size_t node)
     VkUtils::flushCommandBuffer(cmdBuffer);*/
 }
 
-void TerrainVirtualMap::pushTask(size_t node)
+void TerrainVirtualMap::pushNodeToLoad(size_t node)
 {
     std::lock_guard<std::mutex> lock(mutexVec);
-    taskQueue.push_back(node);
+    m_NodesToLoad.push_back(node);
 }
 
-void TerrainVirtualSerializer::Serialize(const std::shared_ptr<VulkanImage>& map, const VirtualTerrainMapSpecification& spec, 
+static std::mutex blitMutex;
+
+void TerrainVirtualMap::blitNode(NodeData& nodeData, VkCommandBuffer cmdBuffer)
+{
+    if (m_ActiveNodes.find(nodeData.Node) != m_ActiveNodes.end())
+        return;
+    {
+        std::lock_guard<std::mutex> lock(activeMutex);
+        m_ActiveNodes.insert(nodeData.Node);
+    }
+    VulkanBuffer* StagingBuffer = new VulkanBuffer(nodeData.Data.data(), 128 * 128 * 2, BufferType::TRANSFER_SRC, BufferUsage::STATIC);
+
+    OnFileChunkProperties onFileProps = m_ChunkProperties[nodeData.Node];
+
+    VkImageSubresourceRange imgSubresource{};
+    VulkanImageSpecification texSpec = m_AuxiliaryTexture->getSpecification();
+    imgSubresource.aspectMask = texSpec.Aspect;
+    imgSubresource.layerCount = 1;
+    imgSubresource.levelCount = 1;
+    imgSubresource.baseMipLevel = 0;
+
+   // prepareImageLayout(m_AuxiliaryTexture, m_PhysicalTexture);
+
+    VkImageBlit blit{};
+
+    int32_t iChunkSize = m_Specification.ChunkSize;
+
+    assert(m_AvailableSlots.size() != 0);
+
+    int32_t availableLoc = *m_AvailableSlots.begin();
+    m_AvailableSlots.erase(availableLoc);
+
+    m_LastChunkSlot[nodeData.Node] = availableLoc;
+    m_LastSlotChunk[availableLoc] = nodeData.Node;
+
+    int32_t slotsPerRow = m_Specification.PhysicalTextureSize / m_Specification.ChunkSize;
+    int32_t x = availableLoc / slotsPerRow;
+    int32_t y = availableLoc % slotsPerRow;
+
+    VkUtils::transitionImageLayout(cmdBuffer, m_PhysicalTexture->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    m_PhysicalTexture->copyBuffer(cmdBuffer, *StagingBuffer->getBaseBuffer(), 0, glm::uvec2(128, 128), glm::uvec2(x * iChunkSize, y * iChunkSize));
+    VkUtils::transitionImageLayout(cmdBuffer, m_PhysicalTexture->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+    
+    //blit.srcOffsets[0] = { 0, 0, 0 };
+    //blit.srcOffsets[1] = { iChunkSize, iChunkSize, 1 };
+    //blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    //blit.srcSubresource.mipLevel = 0;
+    //blit.srcSubresource.baseArrayLayer = 0;
+    //blit.srcSubresource.layerCount = 1;
+    //blit.dstOffsets[0] = { x * iChunkSize, y * iChunkSize, 0 };
+    //blit.dstOffsets[1] = { (x + 1) * iChunkSize, (y + 1) * iChunkSize, 1 };
+    //blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    //blit.dstSubresource.mipLevel = 0;
+    //blit.dstSubresource.baseArrayLayer = 0;
+    //blit.dstSubresource.layerCount = 1;
+    //
+    //vkCmdBlitImage(cmdBuffer,
+    //    m_AuxiliaryTexture->getVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+    //    m_PhysicalTexture->getVkImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    //    1, &blit,
+    //    VK_FILTER_LINEAR);
+
+
+    //restoreImageLayout(m_AuxiliaryTexture, m_PhysicalTexture);
+}
+
+static std::mutex taskMutex;
+
+std::thread TerrainVirtualSerializer::m_LoadThread;
+bool TerrainVirtualSerializer::m_ThreadRunning = true;
+
+std::vector<ChunkLoadTask> TerrainVirtualSerializer::m_LoadTasks;
+
+void TerrainVirtualSerializer::Initialize()
+{
+    m_LoadThread = std::thread([&]() -> void {
+        while (m_ThreadRunning)
+        {
+            std::vector<ChunkLoadTask> taskQueueCopy;
+            {
+                std::lock_guard<std::mutex> lock(taskMutex);
+                std::swap(taskQueueCopy, m_LoadTasks);
+                m_LoadTasks.clear();
+            }
+
+            if (taskQueueCopy.empty())
+                continue;
+
+            VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
+
+            std::for_each(std::begin(taskQueueCopy), std::end(taskQueueCopy), [&](ChunkLoadTask task) -> void {
+                loadChunk(task, cmdBuffer);
+                });
+
+            VkUtils::flushCommandBuffer(cmdBuffer);
+        }
+        });
+}
+
+void TerrainVirtualSerializer::Serialize(const std::shared_ptr<VulkanImage>& map, const VirtualTerrainMapSpecification& spec,
     glm::uvec2 worldOffset, bool purgeContent)
 {
     std::shared_ptr<VulkanImage> auxImg;
@@ -484,10 +520,10 @@ void TerrainVirtualSerializer::Serialize(const std::shared_ptr<VulkanImage>& map
                     // Serialize to file
                     uint32_t worldOffset = packOffset(x, y);
 
-                    tableOut << size        << " ";
-                    tableOut << mip         << " ";
+                    tableOut << size << " ";
+                    tableOut << mip << " ";
                     tableOut << worldOffset << " ";
-                    tableOut << binOffset   << " ";
+                    tableOut << binOffset << " ";
 
                     binOffset += size;
 
@@ -509,6 +545,29 @@ void TerrainVirtualSerializer::Deserialize(const std::shared_ptr<TerrainVirtualM
 
     while (tabCache >> size >> mip >> worldOffset >> binOffset)
         virtualMap->m_ChunkProperties[getChunkID(worldOffset, mip)] = { binOffset, size };
+}
+
+void TerrainVirtualSerializer::loadChunk(TerrainVirtualMap* vm, size_t node, const VirtualTextureLocation& location, OnFileChunkProperties onFileProps)
+{
+    std::lock_guard<std::mutex> lock(taskMutex);
+    m_LoadTasks.push_back({ vm, node, location, onFileProps });
+}
+
+void TerrainVirtualSerializer::loadChunk(const ChunkLoadTask& task, VkCommandBuffer cmdBuffer)
+{
+    std::ifstream imgCacheOut = std::ifstream(task.Location.Data, std::ios::binary);
+    if (!imgCacheOut.is_open())
+        throw(false);
+
+    std::vector<char> destination;
+    destination.resize(task.OnFileProperties.Size);
+
+    imgCacheOut.seekg(task.OnFileProperties.Offset, std::ios::beg);
+    imgCacheOut.read(destination.data(), task.OnFileProperties.Size);
+
+    NodeData nd{ task.Node, destination };
+
+    task.VirtualMap->blitNode(nd, cmdBuffer);
 }
 
 void TerrainVirtualSerializer::loadChunk(std::vector<char>& dst, const VirtualTextureLocation& location, OnFileChunkProperties onFileProps)

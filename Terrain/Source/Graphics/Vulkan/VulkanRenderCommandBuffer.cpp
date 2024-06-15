@@ -125,7 +125,7 @@ void VulkanRenderCommandBuffer::Submit()
 
 
 	{
-		std::lock_guard<std::mutex> lock(queueMutex);
+		std::lock_guard<std::mutex> lock(graphicsMutex);
 		if (vkQueueSubmit(VulkanDevice::getVulkanContext()->getGraphicsQueue(), 1, &submitInfo,
 			m_inFlightFences[m_QueryFrame]) != VK_SUCCESS)
 			assert(false);

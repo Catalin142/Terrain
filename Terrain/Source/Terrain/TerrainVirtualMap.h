@@ -71,6 +71,15 @@ public:
 	std::shared_ptr<VulkanImage> m_IndirectionTexture;
 	std::shared_ptr<VulkanImage> m_AuxiliaryTexture;
 
+
+private:
+	void refreshNodes();
+	void loadNode(size_t node);
+	void pushNodeToLoad(size_t node);
+
+	void blitNode(NodeData& nodeData, VkCommandBuffer cmdBuffer);
+
+private:
 	// Hash(Offset, Mip)
 	std::unordered_map<size_t, OnFileChunkProperties> m_ChunkProperties;
 
@@ -82,26 +91,40 @@ public:
 
 	// I created them here instead each frame in the function, ig it saves performance, maybe?
 	std::unordered_set<size_t> m_NodesToUnload;
-	std::unordered_set<size_t> m_NodesToLoad;
+	std::vector<size_t> m_NodesToLoad;
 
-	std::thread m_LoadThread;
-	std::vector<size_t> taskQueue;
-	void pushTask(size_t node);
-	bool Running = true;
-	std::vector<NodeData> nodeData;
+	// Thread made for loading nodes
+	//std::thread m_LoadThread;
 
-	std::shared_ptr<VulkanBuffer> m_StagingBuffer;
+	// Keep track of all the data that needs to be blited in the mega texture
+	std::vector<NodeData> m_NodeData;
+	bool m_ThreadRunning = true;
+};
 
-private:
-	void refreshNodes();
-	void loadNode(size_t node);
+struct ChunkLoadTask
+{
+	TerrainVirtualMap* VirtualMap;
+	size_t Node;
+	VirtualTextureLocation Location;
+	OnFileChunkProperties OnFileProperties;
 };
 
 class TerrainVirtualSerializer
 {
 public:
+	static void Initialize();
+
 	static void Serialize(const std::shared_ptr<VulkanImage>& map, const VirtualTerrainMapSpecification& spec, glm::uvec2 worldOffset = { 0u, 0u }, bool purgeContent = true);
 	static void Deserialize(const std::shared_ptr<TerrainVirtualMap>& virtualMap);
 
 	static void loadChunk(std::vector<char>& dst, const VirtualTextureLocation& location, OnFileChunkProperties onFileProps);
+	static void loadChunk(TerrainVirtualMap* vm, size_t node, const VirtualTextureLocation& location, OnFileChunkProperties onFileProps);
+
+	static void loadChunk(const ChunkLoadTask& task, VkCommandBuffer cmdBuffer);
+
+private:
+	static std::thread m_LoadThread;
+	static bool m_ThreadRunning;
+
+	static std::vector<ChunkLoadTask> m_LoadTasks;
 };

@@ -47,8 +47,10 @@ public:
 	VkSampler getVkSampler() const { return m_Sampler; }
 
 	const VulkanImageSpecification& getSpecification() { return m_Specification; }
-	void copyBuffer(const VulkanBaseBuffer& buffer, uint32_t layer = 0, const glm::ivec2& offset = glm::ivec2(0, 0));
-	void copyBuffer(VkCommandBuffer cmdBuffer, const VulkanBaseBuffer& buffer, uint32_t layer = 0, const glm::ivec2& offset = glm::ivec2(0, 0));
+	void copyBuffer(const VulkanBaseBuffer& buffer, uint32_t layer = 0, const glm::uvec2& srcExtent = glm::uvec2(0u, 0u),
+		const glm::uvec2& offset = glm::ivec2(0u, 0u));
+	void copyBuffer(VkCommandBuffer cmdBuffer, const VulkanBaseBuffer& buffer, uint32_t layer = 0, const glm::uvec2& srcExtent = glm::uvec2(0u, 0u),
+		const glm::uvec2& offset = glm::ivec2(0u, 0u));
 
 	void generateMips();
 

@@ -309,7 +309,7 @@ void VulkanSwapchain::endFrame()
 	vkResetFences(device, 1, &m_inFlightFences[m_currentFrameIndex]);
 
 	{
-		std::lock_guard<std::mutex> lock(queueMutex);
+		std::lock_guard<std::mutex> lock(graphicsMutex);
 		if (vkQueueSubmit(VulkanDevice::getVulkanContext()->getGraphicsQueue(), 1, &submitInfo, m_inFlightFences[m_currentFrameIndex]) != VK_SUCCESS)
 			assert(false);
 	}
@@ -329,7 +329,8 @@ void VulkanSwapchain::presentFrame()
 	presentInfo.pSwapchains = swapChains;
 	presentInfo.pImageIndices = &m_ImageIndex;
 
-	VkResult res = vkQueuePresentKHR(VulkanDevice::getVulkanContext()->getPresentQueue(), &presentInfo);
+	VkResult res = VK_SUCCESS;
+	res = vkQueuePresentKHR(VulkanDevice::getVulkanContext()->getPresentQueue(), &presentInfo);
 
 	if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR) {
 		onResize(m_Width, m_Height);
