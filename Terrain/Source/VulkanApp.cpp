@@ -36,8 +36,7 @@ VulkanApp::VulkanApp(const std::string& title, uint32_t width, uint32_t height) 
 
 void VulkanApp::onCreate()
 {
-	TerrainVirtualSerializer::Initialize();
-
+	DynamicVirtualTerrainDeserializer::Get()->Initialize();
 	CommandBuffer = std::make_shared<VulkanRenderCommandBuffer>(true);
 
 	{
@@ -132,7 +131,7 @@ void VulkanApp::onCreate()
 	spec.PhysicalTextureSize = 1024;
 	VirtualMap = std::make_shared<TerrainVirtualMap>(spec);
 
-	TerrainVirtualSerializer::Deserialize(VirtualMap);
+	VirtualTerrainSerializer::Deserialize(VirtualMap);
 
 	m_HeightMapDescriptor = ImGui_ImplVulkan_AddTexture(m_Sampler->Get(),
 		VirtualMap->m_PhysicalTexture->getVkImageView(), VK_IMAGE_LAYOUT_GENERAL);
@@ -184,96 +183,99 @@ void VulkanApp::onUpdate()
 
 	terrainQuadTree->insertPlayer({ cam.getPosition().x, cam.getPosition().z });
 
-
-	CommandBuffer->Begin();
-	VkCommandBuffer commandBuffer = CommandBuffer->getCurrentCommandBuffer();
-	m_TerrainGenerator->Generate(CommandBuffer);
-
-
-	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_3))
-		m_TerrainGenerator->runHydraulicErosion(CommandBuffer);
-
-	/*CameraCompParams compParams;
-
-	compParams.forward = glm::vec2(cam.Forward().x, cam.Forward().z);
-	compParams.position = glm::vec2(cam.getPosition().x / 1024.0f * 100.0f, cam.getPosition().z / 1024.0f * 100.0f);
-	compParams.fov = 45.0f;
-	compParams.right = glm::vec2(cam.Right().x, cam.Right().z);*/
-
-	glm::vec2 cameraPosition = { (cam.getPosition().x), (cam.getPosition().z) };
-
-	static int xHH = 0, yHH = 0, mipHH = 0;
-
-	// Geometry pass
 	{
-		CommandBuffer->beginQuery("GeometryPass");
-		m_TerrainRenderer->setRenderCommandBuffer(CommandBuffer);
-		m_TerrainRenderer->Render(cam);
-		CommandBuffer->endQuery("GeometryPass");
-	}
+		CommandBuffer->Begin();
+		VkCommandBuffer commandBuffer = CommandBuffer->getCurrentCommandBuffer();
+		m_TerrainGenerator->Generate(CommandBuffer);
 
-	// Present, fullscreen quad
-	{
-		CommandBuffer->beginQuery("PresentPass");
 
-		VulkanRenderer::beginSwapchainRenderPass(CommandBuffer, m_FinalPass);
-		VulkanRenderer::preparePipeline(CommandBuffer, m_FinalPass);
+		if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_3))
+			m_TerrainGenerator->runHydraulicErosion(CommandBuffer);
 
-		vkCmdDraw(commandBuffer, 6, 1, 0, 0);
+		/*CameraCompParams compParams;
 
-		CommandBuffer->beginQuery("Imgui");
-		beginImGuiFrame();
+		compParams.forward = glm::vec2(cam.Forward().x, cam.Forward().z);
+		compParams.position = glm::vec2(cam.getPosition().x / 1024.0f * 100.0f, cam.getPosition().z / 1024.0f * 100.0f);
+		compParams.fov = 45.0f;
+		compParams.right = glm::vec2(cam.Right().x, cam.Right().z);*/
 
-		static ProfilerManager manager({ 10.0f, 10.0f }, 400.0f);
+		glm::vec2 cameraPosition = { (cam.getPosition().x), (cam.getPosition().z) };
+
+		static int xHH = 0, yHH = 0, mipHH = 0;
+
+		// Geometry pass
 		{
-			manager.addProfiler("GPUProfiler", 100);
-			manager["GPUProfiler"]->addProfileValue("TotalGPU", CommandBuffer->getCommandBufferTime(), 0xffff00ff);
-			manager["GPUProfiler"]->addProfileValue("GeometryPass", CommandBuffer->getTime("GeometryPass"), 0xffffffff);
-			manager["GPUProfiler"]->addProfileValue("PresentPass", CommandBuffer->getTime("PresentPass"), 0xff0000ff);
-			manager["GPUProfiler"]->addProfileValue("Imgui", CommandBuffer->getTime("Imgui"), 0xff00ffff);
-		}
-		{
-			manager.addProfiler("CPUProfiler", 100);
-			manager["CPUProfiler"]->addProfileValue("Total Time", Instrumentor::Get().getTime("_TotalTime"), 0xffffffff);
-			manager["CPUProfiler"]->addProfileValue("Update", Instrumentor::Get().getTime("_Update"), 0xffff00ff);
+			CommandBuffer->beginQuery("GeometryPass");
+			m_TerrainRenderer->setRenderCommandBuffer(CommandBuffer);
+			m_TerrainRenderer->Render(cam);
+			CommandBuffer->endQuery("GeometryPass");
 		}
 
-		manager.Render();
+		// Present, fullscreen quad
+		{
+			CommandBuffer->beginQuery("PresentPass");
 
-		TerrainGUI->Render();
+			VulkanRenderer::beginSwapchainRenderPass(CommandBuffer, m_FinalPass);
+			VulkanRenderer::preparePipeline(CommandBuffer, m_FinalPass);
 
-		m_Terrain->setHeightMultiplier(100.0f);
+			vkCmdDraw(commandBuffer, 6, 1, 0, 0);
 
-		ImGui::Begin("VirtualHeightMapDebug");
+			CommandBuffer->beginQuery("Imgui");
+			beginImGuiFrame();
 
-		ImGui::Image(m_HeightMapDescriptor, ImVec2{ 512, 512 });
+			static ProfilerManager manager({ 10.0f, 10.0f }, 400.0f);
+			{
+				manager.addProfiler("GPUProfiler", 100);
+				manager["GPUProfiler"]->addProfileValue("TotalGPU", CommandBuffer->getCommandBufferTime(), 0xffff00ff);
+				manager["GPUProfiler"]->addProfileValue("GeometryPass", CommandBuffer->getTime("GeometryPass"), 0xffffffff);
+				manager["GPUProfiler"]->addProfileValue("PresentPass", CommandBuffer->getTime("PresentPass"), 0xff0000ff);
+				manager["GPUProfiler"]->addProfileValue("Imgui", CommandBuffer->getTime("Imgui"), 0xff00ffff);
+			}
+			{
+				manager.addProfiler("CPUProfiler", 100);
+				manager["CPUProfiler"]->addProfileValue("Total Time", Instrumentor::Get().getTime("_TotalTime"), 0xffffffff);
+				manager["CPUProfiler"]->addProfileValue("Update", Instrumentor::Get().getTime("_Update"), 0xffff00ff);
+			}
 
-		ImGui::DragInt("x", &xHH);
-		ImGui::DragInt("y", &yHH);
-		ImGui::DragInt("mip", &mipHH);
+			manager.Render();
 
-		ImGui::End();
+			TerrainGUI->Render();
 
-		endImGuiFrame();
-		CommandBuffer->endQuery("Imgui");
+			m_Terrain->setHeightMultiplier(100.0f);
 
-		VulkanRenderer::endRenderPass(CommandBuffer);
-		CommandBuffer->endQuery("PresentPass");
+			ImGui::Begin("VirtualHeightMapDebug");
+
+			ImGui::Image(m_HeightMapDescriptor, ImVec2{ 512, 512 });
+
+			ImGui::DragInt("x", &xHH);
+			ImGui::DragInt("y", &yHH);
+			ImGui::DragInt("mip", &mipHH);
+
+			ImGui::End();
+
+			endImGuiFrame();
+			CommandBuffer->endQuery("Imgui");
+
+			VulkanRenderer::endRenderPass(CommandBuffer);
+			CommandBuffer->endQuery("PresentPass");
+		}
+
+		VkClearColorValue colorQuad = { 0.0f, 0.0f, 0.0f, 1.0f };
+		VkImageSubresourceRange range{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+
+		CommandBuffer->End();
+		CommandBuffer->Submit();
 	}
-
-	VkClearColorValue colorQuad = { 0.0f, 0.0f, 0.0f, 1.0f };
-	VkImageSubresourceRange range{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-
-	CommandBuffer->End();
-	CommandBuffer->Submit();
 
 	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_O))
-		TerrainVirtualSerializer::Serialize(m_TerrainGenerator->getHeightMap(), VirtualMap->m_Specification);
+		VirtualTerrainSerializer::Serialize(m_TerrainGenerator->getHeightMap(), VirtualMap->getSpecification());
 	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_P))
 	{
-		TerrainVirtualSerializer::Deserialize(VirtualMap);
+		VirtualTerrainSerializer::Deserialize(VirtualMap);
 	}
 	VirtualMap->updateVirtualMap(m_Terrain->getQuadTreeVisitedNodes());
+
+	DynamicVirtualTerrainDeserializer::Get()->Refresh();
 }
 
 void VulkanApp::onResize()
@@ -296,6 +298,7 @@ void VulkanApp::onResize()
 
 void VulkanApp::onDestroy()
 {
+	DynamicVirtualTerrainDeserializer::Get()->Shutdown();
 	m_TerrainGenerator.reset();
 }
 

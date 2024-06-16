@@ -115,8 +115,6 @@ void VulkanRenderCommandBuffer::Submit()
 
 	VkDevice device = VulkanDevice::getVulkanDevice();
 
-	vkWaitForFences(device, 1, &m_inFlightFences[m_QueryFrame], VK_TRUE, UINT64_MAX);
-	vkResetFences(device, 1, &m_inFlightFences[m_QueryFrame]);
 	VkSubmitInfo submitInfo{};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submitInfo.commandBufferCount = 1;
@@ -129,6 +127,8 @@ void VulkanRenderCommandBuffer::Submit()
 		if (vkQueueSubmit(VulkanDevice::getVulkanContext()->getGraphicsQueue(), 1, &submitInfo,
 			m_inFlightFences[m_QueryFrame]) != VK_SUCCESS)
 			assert(false);
+		vkWaitForFences(device, 1, &m_inFlightFences[m_QueryFrame], VK_TRUE, UINT64_MAX);
+		vkResetFences(device, 1, &m_inFlightFences[m_QueryFrame]);
 	}
 }
 

@@ -330,15 +330,19 @@ void VulkanSwapchain::presentFrame()
 	presentInfo.pImageIndices = &m_ImageIndex;
 
 	VkResult res = VK_SUCCESS;
-	res = vkQueuePresentKHR(VulkanDevice::getVulkanContext()->getPresentQueue(), &presentInfo);
+	
+	{
+		std::lock_guard<std::mutex> lock(graphicsMutex);
+		res = vkQueuePresentKHR(VulkanDevice::getVulkanContext()->getPresentQueue(), &presentInfo);
 
-	if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR) {
-		onResize(m_Width, m_Height);
+		if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR) {
+			onResize(m_Width, m_Height);
+		}
+		else if (res != VK_SUCCESS)
+			assert(false);
+
+		m_currentFrameIndex = (m_currentFrameIndex + 1) % m_FramesInFlight;
+
+		vkWaitForFences(device, 1, &m_inFlightFences[m_currentFrameIndex], VK_TRUE, UINT64_MAX);
 	}
-	else if (res != VK_SUCCESS)
-		assert(false);
-
-	m_currentFrameIndex = (m_currentFrameIndex + 1) % m_FramesInFlight;
-
-	vkWaitForFences(device, 1, &m_inFlightFences[m_currentFrameIndex], VK_TRUE, UINT64_MAX);
 }

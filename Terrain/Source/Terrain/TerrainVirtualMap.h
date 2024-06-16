@@ -12,7 +12,11 @@
 #include <queue>
 #include <set>
 #include <functional>
+#include <mutex>
 #include <thread>
+#include <fstream>
+#include <unordered_map>
+#include <string>
 
 struct VirtualTextureLocation
 {
@@ -43,63 +47,56 @@ struct ChunkHashValues
 	uint32_t Mip;
 };
 
-
 struct NodeData
 {
 	size_t Node;
 	std::vector<char> Data;
 };
 
-class TerrainVirtualSerializer;
+class VirtualTerrainSerializer;
 
 #define INVALID_SLOT -1
 
 // offline - reads data from disk
 class TerrainVirtualMap
 {
-	friend class TerrainVirtualSerializer;
-
 public:
 	TerrainVirtualMap(const VirtualTerrainMapSpecification& spec);
-	~TerrainVirtualMap();
+	~TerrainVirtualMap() {}
+
+	const VirtualTerrainMapSpecification& getSpecification() {
+		return m_Specification;
+	}
 
 	void updateVirtualMap(const std::vector<TerrainChunk>& chunks);
+	void blitNode(NodeData& nodeData, VkCommandBuffer cmdBuffer, const std::shared_ptr<VulkanBuffer>& StagingBuffer);
 
-	VirtualTerrainMapSpecification m_Specification;
+	void addChunkProperty(size_t chunk, const OnFileChunkProperties& prop);
 
 	std::shared_ptr<VulkanImage> m_PhysicalTexture;
-	std::shared_ptr<VulkanImage> m_IndirectionTexture;
-	std::shared_ptr<VulkanImage> m_AuxiliaryTexture;
-
 
 private:
 	void refreshNodes();
-	void loadNode(size_t node);
-	void pushNodeToLoad(size_t node);
-
-	void blitNode(NodeData& nodeData, VkCommandBuffer cmdBuffer);
 
 private:
+	VirtualTerrainMapSpecification m_Specification;
+
 	// Hash(Offset, Mip)
 	std::unordered_map<size_t, OnFileChunkProperties> m_ChunkProperties;
 
 	// I Kepp a cache of the last Slot a Chunk occupied and the last chunk in a specified slot
 	std::unordered_map<size_t, int32_t> m_LastChunkSlot;
 	std::vector<size_t> m_LastSlotChunk;
+
 	std::unordered_set<size_t> m_ActiveNodes;
 	std::unordered_set<int32_t> m_AvailableSlots;
 
 	// I created them here instead each frame in the function, ig it saves performance, maybe?
 	std::unordered_set<size_t> m_NodesToUnload;
-	std::vector<size_t> m_NodesToLoad;
-
-	// Thread made for loading nodes
-	//std::thread m_LoadThread;
-
-	// Keep track of all the data that needs to be blited in the mega texture
-	std::vector<NodeData> m_NodeData;
-	bool m_ThreadRunning = true;
 };
+
+// Data gets laoded to the virtual map in batches (for each batch i allocate a vulkan buffer to hold data)
+#define LOAD_BATCH_SIZE 8
 
 struct ChunkLoadTask
 {
@@ -109,22 +106,56 @@ struct ChunkLoadTask
 	OnFileChunkProperties OnFileProperties;
 };
 
-class TerrainVirtualSerializer
+struct NodeToBlit
 {
-public:
-	static void Initialize();
+	NodeData Node;
+	TerrainVirtualMap* Destination;
+};
 
+class VirtualTerrainSerializer
+{
+	friend class TerrainVirtualMap;
+
+public:
 	static void Serialize(const std::shared_ptr<VulkanImage>& map, const VirtualTerrainMapSpecification& spec, glm::uvec2 worldOffset = { 0u, 0u }, bool purgeContent = true);
 	static void Deserialize(const std::shared_ptr<TerrainVirtualMap>& virtualMap);
+};
 
-	static void loadChunk(std::vector<char>& dst, const VirtualTextureLocation& location, OnFileChunkProperties onFileProps);
-	static void loadChunk(TerrainVirtualMap* vm, size_t node, const VirtualTextureLocation& location, OnFileChunkProperties onFileProps);
+class DynamicVirtualTerrainDeserializer
+{
+public:
+	static DynamicVirtualTerrainDeserializer* Get() {
+		if (m_Instance == nullptr)
+			m_Instance = new DynamicVirtualTerrainDeserializer();
+		return m_Instance;
+	}
 
-	static void loadChunk(const ChunkLoadTask& task, VkCommandBuffer cmdBuffer);
+	void Initialize();
+	void Shutdown();
+
+	// The deserializer loads data from the file on a different thread and holds it until i refresh the deserializer
+	// on refresh, every loaded node gets blited to it s destination virtual map 
+	void Refresh();
+
+	void loadChunk(const ChunkLoadTask& task);
+	void pushLoadTask(TerrainVirtualMap* vm, size_t node, const VirtualTextureLocation& location, OnFileChunkProperties onFileProps);
 
 private:
-	static std::thread m_LoadThread;
-	static bool m_ThreadRunning;
+	static DynamicVirtualTerrainDeserializer* m_Instance;
 
-	static std::vector<ChunkLoadTask> m_LoadTasks;
+	std::thread m_LoadThread;
+	std::mutex m_DataMutex;
+	std::mutex m_TaskMutex;
+
+	bool m_ThreadRunning = true;
+
+	std::vector<NodeToBlit> m_NodesToBlit;
+	std::queue<ChunkLoadTask> m_LoadTasks;
+
+	std::vector<std::shared_ptr<VulkanBuffer>> m_BufferPool;
+
+	// Cache of file handlers
+	// IDK if it impacts performance if i keep them open all the time
+	// Guess it s better than opening and closing them all the time
+	std::unordered_map<std::string, std::ifstream*> m_FileHandlerCache;
 };

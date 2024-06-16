@@ -19,7 +19,7 @@ void BenchmarkTimer::Shutdown()
 	Instrumentor::Get().Write(m_FunName, (float)elapsed.count());
 }
 
-#if DEBUG == 1
+//#if DEBUG == 1
 void Instrumentor::beginTimer(const std::string& name)
 {
 	if (m_Timers.find(name) == m_Timers.end())
@@ -40,4 +40,4 @@ float Instrumentor::getTime(const std::string& name)
 		return 0.0f;
 	return m_BenchmarkTime[name];
 }
-#endif
+//#endif

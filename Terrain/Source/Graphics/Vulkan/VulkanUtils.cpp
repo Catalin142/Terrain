@@ -43,8 +43,8 @@ void VkUtils::endSingleTimeCommand(VkCommandBuffer buffer)
 	{
 		std::lock_guard<std::mutex> lock(graphicsMutex);
 		vkQueueSubmit(deviceContext->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+		vkQueueWaitIdle(deviceContext->getGraphicsQueue());
 	}
-	vkQueueWaitIdle(deviceContext->getGraphicsQueue());
 
 	vkFreeCommandBuffers(deviceContext->getLogicalDevice(), VulkanDevice::getGraphicsCommandPool(), 1, &buffer);
 }
@@ -72,9 +72,8 @@ void VkUtils::flushCommandBuffer(VkCommandBuffer commandBuffer)
 	{
 		std::lock_guard<std::mutex> lock(graphicsMutex);
 		vkQueueSubmit(VulkanDevice::getVulkanContext()->getGraphicsQueue(), 1, &submitInfo, fence);
+		vkWaitForFences(VulkanDevice::getVulkanDevice(), 1, &fence, VK_TRUE, UINT64_MAX);
 	}
-
-	vkWaitForFences(VulkanDevice::getVulkanDevice(), 1, &fence, VK_TRUE, 100000000000);
 	vkDestroyFence(VulkanDevice::getVulkanDevice(), fence, nullptr);
 	vkFreeCommandBuffers(VulkanDevice::getVulkanDevice(), VulkanDevice::getVulkanContext()->getGraphicsCommandPool(), 1, &commandBuffer);
 }

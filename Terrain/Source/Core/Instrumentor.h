@@ -31,15 +31,15 @@ class Instrumentor
 
 public:
 
-#if DEBUG == 1
+//#if DEBUG == 1
 
 	void beginTimer(const std::string& name);
 	void endTimer(const std::string& name);
 	float getTime(const std::string& name);
 
-#else
+//#else
 
-	void beginTimer(const std::string& name)
+	/*void beginTimer(const std::string& name)
 	{}
 
 	void endTimer(const std::string& name)
@@ -48,9 +48,9 @@ public:
 	float getTime(const std::string& name)
 	{	
 		return 0.0f;
-	}
+	}*/
 
-#endif
+//#endif
 
 	static Instrumentor& Get()
 	{
