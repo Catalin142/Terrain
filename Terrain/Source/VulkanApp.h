@@ -26,7 +26,7 @@
 #include "Terrain/Container/TerrainQuadTree.h"
 
 #include <thread>
-#include "Terrain/TerrainVirtualMap.h"
+#include "Terrain/VirtualMap/TerrainVirtualMap.h"
 
 #define MAX_FRAMES_IN_FLIGHT 2
 

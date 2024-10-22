@@ -32,26 +32,16 @@ vec3 heightBlend(vec3 input1, float height1, vec3 input2, float height2, vec3 in
 	return ((input1 * b1) + (input2 * b2) + (input3 * b3) + (input4 * b4)) / (b1 + b2 + b3 + b4);
 }
 
-float rand(vec2 co){
-    return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
-}
-
-vec2 rotateUV(vec2 uv, float rotation, vec2 mid)
-{
-    return vec2(
-      cos(rotation) * (uv.x - mid.x) + sin(rotation) * (uv.y - mid.y) + mid.x,
-      cos(rotation) * (uv.y - mid.y) - sin(rotation) * (uv.x - mid.x) + mid.y
-    );
-}
-
 vec2 randomRotateUV(vec2 uv, vec2 position)
 {
-    return rotateUV(uv, radians(rand(position) * 360.0), vec2(0.0, 0.0));
-}
+    float rotation = radians(fract(sin(dot(position, vec2(12.9898, 78.233))) * 43758.5453) * 360.0);
+    float rotSin = sin(rotation);
+    float rotCos = cos(rotation);
 
-vec4 sampleRotatedUV(sampler2DArray tex, vec2 uv, int layer, vec2 ddx, vec2 ddy)
-{
-     return textureGrad(tex, vec3(uv, layer), ddx, ddy);
+    return vec2(
+      rotCos * uv.x + rotSin * uv.y,
+      rotCos * uv.y - rotSin * uv.x
+    );
 }
 
 void getPatchAttributes(vec2 uv, vec2 ddx, vec2 ddy, ivec4 surroundingLayers, out vec3 outColor, out vec3 outNormal) 
@@ -64,15 +54,20 @@ void getPatchAttributes(vec2 uv, vec2 ddx, vec2 ddy, ivec4 surroundingLayers, ou
     vec2 rotatedCoordBR = fract(randomRotateUV(uv, flooredUV + vec2(0.0, 0.0)));
     vec2 rotatedCoordBL = fract(randomRotateUV(uv, flooredUV + vec2(1.0, 0.0)));
     
-    vec3 colorTR = sampleRotatedUV(texturePack, rotatedCoordTR, surroundingLayers[0], ddx, ddy).rgb;
-    vec3 colorTL = sampleRotatedUV(texturePack, rotatedCoordTL, surroundingLayers[1], ddx, ddy).rgb;
-    vec3 colorBR = sampleRotatedUV(texturePack, rotatedCoordBR, surroundingLayers[2], ddx, ddy).rgb;
-    vec3 colorBL = sampleRotatedUV(texturePack, rotatedCoordBL, surroundingLayers[3], ddx, ddy).rgb;
+    vec3 coordTR = vec3(rotatedCoordTR, surroundingLayers[0]);
+    vec3 coordTL = vec3(rotatedCoordTL, surroundingLayers[1]);
+    vec3 coordBR = vec3(rotatedCoordBR, surroundingLayers[2]);
+    vec3 coordBL = vec3(rotatedCoordBL, surroundingLayers[3]);
 
-    vec4 normalHeightTR = sampleRotatedUV(normalPack, rotatedCoordTR, surroundingLayers[0], ddx, ddy);
-    vec4 normalHeightTL = sampleRotatedUV(normalPack, rotatedCoordTL, surroundingLayers[1], ddx, ddy);
-    vec4 normalHeightBR = sampleRotatedUV(normalPack, rotatedCoordBR, surroundingLayers[2], ddx, ddy);
-    vec4 normalHeightBL = sampleRotatedUV(normalPack, rotatedCoordBL, surroundingLayers[3], ddx, ddy);
+    vec3 colorTR = textureGrad(texturePack, coordTR, ddx, ddy).rgb;
+    vec3 colorTL = textureGrad(texturePack, coordTL, ddx, ddy).rgb;
+    vec3 colorBR = textureGrad(texturePack, coordBR, ddx, ddy).rgb;
+    vec3 colorBL = textureGrad(texturePack, coordBL, ddx, ddy).rgb;
+
+    vec4 normalHeightTR = textureGrad(normalPack, coordTR, ddx, ddy);
+    vec4 normalHeightTL = textureGrad(normalPack, coordTL, ddx, ddy);
+    vec4 normalHeightBR = textureGrad(normalPack, coordBR, ddx, ddy);
+    vec4 normalHeightBL = textureGrad(normalPack, coordBL, ddx, ddy);
 
     float tTR = normalHeightTR.w * (1.0 - distance(fragPos.xz, flooredUV + vec2(1, 1)));
     float tTL = normalHeightTL.w * (1.0 - distance(fragPos.xz, flooredUV + vec2(0, 1)));

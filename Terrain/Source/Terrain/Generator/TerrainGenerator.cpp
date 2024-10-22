@@ -100,13 +100,13 @@ void TerrainGenerator::runHydraulicErosion(const std::shared_ptr<VulkanRenderCom
 			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 	}
 
-	//{
-	//	VulkanRenderer::dispatchCompute(commandBuffer, m_CompositionPass, { m_Width / 8, m_Height / 8, 1 });
+	{
+		VulkanRenderer::dispatchCompute(commandBuffer, m_CompositionPass, { m_Width / 8, m_Height / 8, 1 });
 
-	//	// prevernts terrain fragment shader read from composition image until it is finished
-	//	m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Composition, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-	//		VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-	//}
+		// prevernts terrain fragment shader read from composition image until its finished
+		m_NoiseGenerationPass->Pipeline->imageMemoryBarrier(commandBuffer, m_Composition, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+	}
 }
 
 void TerrainGenerator::notifyChange()

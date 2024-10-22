@@ -23,6 +23,8 @@
 
 #include "Graphics/Vulkan/VulkanShader.h"
 #include "Terrain/Techniques/DistanceLOD.h"
+#include "Terrain/VirtualMap/DynamicVirtualTerrainDeserializer.h"
+#include "Terrain/VirtualMap/VirtualTerrainSerializer.h"
 #include <backends/imgui_impl_vulkan.h>
 
 #include "GUI/ProfilerGUI.h"
