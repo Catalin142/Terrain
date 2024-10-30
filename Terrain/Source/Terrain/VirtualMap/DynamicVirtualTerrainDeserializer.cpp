@@ -77,6 +77,9 @@ void DynamicVirtualTerrainDeserializer::Refresh()
     // Maybe multithread this, one batch per thread?
     std::lock_guard<std::mutex> lock(m_DataMutex);
 
+    // TODO: refactor
+    TerrainVirtualMap* map = nullptr;
+
     for (uint32_t batch = 0; batch <= m_NodesToBlit.size() / LOAD_BATCH_SIZE; batch++)
     {
         VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
@@ -96,6 +99,7 @@ void DynamicVirtualTerrainDeserializer::Refresh()
             m_BufferPool[bufferIndex]->Unmap();
 
             nd.Destination->blitNode(nd.Node, cmdBuffer, m_BufferPool[bufferIndex]);
+            map = nd.Destination;
         }
 
         VkUtils::endSingleTimeCommand(cmdBuffer);
@@ -103,5 +107,17 @@ void DynamicVirtualTerrainDeserializer::Refresh()
 
     uint32_t index = 0;
 
+    if (map != nullptr)
+    {
+        VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
+
+        std::vector<LoadedNode> nodes;
+        nodes.push_back(LoadedNode{ (int)packOffset(128, 256), (int)packOffset(1024, 2048), 0, 0 });
+
+        map->updateIndirectionTexture(cmdBuffer, nodes);
+        VkUtils::endSingleTimeCommand(cmdBuffer);
+    }
+
     m_NodesToBlit.clear();
 }
+

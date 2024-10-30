@@ -4,6 +4,7 @@
 #include "Terrain/Generator/TerrainGenerator.h"
 #include "Graphics/Vulkan/VulkanBuffer.h"
 #include "Terrain/TerrainChunk.h"
+#include "VMData.h"
 
 #include <cstdint>
 #include <memory>
@@ -17,6 +18,9 @@
 #include <fstream>
 #include <unordered_map>
 #include <string>
+
+#define INVALID_SLOT -1
+#define MAX_LOD 8u
 
 struct VirtualTextureLocation
 {
@@ -71,9 +75,8 @@ struct NodeToBlit
 
 class VirtualTerrainSerializer;
 
-#define INVALID_SLOT -1
-
 // offline - reads data from disk
+// we should have only one instance that includes all terrain virtual textures.
 class TerrainVirtualMap
 {
 public:
@@ -92,8 +95,12 @@ public:
 	std::shared_ptr<VulkanImage> m_PhysicalTexture;
 	std::shared_ptr<VulkanImage> m_IndirectionTexture;
 
+	void updateIndirectionTexture(VkCommandBuffer cmdBuffer, std::vector<LoadedNode>& nodes);
+
 private:
 	void refreshNodes();
+
+	void createCompute();
 
 private:
 	VirtualTerrainMapSpecification m_Specification;
@@ -109,6 +116,10 @@ private:
 	std::unordered_set<int32_t> m_AvailableSlots;
 
 	std::unordered_set<size_t> m_NodesToUnload;
+
+	std::shared_ptr<VulkanComputePass> m_IndirectionTextureUpdatePass;
+	std::shared_ptr<VulkanUniformBuffer> m_LoadedNodesUB;
+	VirtualMapProperties m_VMProps{ };
 };
 
 

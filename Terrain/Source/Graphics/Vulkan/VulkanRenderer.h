@@ -34,6 +34,9 @@ public:
 	static void dispatchCompute(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer, 
 		const std::shared_ptr<VulkanComputePass>& computePass, glm::ivec3 workgroups, uint32_t pushConstantSize = 0, void* data = nullptr);
 
+	static void dispatchCompute(VkCommandBuffer commandBuffer,
+		const std::shared_ptr<VulkanComputePass>& computePass, glm::ivec3 workgroups, uint32_t pushConstantSize = 0, void* data = nullptr);
+
 private:
 	VulkanRenderer() = default;
 	~VulkanRenderer() = default;

@@ -147,20 +147,23 @@ static std::mutex queueMutex;
 void VulkanRenderer::dispatchCompute(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer, const std::shared_ptr<VulkanComputePass>& computePass, glm::ivec3 workgroups,
 	uint32_t pushConstantSize, void* data)
 {
-	VkCommandBuffer cmd = commandBuffer->getCurrentCommandBuffer();
+	dispatchCompute(commandBuffer->getCurrentCommandBuffer(), computePass, workgroups, pushConstantSize, data);
+}
 
+void VulkanRenderer::dispatchCompute(VkCommandBuffer cmd, const std::shared_ptr<VulkanComputePass>& computePass, glm::ivec3 workgroups, uint32_t pushConstantSize, void* data)
+{
 	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, computePass->Pipeline->getVkPipeline());
 
 	if (computePass->DescriptorSet != nullptr)
-	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, computePass->Pipeline->getVkPipelineLayout(),
-		0, computePass->DescriptorSet->getNumberOfSets(),
-		computePass->DescriptorSet->getDescriptorSet(VulkanRenderer::getCurrentFrame()).data(), 0, nullptr);
+		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, computePass->Pipeline->getVkPipelineLayout(),
+			0, computePass->DescriptorSet->getNumberOfSets(),
+			computePass->DescriptorSet->getDescriptorSet(VulkanRenderer::getCurrentFrame()).data(), 0, nullptr);
 
 	if (pushConstantSize != 0)
 		vkCmdPushConstants(cmd, computePass->Pipeline->getVkPipelineLayout(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
 			pushConstantSize, data);
 
-	vkCmdDispatch(commandBuffer->getCurrentCommandBuffer(), workgroups.x, workgroups.y, workgroups.z);
+	vkCmdDispatch(cmd, workgroups.x, workgroups.y, workgroups.z);
 
 	VkSubmitInfo submitInfo{};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;

@@ -5,8 +5,8 @@
 
 static uint32_t packOffset(uint32_t x, uint32_t y)
 {
-    uint32_t xOffset = x & 0x00ff;
-    uint32_t yOffset = (y & 0x00ff) << 16;
+    uint32_t xOffset = x & 0x0000ffff;
+    uint32_t yOffset = (y & 0x0000ffff) << 16;
     return xOffset | yOffset;
 }
 

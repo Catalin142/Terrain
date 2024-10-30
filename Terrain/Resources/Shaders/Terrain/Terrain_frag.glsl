@@ -17,7 +17,7 @@ layout (set = 2, binding = 0) uniform sampler2DArray texturePack;
 layout (set = 2, binding = 1) uniform sampler2DArray normalPack;
 layout (set = 2, binding = 2) uniform texture2D noiseMap;
 
-vec3 lightDirection = normalize(vec3(100.0, 50.0, 0.0));
+vec3 lightDirection = normalize(vec3(100.0, -50.0, 0.0));
 
 #define HEIGHT_BLEND_FACTOR 0.05
 

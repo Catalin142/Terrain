@@ -47,4 +47,8 @@ private:
 	// IDK if it impacts performance if i keep them open all the time
 	// Guess it s better than opening and closing them all the time
 	std::unordered_map<std::string, std::ifstream*> m_FileHandlerCache;
+
+	std::shared_ptr<VulkanComputePass> m_IndirectionTextureUpdatePass;
+	std::shared_ptr<VulkanUniformBuffer> m_LoadedNodesUB;
+	VirtualMapProperties m_VMProps{ };
 };
