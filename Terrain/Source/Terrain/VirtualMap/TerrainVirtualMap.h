@@ -20,7 +20,7 @@
 #include <string>
 
 #define INVALID_SLOT -1
-#define MAX_LOD 8u
+#define MAX_LOD 6u
 
 struct VirtualTextureLocation
 {
@@ -32,6 +32,10 @@ struct VirtualTerrainMapSpecification
 {
 	uint32_t VirtualTextureSize = 1024;
 	uint32_t ChunkSize = 128;
+
+	// Must be <more than >= 128
+	uint32_t IndirectionTextureSize = 64;
+	
 	uint32_t PhysicalTextureSize = 2048;
 	uint32_t LODCount = 4; 
 	VkFormat Format;
@@ -77,6 +81,7 @@ class VirtualTerrainSerializer;
 
 // offline - reads data from disk
 // we should have only one instance that includes all terrain virtual textures.
+// only one indirection texture for all virtual textures
 class TerrainVirtualMap
 {
 public:

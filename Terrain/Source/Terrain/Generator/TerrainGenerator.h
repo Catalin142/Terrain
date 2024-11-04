@@ -18,11 +18,6 @@ struct GenerationParameters
 	float _padding[1];
 };
 
-struct CompositionParameters
-{
-	int8_t _padding[4];
-};
-
 struct HydraulicErosionParameters
 {
 	int Simulations = 300;
@@ -57,7 +52,6 @@ public:
 
 public:
 	GenerationParameters Noise{ };
-	CompositionParameters Composition{ };
 	HydraulicErosionParameters HydraulicErosion{ };
 
 	bool RunHydraulicErosion = false;
@@ -81,7 +75,6 @@ private:
 	std::shared_ptr<VulkanImage> m_Composition;
 
 	GenerationParameters m_OldNoise{ };
-	CompositionParameters m_OldComposition{ };
 
 	std::shared_ptr<VulkanUniformBuffer> m_UniformBuffer;
 

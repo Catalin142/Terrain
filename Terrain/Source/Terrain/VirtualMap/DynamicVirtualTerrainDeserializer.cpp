@@ -105,14 +105,14 @@ void DynamicVirtualTerrainDeserializer::Refresh()
         VkUtils::endSingleTimeCommand(cmdBuffer);
     }
 
-    uint32_t index = 0;
-
     if (map != nullptr)
     {
         VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
 
         std::vector<LoadedNode> nodes;
         nodes.push_back(LoadedNode{ (int)packOffset(128, 256), (int)packOffset(1024, 2048), 0, 0 });
+        nodes.push_back(LoadedNode{ (int)packOffset(1024, 256), (int)packOffset(612, 2048), 1, 0 });
+        nodes.push_back(LoadedNode{ (int)packOffset(128, 0), (int)packOffset(1024, 612), 3, 0 });
 
         map->updateIndirectionTexture(cmdBuffer, nodes);
         VkUtils::endSingleTimeCommand(cmdBuffer);

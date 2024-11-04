@@ -35,9 +35,9 @@ TerrainVirtualMap::TerrainVirtualMap(const VirtualTerrainMapSpecification& spec)
     // using a compute shader :-?
     {
         VulkanImageSpecification indirectionTextureSpecification{};
-        indirectionTextureSpecification.Width = m_Specification.VirtualTextureSize / m_Specification.ChunkSize;
-        indirectionTextureSpecification.Height = m_Specification.VirtualTextureSize / m_Specification.ChunkSize;
-        indirectionTextureSpecification.Mips = m_Specification.LODCount;
+        indirectionTextureSpecification.Width = m_Specification.IndirectionTextureSize;
+        indirectionTextureSpecification.Height = m_Specification.IndirectionTextureSize;
+        indirectionTextureSpecification.Mips = MAX_LOD;
         indirectionTextureSpecification.ImageViewOnMips = true;
         indirectionTextureSpecification.Format = VK_FORMAT_R32_UINT;
         indirectionTextureSpecification.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -169,7 +169,7 @@ void TerrainVirtualMap::createCompute()
         m_IndirectionTextureUpdatePass = std::make_shared<VulkanComputePass>();
         m_IndirectionTextureUpdatePass->DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("_IndirectionCompute"));
 
-        for (uint32_t i = 0; i < 1; i++)
+        for (uint32_t i = 0; i < MAX_LOD; i++)
         {
             m_IndirectionTextureUpdatePass->DescriptorSet->bindInput(0, 0, i, m_IndirectionTexture, (uint32_t)i);
         }
@@ -183,7 +183,7 @@ void TerrainVirtualMap::createCompute()
 
 void TerrainVirtualMap::updateIndirectionTexture(VkCommandBuffer cmdBuffer, std::vector<LoadedNode>& nodes)
 {
-    m_LoadedNodesUB->setData(nodes.data(), nodes.size() * sizeof(glm::vec2));
+    m_LoadedNodesUB->setData(nodes.data(), nodes.size() * sizeof(LoadedNode));
 
     m_VMProps.chunkSize = m_Specification.ChunkSize;
     m_VMProps.loadedNodesCount = nodes.size();

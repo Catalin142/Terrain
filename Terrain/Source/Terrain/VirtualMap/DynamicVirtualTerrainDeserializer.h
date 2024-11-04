@@ -10,6 +10,7 @@
 // Data gets laoded to the virtual map in batches (for each batch i allocate a vulkan buffer to hold data)
 #define LOAD_BATCH_SIZE 8
 
+// we only need one instance of this class that will work on only one instance of virtual map
 class DynamicVirtualTerrainDeserializer
 {
 public:
@@ -30,6 +31,7 @@ public:
 	void pushLoadTask(TerrainVirtualMap* vm, size_t node, const VirtualTextureLocation& location, OnFileChunkProperties onFileProps);
 
 private:
+	// Do we need this to be singleton? Maybe create a vm terrain manager to manage the loading and unloading and everything on a update cycle
 	static DynamicVirtualTerrainDeserializer* m_Instance;
 
 	std::thread m_LoadThread;

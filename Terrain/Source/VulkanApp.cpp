@@ -136,7 +136,7 @@ void VulkanApp::onCreate()
 	VirtualTerrainSerializer::Deserialize(VirtualMap);
 
 	m_HeightMapDescriptor = ImGui_ImplVulkan_AddTexture(m_Sampler->Get(),
-		VirtualMap->m_PhysicalTexture->getVkImageView(), VK_IMAGE_LAYOUT_GENERAL);
+		VirtualMap->m_IndirectionTexture->getVkImageView(), VK_IMAGE_LAYOUT_GENERAL);
 }
 
 void VulkanApp::onUpdate()
