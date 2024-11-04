@@ -5,11 +5,21 @@
 
 DynamicVirtualTerrainDeserializer* DynamicVirtualTerrainDeserializer::m_Instance = nullptr;
 
-void DynamicVirtualTerrainDeserializer::Initialize()
+void DynamicVirtualTerrainDeserializer::Initialize(const std::shared_ptr<TerrainVirtualMap>& vm)
 {
+    m_VirtualMap = vm;
+    
+    uint32_t chunkSize = m_VirtualMap->getSpecification().ChunkSize;
+    m_TextureDataStride = chunkSize * chunkSize * SIZE_OF_FLOAT16;
+
+    // have room for 64 chunks at a time
+    m_TextureDataBuffer = new char[m_TextureDataStride * MAX_CHUNKS_LOADING_PER_FRAME];
+    for (uint32_t i = 0; i < MAX_CHUNKS_LOADING_PER_FRAME; i++)
+        m_AvailableSlots.push(i);
+
     m_BufferPool.resize(LOAD_BATCH_SIZE);
     for (std::shared_ptr<VulkanBuffer>& buffer : m_BufferPool)
-        buffer = std::make_shared<VulkanBuffer>(128 * 128 * 2, BufferType::TRANSFER_SRC, BufferUsage::DYNAMIC);
+        buffer = std::make_shared<VulkanBuffer>(m_TextureDataStride, BufferType::TRANSFER_SRC, BufferUsage::DYNAMIC);
 
     m_LoadThread = std::thread([&]() -> void {
         while (m_ThreadRunning)
@@ -42,31 +52,47 @@ void DynamicVirtualTerrainDeserializer::Shutdown()
         delete fileCache.second;
 
     m_FileHandlerCache.clear();
+
+    delete[] m_TextureDataBuffer;
 }
 
-void DynamicVirtualTerrainDeserializer::pushLoadTask(TerrainVirtualMap* vm, size_t node, const VirtualTextureLocation& location, OnFileChunkProperties onFileProps)
+void DynamicVirtualTerrainDeserializer::pushLoadTask(size_t node, uint32_t virtualLocation, VirtualTextureType type)
 {
     std::lock_guard<std::mutex> lock(m_TaskMutex);
-    m_LoadTasks.push({ vm, node, location, onFileProps });
+    m_LoadTasks.push({ node, virtualLocation, type });
 }
 
 void DynamicVirtualTerrainDeserializer::loadChunk(const ChunkLoadTask& task)
 {
-    if (m_FileHandlerCache.find(task.Location.Data) == m_FileHandlerCache.end())
-        m_FileHandlerCache[task.Location.Data] = new std::ifstream(task.Location.Data, std::ios::binary);
+    VirtualTextureLocation location = m_VirtualMap->getTypeLocation(task.Type);
 
-    if (!m_FileHandlerCache[task.Location.Data]->is_open())
+    if (m_FileHandlerCache.find(location.Data) == m_FileHandlerCache.end())
+        m_FileHandlerCache[location.Data] = new std::ifstream(location.Data, std::ios::binary);
+
+    if (!m_FileHandlerCache[location.Data]->is_open())
         throw(false);
 
-    NodeToBlit ntb;
-    ntb.Node.Data.resize(task.OnFileProperties.Size);
-    ntb.Node.Node = task.Node;
-    ntb.Destination = task.VirtualMap;
+    uint32_t fileOffset = m_VirtualMap->getChunkFileOffset(task.Node);
+
+    NodeData ntb;
+    ntb.Node = task.Node;
+    ntb.VirtualLocation = task.VirtualLocation;
 
     {
-        m_FileHandlerCache[task.Location.Data]->seekg(task.OnFileProperties.Offset, std::ios::beg);
-        m_FileHandlerCache[task.Location.Data]->read(ntb.Node.Data.data(), task.OnFileProperties.Size);
+        std::lock_guard<std::mutex> lock(m_SlotsMutex);
+        // at this stage, small map, we won't ever load that many chunks at the time
+        // when we have a bigger map, don t forget to fix this edge case
+        while (m_AvailableSlots.empty())
+        {
+            assert(false);
+        }
+
+        ntb.MemoryIndex = m_AvailableSlots.front();
+        m_AvailableSlots.pop();
+        m_OccupiedSlots++;
     }
+    m_FileHandlerCache[location.Data]->seekg(fileOffset, std::ios::beg);
+    m_FileHandlerCache[location.Data]->read(&m_TextureDataBuffer[ntb.MemoryIndex * m_TextureDataStride], m_TextureDataStride);
 
     std::lock_guard<std::mutex> lock(m_DataMutex);
     m_NodesToBlit.push_back(ntb);
@@ -74,50 +100,52 @@ void DynamicVirtualTerrainDeserializer::loadChunk(const ChunkLoadTask& task)
 
 void DynamicVirtualTerrainDeserializer::Refresh()
 {
+    if (m_NodesToBlit.size() == 0)
+        return;
+
     // Maybe multithread this, one batch per thread?
     std::lock_guard<std::mutex> lock(m_DataMutex);
 
-    // TODO: refactor
-    TerrainVirtualMap* map = nullptr;
+    std::vector<LoadedNode> nodes;
 
     for (uint32_t batch = 0; batch <= m_NodesToBlit.size() / LOAD_BATCH_SIZE; batch++)
     {
         VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
 
-        uint32_t endIndex = std::min(batch * LOAD_BATCH_SIZE, (uint32_t)m_NodesToBlit.size());
+        uint32_t endIndex = std::min(batch * LOAD_BATCH_SIZE + LOAD_BATCH_SIZE, (uint32_t)m_NodesToBlit.size());
 
-        for (uint32_t ndIndex = 0; ndIndex < endIndex; ndIndex++)
+        for (uint32_t index = batch * LOAD_BATCH_SIZE; index < endIndex ; index++)
         {
-            uint32_t bufferIndex = ndIndex % LOAD_BATCH_SIZE;
+            uint32_t bufferIndex = index % LOAD_BATCH_SIZE;
 
-            auto& nd = m_NodesToBlit[ndIndex];
-
-            uint32_t chunkSize = nd.Destination->getSpecification().ChunkSize;
+            NodeData& nd = m_NodesToBlit[index];
 
             m_BufferPool[bufferIndex]->Map();
-            m_BufferPool[bufferIndex]->setDataDirect(nd.Node.Data.data(), chunkSize * chunkSize * SIZE_OF_FLOAT16);
+            m_BufferPool[bufferIndex]->setDataDirect(&m_TextureDataBuffer[nd.MemoryIndex * m_TextureDataStride], 
+                m_TextureDataStride);
             m_BufferPool[bufferIndex]->Unmap();
 
-            nd.Destination->blitNode(nd.Node, cmdBuffer, m_BufferPool[bufferIndex]);
-            map = nd.Destination;
+            uint32_t physicalLocation = m_VirtualMap->blitNode(nd.Node, cmdBuffer, m_BufferPool[bufferIndex]);
+
+            {
+                std::lock_guard<std::mutex> lock(m_SlotsMutex);
+                m_AvailableSlots.push(nd.MemoryIndex);
+                m_OccupiedSlots--;
+            }
         }
 
         VkUtils::endSingleTimeCommand(cmdBuffer);
     }
 
-    if (map != nullptr)
-    {
-        VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
-
-        std::vector<LoadedNode> nodes;
-        nodes.push_back(LoadedNode{ (int)packOffset(128, 256), (int)packOffset(1024, 2048), 0, 0 });
-        nodes.push_back(LoadedNode{ (int)packOffset(1024, 256), (int)packOffset(612, 2048), 1, 0 });
-        nodes.push_back(LoadedNode{ (int)packOffset(128, 0), (int)packOffset(1024, 612), 3, 0 });
-
-        map->updateIndirectionTexture(cmdBuffer, nodes);
-        VkUtils::endSingleTimeCommand(cmdBuffer);
-    }
+    //VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
+    //
+    //nodes.push_back(LoadedNode{ (int)packOffset(128, 256), (int)packOffset(1024, 2048), 0 });
+    //nodes.push_back(LoadedNode{ (int)packOffset(1024, 256), (int)packOffset(612, 2048), 1 });
+    //nodes.push_back(LoadedNode{ (int)packOffset(128, 0), (int)packOffset(1024, 612), 3 });
+    //
+    //m_VirtualMap->updateIndirectionTexture(cmdBuffer, nodes);
+    //
+    //VkUtils::endSingleTimeCommand(cmdBuffer);
 
     m_NodesToBlit.clear();
 }
-

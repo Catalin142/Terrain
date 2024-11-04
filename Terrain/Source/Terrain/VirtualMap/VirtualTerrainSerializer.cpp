@@ -83,7 +83,7 @@ static void restoreImageLayout(std::shared_ptr<VulkanImage> src, std::shared_ptr
 
 // The virtual map may be bigger than we can fit in memory, we need to combine multiple data from the file into one image
 void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& map, const VirtualTerrainMapSpecification& spec,
-    glm::uvec2 worldOffset, bool purgeContent)
+    VirtualTextureType type, glm::uvec2 worldOffset, bool purgeContent)
 {
     std::shared_ptr<VulkanImage> auxImg;
     {
@@ -138,15 +138,17 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& map
         std::ofstream tableOut;
         std::ofstream imgCacheOut;
 
+        VirtualTextureLocation filepath = spec.Filepaths.at(type);
+
         if (purgeContent)
         {
-            tableOut = std::ofstream(spec.Filepath.Table, std::ios::trunc);
-            imgCacheOut = std::ofstream(spec.Filepath.Data, std::ios::binary | std::ios::trunc);
+            tableOut = std::ofstream(filepath.Table, std::ios::trunc);
+            imgCacheOut = std::ofstream(filepath.Data, std::ios::binary | std::ios::trunc);
         }
         else
         {
-            tableOut = std::ofstream(spec.Filepath.Table, std::ios::app);
-            imgCacheOut = std::ofstream(spec.Filepath.Data, std::ios::binary | std::ios::app);
+            tableOut = std::ofstream(filepath.Table, std::ios::app);
+            imgCacheOut = std::ofstream(filepath.Data, std::ios::binary | std::ios::app);
         }
 
         uint32_t size = spec.ChunkSize * spec.ChunkSize * SIZE_OF_FLOAT16;
@@ -208,12 +210,14 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& map
     restoreImageLayout(map, auxImg);
 }
 
-void VirtualTerrainSerializer::Deserialize(const std::shared_ptr<TerrainVirtualMap>& virtualMap)
+void VirtualTerrainSerializer::Deserialize(const std::shared_ptr<TerrainVirtualMap>& virtualMap, VirtualTextureType type)
 {
-    std::ifstream tabCache = std::ifstream(virtualMap->getSpecification().Filepath.Table);
+    VirtualTextureLocation filepath = virtualMap->getTypeLocation(type);
+
+    std::ifstream tabCache = std::ifstream(filepath.Table);
     uint32_t size, mip, worldOffset;
     size_t binOffset;
 
     while (tabCache >> size >> mip >> worldOffset >> binOffset)
-        virtualMap->addChunkProperty(getChunkID(worldOffset, mip), { binOffset, size });
+        virtualMap->addChunkFileOffset(getChunkID(worldOffset, mip), binOffset);
 }

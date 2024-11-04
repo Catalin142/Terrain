@@ -14,7 +14,6 @@
 #include <fstream>
 #include <execution>
 
-
 TerrainVirtualMap::TerrainVirtualMap(const VirtualTerrainMapSpecification& spec) : m_Specification(spec)
 {
     m_Specification.LODCount = glm::clamp(m_Specification.LODCount, 0u, MAX_LOD);
@@ -51,7 +50,6 @@ TerrainVirtualMap::TerrainVirtualMap(const VirtualTerrainMapSpecification& spec)
     availableSlots *= availableSlots;
     for (int32_t slot = 0; slot < availableSlots; slot++)
         m_AvailableSlots.insert(slot);
-
     m_LastSlotChunk.resize(availableSlots);
 
     createCompute();
@@ -81,16 +79,29 @@ void TerrainVirtualMap::updateVirtualMap(const std::vector<TerrainChunk>& chunks
         // check for nodes that need to be loaded
         if (m_ActiveNodes.find(chunkHashValue) == m_ActiveNodes.end())
         {
-            int32_t avSlot = m_LastChunkSlot[chunkHashValue];
+            m_ActiveNodes.insert(chunkHashValue);
+            int32_t avSlot = -1;
+
+            if (m_LastChunkSlot.find(chunkHashValue) != m_LastChunkSlot.end())
+                avSlot = m_LastChunkSlot.at(chunkHashValue);
 
             // check if the node may be already in the map but unloaded, if so, just remeber id
-            if (m_LastSlotChunk[avSlot] == chunkHashValue)
-            {
+            if (avSlot != -1 && m_LastSlotChunk.at(avSlot) == chunkHashValue)
                 m_AvailableSlots.erase(avSlot);
-                m_ActiveNodes.insert(chunkHashValue);
-            }
             else
-                DynamicVirtualTerrainDeserializer::Get()->pushLoadTask(this, chunkHashValue, m_Specification.Filepath, m_ChunkProperties[chunkHashValue]);
+            {
+                assert(m_AvailableSlots.size() != 0);
+
+                int32_t availableLoc = *m_AvailableSlots.begin();
+                m_AvailableSlots.erase(availableLoc);
+
+                // Cache
+                m_LastChunkSlot[chunkHashValue] = availableLoc;
+                m_LastSlotChunk[availableLoc] = chunkHashValue;
+
+                DynamicVirtualTerrainDeserializer::Get()->pushLoadTask(chunkHashValue, packOffset(chunk.Offset.x, chunk.Offset.y),
+                    VirtualTextureType::HEIGHT);
+            }
         }
     }
 
@@ -111,12 +122,8 @@ void TerrainVirtualMap::refreshNodes()
     }
 }
 
-void TerrainVirtualMap::blitNode(NodeData& nodeData, VkCommandBuffer cmdBuffer, const std::shared_ptr<VulkanBuffer>& StagingBuffer)
+uint32_t TerrainVirtualMap::blitNode(size_t chunk, VkCommandBuffer cmdBuffer, const std::shared_ptr<VulkanBuffer>& StagingBuffer)
 {
-    if (m_ActiveNodes.find(nodeData.Node) != m_ActiveNodes.end())
-        return;
-    m_ActiveNodes.insert(nodeData.Node);
-
     VkImageSubresourceRange imgSubresource{};
     imgSubresource.aspectMask = m_PhysicalTexture->getSpecification().Aspect;
     imgSubresource.layerCount = 1;
@@ -125,15 +132,8 @@ void TerrainVirtualMap::blitNode(NodeData& nodeData, VkCommandBuffer cmdBuffer, 
 
     int32_t iChunkSize = (int32_t)m_Specification.ChunkSize;
 
-    assert(m_AvailableSlots.size() != 0);
-
-    int32_t availableLoc = *m_AvailableSlots.begin();
-    m_AvailableSlots.erase(availableLoc);
-
-    // Cache
-    m_LastChunkSlot[nodeData.Node] = availableLoc;
-    m_LastSlotChunk[availableLoc] = nodeData.Node;
-
+    int32_t availableLoc = m_LastChunkSlot[chunk];
+    
     int32_t slotsPerRow = m_Specification.PhysicalTextureSize / m_Specification.ChunkSize;
     int32_t x = availableLoc / slotsPerRow;
     int32_t y = availableLoc % slotsPerRow;
@@ -143,11 +143,18 @@ void TerrainVirtualMap::blitNode(NodeData& nodeData, VkCommandBuffer cmdBuffer, 
         glm::uvec2(x * iChunkSize, y * iChunkSize));
     VkUtils::transitionImageLayout(cmdBuffer, m_PhysicalTexture->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
 
+    return packOffset(x, y);
 }
 
-void TerrainVirtualMap::addChunkProperty(size_t chunk, const OnFileChunkProperties& prop)
+void TerrainVirtualMap::addChunkFileOffset(size_t chunk, uint32_t prop)
 {
     m_ChunkProperties[chunk] = prop;
+}
+
+uint32_t TerrainVirtualMap::getChunkFileOffset(size_t chunk)
+{
+    assert(m_ChunkProperties.find(chunk) != m_ChunkProperties.end());
+    return m_ChunkProperties[chunk];
 }
 
 void TerrainVirtualMap::createCompute()

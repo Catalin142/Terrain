@@ -38,7 +38,6 @@ VulkanApp::VulkanApp(const std::string& title, uint32_t width, uint32_t height) 
 
 void VulkanApp::onCreate()
 {
-	DynamicVirtualTerrainDeserializer::Get()->Initialize();
 	CommandBuffer = std::make_shared<VulkanRenderCommandBuffer>(true);
 
 	{
@@ -127,16 +126,18 @@ void VulkanApp::onCreate()
 	createFinalPass();
 
 	VirtualTerrainMapSpecification spec{};
-	spec.Filepath.Data = "heightData.tc";
-	spec.Filepath.Table = "heightTable.tb";
+	spec.Filepaths[VirtualTextureType::HEIGHT].Data = "heightData.tc";
+	spec.Filepaths[VirtualTextureType::HEIGHT].Table = "heightTable.tb";
 	spec.Format = VK_FORMAT_R16_SFLOAT;
 	spec.PhysicalTextureSize = 1024;
 	VirtualMap = std::make_shared<TerrainVirtualMap>(spec);
 
-	VirtualTerrainSerializer::Deserialize(VirtualMap);
+	VirtualTerrainSerializer::Deserialize(VirtualMap, VirtualTextureType::HEIGHT);
 
 	m_HeightMapDescriptor = ImGui_ImplVulkan_AddTexture(m_Sampler->Get(),
-		VirtualMap->m_IndirectionTexture->getVkImageView(), VK_IMAGE_LAYOUT_GENERAL);
+		VirtualMap->m_PhysicalTexture->getVkImageView(), VK_IMAGE_LAYOUT_GENERAL);
+
+	DynamicVirtualTerrainDeserializer::Get()->Initialize(VirtualMap);
 }
 
 void VulkanApp::onUpdate()
@@ -270,10 +271,10 @@ void VulkanApp::onUpdate()
 	}
 
 	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_O))
-		VirtualTerrainSerializer::Serialize(m_TerrainGenerator->getHeightMap(), VirtualMap->getSpecification());
+		VirtualTerrainSerializer::Serialize(m_TerrainGenerator->getHeightMap(), VirtualMap->getSpecification(), VirtualTextureType::HEIGHT);
 	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_P))
 	{
-		VirtualTerrainSerializer::Deserialize(VirtualMap);
+		VirtualTerrainSerializer::Deserialize(VirtualMap, VirtualTextureType::HEIGHT);
 	}
 	VirtualMap->updateVirtualMap(m_Terrain->getQuadTreeVisitedNodes());
 
