@@ -4,10 +4,10 @@
 
 struct LoadedNode
 {
-    int32_t virtualLocation;
-    int32_t physicalLocation;
-    int32_t mip;
-    int32_t padding;
+    uint32_t virtualLocation;
+    uint32_t physicalLocation;
+    uint32_t mip;
+    uint32_t padding;
 };
 
 struct VirtualMapProperties

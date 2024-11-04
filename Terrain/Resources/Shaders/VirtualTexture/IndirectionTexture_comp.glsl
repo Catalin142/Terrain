@@ -7,9 +7,9 @@ layout (binding = 0, r32ui) uniform writeonly uimage2D indirectionTexture[6];
 
 struct LoadedNode
 {
-    int virtualLocation;
-    int physicalLocation;
-    int mip;
+    uint virtualLocation;
+    uint physicalLocation;
+    uint mip;
 };
 
 layout(set = 1, binding = 0) uniform NodesUniformBuffer
@@ -41,11 +41,11 @@ void main()
     // idk how to avoid this, we can't index with not constant in glsl
     switch (node.mip) 
     {
-        case 0: imageStore(indirectionTexture[0], texel, uvec4(node.mip, 0u, 0u, 0u)); break;
-        case 1: imageStore(indirectionTexture[1], texel, uvec4(node.mip, 0u, 0u, 0u)); break;
-        case 2: imageStore(indirectionTexture[2], texel, uvec4(node.mip, 0u, 0u, 0u)); break;
-        case 3: imageStore(indirectionTexture[3], texel, uvec4(node.mip, 0u, 0u, 0u)); break;
-        case 4: imageStore(indirectionTexture[4], texel, uvec4(node.mip, 0u, 0u, 0u)); break;
-        case 5: imageStore(indirectionTexture[5], texel, uvec4(node.mip, 0u, 0u, 0u)); break;
+        case 0: imageStore(indirectionTexture[0], texel, uvec4(node.physicalLocation, 0u, 0u, 0u)); break;
+        case 1: imageStore(indirectionTexture[1], texel, uvec4(node.physicalLocation, 0u, 0u, 0u)); break;
+        case 2: imageStore(indirectionTexture[2], texel, uvec4(node.physicalLocation, 0u, 0u, 0u)); break;
+        case 3: imageStore(indirectionTexture[3], texel, uvec4(node.physicalLocation, 0u, 0u, 0u)); break;
+        case 4: imageStore(indirectionTexture[4], texel, uvec4(node.physicalLocation, 0u, 0u, 0u)); break;
+        case 5: imageStore(indirectionTexture[5], texel, uvec4(node.physicalLocation, 0u, 0u, 0u)); break;
     }
 }

@@ -10,6 +10,12 @@ static uint32_t packOffset(uint32_t x, uint32_t y)
     return xOffset | yOffset;
 }
 
+static void unpackOffset(uint32_t offset, uint32_t& x, uint32_t& y)
+{
+    x = offset & 0x0000ffff;
+    y = (offset & 0xffff0000) >> 16;
+}
+
 static size_t getChunkID(uint32_t offsetX, uint32_t offsetY, uint32_t mip)
 {
     return hash(packOffset(offsetX, offsetY), mip);

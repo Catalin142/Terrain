@@ -24,7 +24,7 @@ void DynamicVirtualTerrainDeserializer::Initialize(const std::shared_ptr<Terrain
     m_LoadThread = std::thread([&]() -> void {
         while (m_ThreadRunning)
         {
-            ChunkLoadTask task;
+            NodeData task;
             // the main thread pushes tasks
             {
                 std::lock_guard<std::mutex> lock(m_TaskMutex);
@@ -56,13 +56,13 @@ void DynamicVirtualTerrainDeserializer::Shutdown()
     delete[] m_TextureDataBuffer;
 }
 
-void DynamicVirtualTerrainDeserializer::pushLoadTask(size_t node, uint32_t virtualLocation, VirtualTextureType type)
+void DynamicVirtualTerrainDeserializer::pushLoadTask(size_t node, uint32_t virtualLocation, uint32_t mip, VirtualTextureType type)
 {
     std::lock_guard<std::mutex> lock(m_TaskMutex);
-    m_LoadTasks.push({ node, virtualLocation, type });
+    m_LoadTasks.push({ node, virtualLocation, mip, type });
 }
 
-void DynamicVirtualTerrainDeserializer::loadChunk(const ChunkLoadTask& task)
+void DynamicVirtualTerrainDeserializer::loadChunk(NodeData task)
 {
     VirtualTextureLocation location = m_VirtualMap->getTypeLocation(task.Type);
 
@@ -74,10 +74,6 @@ void DynamicVirtualTerrainDeserializer::loadChunk(const ChunkLoadTask& task)
 
     uint32_t fileOffset = m_VirtualMap->getChunkFileOffset(task.Node);
 
-    NodeData ntb;
-    ntb.Node = task.Node;
-    ntb.VirtualLocation = task.VirtualLocation;
-
     {
         std::lock_guard<std::mutex> lock(m_SlotsMutex);
         // at this stage, small map, we won't ever load that many chunks at the time
@@ -87,15 +83,15 @@ void DynamicVirtualTerrainDeserializer::loadChunk(const ChunkLoadTask& task)
             assert(false);
         }
 
-        ntb.MemoryIndex = m_AvailableSlots.front();
+        task.MemoryIndex = m_AvailableSlots.front();
         m_AvailableSlots.pop();
         m_OccupiedSlots++;
     }
     m_FileHandlerCache[location.Data]->seekg(fileOffset, std::ios::beg);
-    m_FileHandlerCache[location.Data]->read(&m_TextureDataBuffer[ntb.MemoryIndex * m_TextureDataStride], m_TextureDataStride);
+    m_FileHandlerCache[location.Data]->read(&m_TextureDataBuffer[task.MemoryIndex * m_TextureDataStride], m_TextureDataStride);
 
     std::lock_guard<std::mutex> lock(m_DataMutex);
-    m_NodesToBlit.push_back(ntb);
+    m_NodesToBlit.push_back(task);
 }
 
 void DynamicVirtualTerrainDeserializer::Refresh()
@@ -132,20 +128,16 @@ void DynamicVirtualTerrainDeserializer::Refresh()
                 m_AvailableSlots.push(nd.MemoryIndex);
                 m_OccupiedSlots--;
             }
+
+            nodes.push_back(LoadedNode{nd.VirtualLocation, physicalLocation, nd.Mip, 0 });
         }
 
         VkUtils::endSingleTimeCommand(cmdBuffer);
     }
 
-    //VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
-    //
-    //nodes.push_back(LoadedNode{ (int)packOffset(128, 256), (int)packOffset(1024, 2048), 0 });
-    //nodes.push_back(LoadedNode{ (int)packOffset(1024, 256), (int)packOffset(612, 2048), 1 });
-    //nodes.push_back(LoadedNode{ (int)packOffset(128, 0), (int)packOffset(1024, 612), 3 });
-    //
-    //m_VirtualMap->updateIndirectionTexture(cmdBuffer, nodes);
-    //
-    //VkUtils::endSingleTimeCommand(cmdBuffer);
+    VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
+    m_VirtualMap->updateIndirectionTexture(cmdBuffer, nodes);
+    VkUtils::endSingleTimeCommand(cmdBuffer);
 
     m_NodesToBlit.clear();
 }

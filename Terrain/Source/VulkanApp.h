@@ -38,23 +38,6 @@ struct CameraCompParams
 	float fov;
 };
 
-struct noiseParams
-{
-	int32_t octaves = 1;
-	float amplitude = 0.5f;
-	float frequency = 0.0f;
-	float gain = 0.5f;
-	float lacunarity = 2.0f;
-	float padding[2];
-};
-
-struct nodeParams
-{
-	glm::vec2 position;
-	glm::vec2 size;
-	int lod;
-};
-
 class VulkanApp : public Application
 {
 public:

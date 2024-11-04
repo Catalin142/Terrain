@@ -100,7 +100,7 @@ void TerrainVirtualMap::updateVirtualMap(const std::vector<TerrainChunk>& chunks
                 m_LastSlotChunk[availableLoc] = chunkHashValue;
 
                 DynamicVirtualTerrainDeserializer::Get()->pushLoadTask(chunkHashValue, packOffset(chunk.Offset.x, chunk.Offset.y),
-                    VirtualTextureType::HEIGHT);
+                    mip, VirtualTextureType::HEIGHT);
             }
         }
     }

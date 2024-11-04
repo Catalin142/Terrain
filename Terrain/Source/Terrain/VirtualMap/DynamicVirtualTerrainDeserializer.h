@@ -13,18 +13,13 @@
 // TODO: fix the case when we load more than 128
 #define MAX_CHUNKS_LOADING_PER_FRAME 128
 
-struct ChunkLoadTask
-{
-	size_t Node;
-	uint32_t VirtualLocation;
-	VirtualTextureType Type;
-};
-
 struct NodeData
 {
 	size_t Node;
 	uint32_t VirtualLocation;
-	uint32_t MemoryIndex;
+	uint32_t Mip;
+	VirtualTextureType Type;
+	uint32_t MemoryIndex = 0;
 };
 
 // we only need one instance of this class that will work on only one instance of virtual map
@@ -44,8 +39,8 @@ public:
 	// on refresh, every loaded node gets blited to it s destination virtual map 
 	void Refresh();
 
-	void loadChunk(const ChunkLoadTask& task);
-	void pushLoadTask(size_t node, uint32_t virtualLocation, VirtualTextureType type);
+	void loadChunk(NodeData task);
+	void pushLoadTask(size_t node, uint32_t virtualLocation, uint32_t mip, VirtualTextureType type);
 
 private:
 	// Do we need this to be singleton? Maybe create a vm terrain manager to manage the loading and unloading and everything on a update cycle
@@ -61,7 +56,7 @@ private:
 	bool m_ThreadRunning = true;
 
 	std::vector<NodeData> m_NodesToBlit;
-	std::queue<ChunkLoadTask> m_LoadTasks;
+	std::queue<NodeData> m_LoadTasks;
 
 	std::vector<std::shared_ptr<VulkanBuffer>> m_BufferPool;
 
