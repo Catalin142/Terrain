@@ -6,6 +6,7 @@
 #include <iostream>
 #include <algorithm>
 #include <cassert>
+#include <Terrain/VirtualMap/DynamicVirtualTerrainDeserializer.h>
 
 VulkanSwapchain::~VulkanSwapchain()
 {
@@ -295,9 +296,9 @@ void VulkanSwapchain::endFrame()
 	VkSubmitInfo submitInfo{};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	
-	VkSemaphore waitSemaphores[] = { getImageAvailableSemaphore(m_currentFrameIndex) };
+	VkSemaphore waitSemaphores[] = { getImageAvailableSemaphore(m_currentFrameIndex), DynamicVirtualTerrainDeserializer::Get()->hahah };
 	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-	submitInfo.waitSemaphoreCount = 1;
+	submitInfo.waitSemaphoreCount = 2;
 	submitInfo.pWaitSemaphores = waitSemaphores;
 	submitInfo.pWaitDstStageMask = waitStages;
 	submitInfo.commandBufferCount = 1;

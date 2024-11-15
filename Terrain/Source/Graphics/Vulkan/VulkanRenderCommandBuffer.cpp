@@ -107,7 +107,6 @@ void VulkanRenderCommandBuffer::End()
 		assert(false);
 }
 
-static std::mutex queueMutex;
 void VulkanRenderCommandBuffer::Submit()
 {
 	if (m_OwnedBySwapchain)

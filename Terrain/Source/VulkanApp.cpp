@@ -112,7 +112,6 @@ void VulkanApp::onCreate()
 		m_Sampler = std::make_shared<VulkanSampler>(SamplerSpecification{});
 
 		TerrainGUI = std::make_shared<TerrainGenerationGUI>(m_TerrainGenerator, m_Terrain, 300, ImVec2(1290.0f, 10.0f));
-		m_TerrainRenderer = std::make_shared<TerrainRenderer>(m_Output, m_Terrain);
 	}
 
 	{
@@ -122,6 +121,8 @@ void VulkanApp::onCreate()
 		terrainQuadProps.LodDistance = 32;
 		terrainQuadTree = new TerrainQuadTree(terrainQuadProps);
 	}
+
+	VirtualTerrainSerializer::Init();
 
 	createFinalPass();
 
@@ -134,10 +135,14 @@ void VulkanApp::onCreate()
 
 	VirtualTerrainSerializer::Deserialize(VirtualMap, VirtualTextureType::HEIGHT);
 
-	m_HeightMapDescriptor = ImGui_ImplVulkan_AddTexture(m_Sampler->Get(),
-		VirtualMap->m_PhysicalTexture->getVkImageView(), VK_IMAGE_LAYOUT_GENERAL);
+
+	m_Terrain->tvm = VirtualMap;
+
+	m_TerrainRenderer = std::make_shared<TerrainRenderer>(m_Output, m_Terrain);
 
 	DynamicVirtualTerrainDeserializer::Get()->Initialize(VirtualMap);
+	m_HeightMapDescriptor = ImGui_ImplVulkan_AddTexture(m_Sampler->Get(),
+		VirtualMap->m_PhysicalTexture->getVkImageView(), VK_IMAGE_LAYOUT_GENERAL);
 }
 
 void VulkanApp::onUpdate()
@@ -185,6 +190,13 @@ void VulkanApp::onUpdate()
 		m_TerrainRenderer->setWireframe(false);
 
 	terrainQuadTree->insertPlayer({ cam.getPosition().x, cam.getPosition().z });
+
+	std::vector<TerrainChunk> chunksToRender = m_Terrain->getChunksToRender(glm::vec3(0.0f, 0.0f, 0.0f));
+
+	m_Terrain->tvm->updateVirtualMap(m_Terrain->getQuadTreeVisitedNodes());
+	DynamicVirtualTerrainDeserializer::Get()->Refresh();
+
+	uint32_t m_CurrentFrame = VulkanRenderer::getCurrentFrame();
 
 	{
 		CommandBuffer->Begin();
@@ -276,9 +288,6 @@ void VulkanApp::onUpdate()
 	{
 		VirtualTerrainSerializer::Deserialize(VirtualMap, VirtualTextureType::HEIGHT);
 	}
-	VirtualMap->updateVirtualMap(m_Terrain->getQuadTreeVisitedNodes());
-
-	DynamicVirtualTerrainDeserializer::Get()->Refresh();
 }
 
 void VulkanApp::onResize()

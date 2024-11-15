@@ -16,12 +16,14 @@
 
 TerrainVirtualMap::TerrainVirtualMap(const VirtualTerrainMapSpecification& spec) : m_Specification(spec)
 {
+    int32_t availableSlots = m_Specification.PhysicalTextureSize / m_Specification.ChunkSize;
+
     m_Specification.LODCount = glm::clamp(m_Specification.LODCount, 0u, MAX_LOD);
 
     {
         VulkanImageSpecification physicalTextureSpecification{};
-        physicalTextureSpecification.Width = m_Specification.PhysicalTextureSize;
-        physicalTextureSpecification.Height = m_Specification.PhysicalTextureSize;
+        physicalTextureSpecification.Width = m_Specification.PhysicalTextureSize + availableSlots * 2; // Each slots takes 2 pixels padding
+        physicalTextureSpecification.Height = m_Specification.PhysicalTextureSize + availableSlots * 2;
         physicalTextureSpecification.Format = m_Specification.Format;
         physicalTextureSpecification.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
         physicalTextureSpecification.UsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
@@ -46,7 +48,6 @@ TerrainVirtualMap::TerrainVirtualMap(const VirtualTerrainMapSpecification& spec)
         m_IndirectionTexture->Create();
     }
 
-    int32_t availableSlots = m_Specification.PhysicalTextureSize / m_Specification.ChunkSize;
     availableSlots *= availableSlots;
     for (int32_t slot = 0; slot < availableSlots; slot++)
         m_AvailableSlots.insert(slot);
@@ -124,13 +125,7 @@ void TerrainVirtualMap::refreshNodes()
 
 uint32_t TerrainVirtualMap::blitNode(size_t chunk, VkCommandBuffer cmdBuffer, const std::shared_ptr<VulkanBuffer>& StagingBuffer)
 {
-    VkImageSubresourceRange imgSubresource{};
-    imgSubresource.aspectMask = m_PhysicalTexture->getSpecification().Aspect;
-    imgSubresource.layerCount = 1;
-    imgSubresource.levelCount = 1;
-    imgSubresource.baseMipLevel = 0;
-
-    int32_t iChunkSize = (int32_t)m_Specification.ChunkSize;
+    int32_t iChunkSize = (int32_t)m_Specification.ChunkSize + 2;
 
     int32_t availableLoc = m_LastChunkSlot[chunk];
     
@@ -138,10 +133,8 @@ uint32_t TerrainVirtualMap::blitNode(size_t chunk, VkCommandBuffer cmdBuffer, co
     int32_t x = availableLoc / slotsPerRow;
     int32_t y = availableLoc % slotsPerRow;
 
-    VkUtils::transitionImageLayout(cmdBuffer, m_PhysicalTexture->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    m_PhysicalTexture->copyBuffer(cmdBuffer, *StagingBuffer->getBaseBuffer(), 0, glm::uvec2(m_Specification.ChunkSize, m_Specification.ChunkSize), 
+    m_PhysicalTexture->copyBuffer(cmdBuffer, *StagingBuffer->getBaseBuffer(), 0, glm::uvec2(iChunkSize, iChunkSize),
         glm::uvec2(x * iChunkSize, y * iChunkSize));
-    VkUtils::transitionImageLayout(cmdBuffer, m_PhysicalTexture->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
 
     return packOffset(x, y);
 }
@@ -199,4 +192,24 @@ void TerrainVirtualMap::updateIndirectionTexture(VkCommandBuffer cmdBuffer, std:
         VulkanRenderer::dispatchCompute(cmdBuffer, m_IndirectionTextureUpdatePass, { 1, 1, 1 },
             sizeof(VirtualMapProperties), &m_VMProps);
     }
+}
+
+void TerrainVirtualMap::prepareForDeserialization(VkCommandBuffer cmdBuffer)
+{
+    VkImageSubresourceRange imgSubresource{};
+    imgSubresource.aspectMask = m_PhysicalTexture->getSpecification().Aspect;
+    imgSubresource.layerCount = 1;
+    imgSubresource.levelCount = 1;
+    imgSubresource.baseMipLevel = 0;
+    VkUtils::transitionImageLayout(cmdBuffer, m_PhysicalTexture->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+}
+
+void TerrainVirtualMap::prepareForRendering(VkCommandBuffer cmdBuffer)
+{
+    VkImageSubresourceRange imgSubresource{};
+    imgSubresource.aspectMask = m_PhysicalTexture->getSpecification().Aspect;
+    imgSubresource.layerCount = 1;
+    imgSubresource.levelCount = 1;
+    imgSubresource.baseMipLevel = 0;
+    VkUtils::transitionImageLayout(cmdBuffer, m_PhysicalTexture->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
 }

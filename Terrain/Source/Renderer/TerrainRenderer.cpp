@@ -7,6 +7,7 @@
 #include "Graphics/Vulkan/VulkanUtils.h"
 
 #include <cassert>
+#include <Terrain/VirtualMap/DynamicVirtualTerrainDeserializer.h>
 
 struct LODComputeConstants
 {
@@ -121,8 +122,12 @@ void TerrainRenderer::createQuadRenderPass()
 		DescriptorSet->bindInput(0, 3, 0, m_LODMap);
 		DescriptorSet->bindInput(1, 0, 0, m_TerrainSampler);
 		DescriptorSet->bindInput(1, 1, 0, m_Terrain->getHeightMap());
-		DescriptorSet->bindInput(1, 2, 0, m_Terrain->getCompositionMap());
-		DescriptorSet->bindInput(1, 3, 0, m_Terrain->getNormalMap());
+		for (uint32_t i = 0; i < MAX_LOD; i++)
+		{
+			DescriptorSet->bindInput(1, 2, i, m_Terrain->getIndirectionTexture(), (uint32_t)i);
+		}
+		DescriptorSet->bindInput(1, 3, 0, m_Terrain->getCompositionMap());
+		DescriptorSet->bindInput(1, 4, 0, m_Terrain->getNormalMap());
 		DescriptorSet->bindInput(2, 0, 0, m_Terrain->getTerrainTextures());
 		DescriptorSet->bindInput(2, 1, 0, m_Terrain->getNormalTextures());
 		DescriptorSet->bindInput(2, 2, 0, m_NoiseMap);
@@ -213,7 +218,7 @@ void TerrainRenderer::createCirclePipeline()
 
 void TerrainRenderer::renderTerrain(const Camera& camera)
 {
-	std::vector<TerrainChunk> chunksToRender = m_Terrain->getChunksToRender(camera.getPosition());
+	std::vector<TerrainChunk> chunksToRender = m_Terrain->getChunksToRender(glm::vec3(0.0f, 0.0f, 0.0f));
 
 	uint32_t m_CurrentFrame = VulkanRenderer::getCurrentFrame();
 

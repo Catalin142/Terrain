@@ -40,7 +40,6 @@ struct VirtualTerrainMapSpecification
 	uint32_t VirtualTextureSize = 1024;
 	uint32_t ChunkSize = 128;
 
-	// Must be <more than >= 128
 	uint32_t IndirectionTextureSize = 64;
 	
 	uint32_t PhysicalTextureSize = 2048;
@@ -80,6 +79,9 @@ public:
 
 	void updateIndirectionTexture(VkCommandBuffer cmdBuffer, std::vector<LoadedNode>& nodes);
 
+	void prepareForDeserialization(VkCommandBuffer cmdBuffer);
+	void prepareForRendering(VkCommandBuffer cmdBuffer);
+
 private:
 	void refreshNodes();
 	void createCompute();
@@ -90,12 +92,12 @@ private:
 	// Hash(Offset, Mip)
 	std::unordered_map<size_t, uint32_t> m_ChunkProperties;
 
-	// I Kepp a cache of the last Slot a Chunk occupied and the last chunk in a specified slot
+	// I keep a cache of the last Slot a Chunk occupied and the last chunk in a specified slot
 	std::unordered_map<size_t, int32_t> m_LastChunkSlot;
 	std::vector<size_t> m_LastSlotChunk;
 
 	std::unordered_set<size_t> m_ActiveNodes;
-	std::unordered_set<int32_t> m_AvailableSlots;
+	std::set<int32_t> m_AvailableSlots;
 
 	std::unordered_set<size_t> m_NodesToUnload;
 

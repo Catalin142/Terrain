@@ -14,9 +14,14 @@ public:
 	VulkanComputePipeline(const std::shared_ptr<VulkanShader>& shader, uint32_t pushConstantSize = 0);
 	~VulkanComputePipeline();
 
-	void bufferMemoryBarrier(const std::shared_ptr<VulkanRenderCommandBuffer>& cmdBuffer, const std::shared_ptr<VulkanBaseBuffer>& buffer, 
+	static void bufferMemoryBarrier(const std::shared_ptr<VulkanRenderCommandBuffer>& cmdBuffer, const std::shared_ptr<VulkanBaseBuffer>& buffer, 
 		VkAccessFlagBits from, VkAccessFlagBits to);
-	void imageMemoryBarrier(const std::shared_ptr<VulkanRenderCommandBuffer>& cmdBuffer, const std::shared_ptr<VulkanImage>& image,
+	static void imageMemoryBarrier(const std::shared_ptr<VulkanRenderCommandBuffer>& cmdBuffer, const std::shared_ptr<VulkanImage>& image,
+		VkAccessFlagBits from, VkPipelineStageFlags fromStage, VkAccessFlagBits to, VkPipelineStageFlags toStage);
+
+	static void bufferMemoryBarrier(VkCommandBuffer cmdBuffer, const std::shared_ptr<VulkanBaseBuffer>& buffer,
+		VkAccessFlagBits from, VkAccessFlagBits to);
+	static void imageMemoryBarrier(VkCommandBuffer cmdBuffer, const std::shared_ptr<VulkanImage>& image,
 		VkAccessFlagBits from, VkPipelineStageFlags fromStage, VkAccessFlagBits to, VkPipelineStageFlags toStage);
 
 	VkPipeline getVkPipeline() { return m_Pipeline; }

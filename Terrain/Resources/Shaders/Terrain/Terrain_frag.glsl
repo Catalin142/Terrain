@@ -10,8 +10,8 @@ layout(location = 0) out vec4 outColor;
 precision highp float;
 
 layout (set = 1, binding = 0) uniform sampler terrainSampler;
-layout (set = 1, binding = 2, r8ui) uniform readonly uimage2D Composition;
-layout (set = 1, binding = 3) uniform texture2D normalMap;
+layout (set = 1, binding = 3, r8ui) uniform readonly uimage2D Composition;
+layout (set = 1, binding = 4) uniform texture2D normalMap;
 
 layout (set = 2, binding = 0) uniform sampler2DArray texturePack;
 layout (set = 2, binding = 1) uniform sampler2DArray normalPack;

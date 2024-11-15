@@ -35,8 +35,9 @@ layout(set = 0, binding = 2) uniform CameraPositionBuffer
 } cameraInfo;
 
 layout (set = 1, binding = 0) uniform sampler terrainSampler;
+
 layout (set = 1, binding = 1) uniform texture2D heightMap;
-layout (set = 1, binding = 3) uniform texture2D normalMap;
+layout (set = 1, binding = 2, r32ui) uniform readonly uimage2D indirectionTexture[6];
 
 void main() 
 {

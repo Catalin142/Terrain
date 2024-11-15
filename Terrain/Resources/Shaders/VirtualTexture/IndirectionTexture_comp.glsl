@@ -23,7 +23,7 @@ layout (push_constant) uniform VirtualMapProperties
     int loadedNodesCount;
 } props;
 
-layout(local_size_x = 8, local_size_y = 1) in;
+layout(local_size_x = 64, local_size_y = 1) in;
 void main()
 {
     if (gl_GlobalInvocationID.x >= props.loadedNodesCount)

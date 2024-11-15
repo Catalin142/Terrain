@@ -5,6 +5,7 @@ namespace VkUtils
 {
 	VkCommandBuffer beginSingleTimeCommand();
 	void endSingleTimeCommand(VkCommandBuffer buffer);
+	void endSingleTimeCommand(VkCommandBuffer buffer, VkSubmitInfo info);
 	void flushCommandBuffer(VkCommandBuffer buffer);
 	
 	void transitionImageLayout(VkImage image, VkImageSubresourceRange subresourceRange, VkImageLayout oldLayout, VkImageLayout newLayout,

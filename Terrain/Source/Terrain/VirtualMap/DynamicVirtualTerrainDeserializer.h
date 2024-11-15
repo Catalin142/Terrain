@@ -8,7 +8,7 @@
 #include <unordered_map>
 
 // Data gets laoded to the virtual map in batches (for each batch i allocate a vulkan buffer to hold data)
-#define LOAD_BATCH_SIZE 8
+#define LOAD_BATCH_SIZE 16
 
 // TODO: fix the case when we load more than 128
 #define MAX_CHUNKS_LOADING_PER_FRAME 128
@@ -41,6 +41,9 @@ public:
 
 	void loadChunk(NodeData task);
 	void pushLoadTask(size_t node, uint32_t virtualLocation, uint32_t mip, VirtualTextureType type);
+
+	inline static std::shared_ptr<VulkanImage> auxImg;
+	VkSemaphore hahah;
 
 private:
 	// Do we need this to be singleton? Maybe create a vm terrain manager to manage the loading and unloading and everything on a update cycle

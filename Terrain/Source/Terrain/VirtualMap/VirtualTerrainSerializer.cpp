@@ -81,16 +81,13 @@ static void restoreImageLayout(std::shared_ptr<VulkanImage> src, std::shared_ptr
     VkUtils::flushCommandBuffer(cmdBuffer);
 }
 
-// The virtual map may be bigger than we can fit in memory, we need to combine multiple data from the file into one image
-void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& map, const VirtualTerrainMapSpecification& spec,
-    VirtualTextureType type, glm::uvec2 worldOffset, bool purgeContent)
+void VirtualTerrainSerializer::Init()
 {
-    std::shared_ptr<VulkanImage> auxImg;
     {
         VulkanImageSpecification auxSpecification{};
-        auxSpecification.Width = spec.ChunkSize;
-        auxSpecification.Height = spec.ChunkSize;
-        auxSpecification.Format = map->getSpecification().Format;
+        auxSpecification.Width = 128 + 2;
+        auxSpecification.Height = 128 + 2;
+        auxSpecification.Format = VK_FORMAT_R16_SFLOAT;
         auxSpecification.UsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
         auxSpecification.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
         auxSpecification.MemoryType = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
@@ -100,7 +97,12 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& map
         auxImg = std::make_shared<VulkanImage>(auxSpecification);
         auxImg->Create();
     }
+}
 
+// The virtual map may be bigger than we can fit in memory, we need to combine multiple data from the file into one image
+void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& map, const VirtualTerrainMapSpecification& spec,
+    VirtualTextureType type, glm::uvec2 worldOffset, bool purgeContent)
+{
     VkDevice device = VulkanDevice::getVulkanDevice();
 
     VkImageSubresourceRange imgSubresource{};
@@ -117,6 +119,7 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& map
     prepareImageLayout(map, auxImg);
 
     {
+        // MEMORY ALIGMENT
         // Map memory once
         VkDeviceMemory memory = auxImg->getVkDeviceMemory();
         const char* data = nullptr;
@@ -133,7 +136,6 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& map
         VkSubresourceLayout layout;
         vkGetImageSubresourceLayout(device, auxImg->getVkImage(), &subresource, &layout);
 
-        const char* imageData = data + layout.offset;
 
         std::ofstream tableOut;
         std::ofstream imgCacheOut;
@@ -151,9 +153,12 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& map
             imgCacheOut = std::ofstream(filepath.Data, std::ios::binary | std::ios::app);
         }
 
-        uint32_t size = spec.ChunkSize * spec.ChunkSize * SIZE_OF_FLOAT16;
+        VkMemoryRequirements memRequirements;
+        vkGetImageMemoryRequirements(VulkanDevice::getVulkanDevice(), auxImg->getVkImage(), &memRequirements);
+        uint32_t size = 130 * 130 * 2;
         size_t binOffset = 0;
 
+        // TODO: all
         // Serialize each mip 
         for (uint32_t mip = 0; mip < spec.LODCount; mip++)
         {
@@ -162,6 +167,8 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& map
             for (int32_t y = 0; y < currentSize / spec.ChunkSize; y++)
                 for (int32_t x = 0; x < currentSize / spec.ChunkSize; x++)
                 {
+                    const char* imageData = data + layout.offset;
+                    memset((void*)imageData, 0, layout.size);
                     VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
 
                     // Blit portion of heightmap to dstImage
@@ -169,14 +176,30 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& map
 
                     int32_t iChunkSize = spec.ChunkSize;
 
-                    blit.srcOffsets[0] = { x * iChunkSize, y * iChunkSize, 0 };
-                    blit.srcOffsets[1] = { (x + 1) * iChunkSize, (y + 1) * iChunkSize, 1 };
+                    blit.srcOffsets[0] = { glm::max(x * iChunkSize - 1, 0), glm::max(y * iChunkSize - 1, 0), 0};
+                    blit.srcOffsets[1] = { glm::min((x + 1) * iChunkSize + 1, int32_t(currentSize)), glm::min((y + 1) * iChunkSize + 1, int32_t(currentSize)), 1 };
                     blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
                     blit.srcSubresource.mipLevel = mip;
                     blit.srcSubresource.baseArrayLayer = 0;
                     blit.srcSubresource.layerCount = 1;
-                    blit.dstOffsets[0] = { 0, 0, 0 };
-                    blit.dstOffsets[1] = { iChunkSize, iChunkSize, 1 };
+
+                    int32_t startX1 = 0, startY1 = 0;
+                    int32_t startX2 = iChunkSize + 2, startY2 = iChunkSize + 2;
+
+                    if (x * iChunkSize - 1 < 0)
+                        startX1 = 1;
+
+                    if (y * iChunkSize - 1 < 0)
+                        startY1 = 1;
+
+                    if ((x + 1) * iChunkSize + 1 > currentSize)
+                        startX2 = iChunkSize + 1;
+
+                    if ((y + 1) * iChunkSize + 1 > currentSize)
+                        startY2 = iChunkSize + 1;
+
+                    blit.dstOffsets[0] = { startX1, startY1, 0 };
+                    blit.dstOffsets[1] = { startX2, startY2, 1 };
                     blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
                     blit.dstSubresource.mipLevel = 0;
                     blit.dstSubresource.baseArrayLayer = 0;
@@ -186,7 +209,7 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& map
                         map->getVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                         auxImg->getVkImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                         1, &blit,
-                        VK_FILTER_LINEAR);
+                        VK_FILTER_NEAREST);
 
                     VkUtils::flushCommandBuffer(cmdBuffer);
 
@@ -200,7 +223,19 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& map
 
                     binOffset += size;
 
-                    imgCacheOut.write(imageData, size);
+                    for (uint32_t y1 = 0; y1 < 130; y1++)
+                    {
+                        uint16_t* row = (uint16_t*)imageData;
+                        for (uint32_t x1 = 0; x1 < 130; x1++)
+                        {
+                            imgCacheOut.write((char*)row, 2);
+                            row++;
+                        }
+                        imageData += layout.rowPitch;
+                    }
+                    int r = -5;
+
+                    //imgCacheOut.write(imageData, size);
                 }
         }
 

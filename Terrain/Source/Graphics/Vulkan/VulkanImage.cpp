@@ -110,8 +110,8 @@ void VulkanImage::copyBuffer(VkCommandBuffer cmdBuffer, const VulkanBaseBuffer& 
 
 	VkBufferImageCopy region{};
 	region.bufferOffset = 0;
-	region.bufferRowLength = 0;
-	region.bufferImageHeight = 0;
+	region.bufferRowLength = extent.x;
+	region.bufferImageHeight = extent.y;
 
 	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	region.imageSubresource.mipLevel = 0;

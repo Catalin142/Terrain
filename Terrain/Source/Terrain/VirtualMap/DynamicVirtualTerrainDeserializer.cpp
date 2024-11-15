@@ -2,17 +2,41 @@
 
 #include "Graphics/Vulkan/VulkanUtils.h"
 #include "VMUtils.h"
+#include <Graphics/Vulkan/VulkanDevice.h>
 
 DynamicVirtualTerrainDeserializer* DynamicVirtualTerrainDeserializer::m_Instance = nullptr;
 
 void DynamicVirtualTerrainDeserializer::Initialize(const std::shared_ptr<TerrainVirtualMap>& vm)
 {
     m_VirtualMap = vm;
-    
-    uint32_t chunkSize = m_VirtualMap->getSpecification().ChunkSize;
-    m_TextureDataStride = chunkSize * chunkSize * SIZE_OF_FLOAT16;
 
-    // have room for 64 chunks at a time
+    {
+        VulkanImageSpecification auxSpecification{};
+        auxSpecification.Width = 130;
+        auxSpecification.Height = 130;
+        auxSpecification.Format = VK_FORMAT_R16_SFLOAT;
+        auxSpecification.UsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        auxSpecification.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+        auxSpecification.MemoryType = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+        auxSpecification.Tiling = VK_IMAGE_TILING_LINEAR;
+        auxSpecification.Mips = 1;
+
+        auxImg = std::make_shared<VulkanImage>(auxSpecification);
+        auxImg->Create();
+    }
+
+    VkMemoryRequirements memRequirements;
+    vkGetImageMemoryRequirements(VulkanDevice::getVulkanDevice(), auxImg->getVkImage(), &memRequirements);
+    VkDeviceSize imageSize = memRequirements.size;
+
+    VkSemaphoreCreateInfo semaphoreCreateInfo = {};
+    semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    if (vkCreateSemaphore(VulkanDevice::getVulkanDevice(), &semaphoreCreateInfo, nullptr, &hahah)) assert(false);
+
+    uint32_t chunkSize = m_VirtualMap->getSpecification().ChunkSize;
+    m_TextureDataStride = 130 * 130 * 2;
+
     m_TextureDataBuffer = new char[m_TextureDataStride * MAX_CHUNKS_LOADING_PER_FRAME];
     for (uint32_t i = 0; i < MAX_CHUNKS_LOADING_PER_FRAME; i++)
         m_AvailableSlots.push(i);
@@ -62,6 +86,8 @@ void DynamicVirtualTerrainDeserializer::pushLoadTask(size_t node, uint32_t virtu
     m_LoadTasks.push({ node, virtualLocation, mip, type });
 }
 
+// TODO: push in buffers and when we have 8 buffers, blit
+// If less than 8 we need, idk well see
 void DynamicVirtualTerrainDeserializer::loadChunk(NodeData task)
 {
     VirtualTextureLocation location = m_VirtualMap->getTypeLocation(task.Type);
@@ -96,6 +122,21 @@ void DynamicVirtualTerrainDeserializer::loadChunk(NodeData task)
 
 void DynamicVirtualTerrainDeserializer::Refresh()
 {
+    // TODO (urgent): modify this, don t run an empty commabd buffer each frame
+
+    VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &cmdBuffer;
+
+    submitInfo.pSignalSemaphores = &hahah;
+    submitInfo.signalSemaphoreCount = 1;
+
+    m_VirtualMap->prepareForDeserialization(cmdBuffer);
+    VkUtils::endSingleTimeCommand(cmdBuffer, submitInfo);
+
     if (m_NodesToBlit.size() == 0)
         return;
 
@@ -110,7 +151,9 @@ void DynamicVirtualTerrainDeserializer::Refresh()
 
         uint32_t endIndex = std::min(batch * LOAD_BATCH_SIZE + LOAD_BATCH_SIZE, (uint32_t)m_NodesToBlit.size());
 
-        for (uint32_t index = batch * LOAD_BATCH_SIZE; index < endIndex ; index++)
+        nodes.clear();
+
+        for (uint32_t index = batch * LOAD_BATCH_SIZE; index < endIndex ;index++)
         {
             uint32_t bufferIndex = index % LOAD_BATCH_SIZE;
 
@@ -123,6 +166,9 @@ void DynamicVirtualTerrainDeserializer::Refresh()
 
             uint32_t physicalLocation = m_VirtualMap->blitNode(nd.Node, cmdBuffer, m_BufferPool[bufferIndex]);
 
+            auxImg->copyBuffer(cmdBuffer, *m_BufferPool[bufferIndex]->getBaseBuffer(), 0, glm::uvec2(130, 130),
+                glm::uvec2(0, 0));
+            
             {
                 std::lock_guard<std::mutex> lock(m_SlotsMutex);
                 m_AvailableSlots.push(nd.MemoryIndex);
@@ -132,12 +178,24 @@ void DynamicVirtualTerrainDeserializer::Refresh()
             nodes.push_back(LoadedNode{nd.VirtualLocation, physicalLocation, nd.Mip, 0 });
         }
 
-        VkUtils::endSingleTimeCommand(cmdBuffer);
+        m_VirtualMap->updateIndirectionTexture(cmdBuffer, nodes);
+
+        const uint64_t signalValue = 2; 
+        const uint64_t waitValue = 0; 
+
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &cmdBuffer;
+
+        submitInfo.pSignalSemaphores = &hahah;
+        submitInfo.signalSemaphoreCount = 1;
+
+        m_VirtualMap->prepareForRendering(cmdBuffer);
+
+        VkUtils::endSingleTimeCommand(cmdBuffer, submitInfo);
     }
 
-    VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
-    m_VirtualMap->updateIndirectionTexture(cmdBuffer, nodes);
-    VkUtils::endSingleTimeCommand(cmdBuffer);
 
     m_NodesToBlit.clear();
 }

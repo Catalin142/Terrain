@@ -1,6 +1,7 @@
 #pragma once
 
 #include "TerrainChunk.h"
+#include "VirtualMap/TerrainVirtualMap.h"
 #include "Graphics/Vulkan/VulkanImage.h"
 #include "Graphics/Vulkan/VulkanTexture.h"
 
@@ -64,11 +65,13 @@ public:
 	const std::shared_ptr<QuadTreeLOD>& getQuadTreeLODTechnique() { return m_QuadTreeLOD; }
 	const std::shared_ptr<SinkingLOD>& getSinkingCircleLODTechnique() { return m_SinkingCircleLOD; }
 
-
 	TerrainInfo getInfo() { return m_Specification.Info; }
 	void setHeightMultiplier(float mul) { m_Specification.Info.HeightMultiplier = mul; }
 
-	const std::shared_ptr<VulkanImage>& getHeightMap() { return m_Specification.HeightMap; }
+	std::shared_ptr<TerrainVirtualMap> tvm;
+
+	const std::shared_ptr<VulkanImage>& getHeightMap() { return tvm->m_PhysicalTexture; }
+	const std::shared_ptr<VulkanImage>& getIndirectionTexture() { return tvm->m_IndirectionTexture; }
 	const std::shared_ptr<VulkanImage>& getNormalMap() { return m_Specification.NormalMap; }
 	const std::shared_ptr<VulkanImage>& getCompositionMap() { return m_Specification.CompositionMap; }
 	const std::shared_ptr<VulkanTexture>& getTerrainTextures() { return m_Specification.TerrainTextures; }
