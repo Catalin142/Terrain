@@ -25,6 +25,7 @@
 #include "Terrain/Techniques/DistanceLOD.h"
 #include "Terrain/VirtualMap/DynamicVirtualTerrainDeserializer.h"
 #include "Terrain/VirtualMap/VirtualTerrainSerializer.h"
+#include "Terrain/VirtualMap/VMUtils.h"
 #include <backends/imgui_impl_vulkan.h>
 
 #include "GUI/ProfilerGUI.h"
@@ -145,6 +146,15 @@ void VulkanApp::onCreate()
 		VirtualMap->m_PhysicalTexture->getVkImageView(), VK_IMAGE_LAYOUT_GENERAL);
 }
 
+static bool CheckCollision(glm::vec2 onePos, int oneSize, glm::vec2 twoPos, int twoSize)
+{
+	bool collisionX = onePos.x + oneSize >= twoPos.x &&
+		twoPos.x + twoSize >= onePos.x;
+	bool collisionY = onePos.y + oneSize >= twoPos.y &&
+		twoPos.y + twoSize >= onePos.y;
+	return collisionX && collisionY;
+}
+
 void VulkanApp::onUpdate()
 {
 	glm::vec3 camVelocity{ 0.0f };
@@ -191,9 +201,62 @@ void VulkanApp::onUpdate()
 
 	terrainQuadTree->insertPlayer({ cam.getPosition().x, cam.getPosition().z });
 
-	std::vector<TerrainChunk> chunksToRender = m_Terrain->getChunksToRender(glm::vec3(0.0f, 0.0f, 0.0f));
+	//std::vector<TerrainChunk> chunksToRender = m_Terrain->getChunksToRender(glm::vec3(0.0f, 0.0f, 0.0f));
+	std::vector<TerrainChunk> chunksToRender;
 
-	m_Terrain->tvm->updateVirtualMap(m_Terrain->getQuadTreeVisitedNodes());
+	// TODO: Store lods in terrain
+	// world size 1024
+	std::vector<TerrainChunk> rings;
+	int32_t initialRingSize = 1024 / 8;
+	glm::vec2 posRing1 = glm::vec2(cam.getPosition().x - initialRingSize / 2 - 1, cam.getPosition().z - initialRingSize - 1);
+	initialRingSize *= 2;																			
+	glm::vec2 posRing2 = glm::vec2(cam.getPosition().x - initialRingSize / 2 - 1, cam.getPosition().z - initialRingSize - 1);
+	initialRingSize *= 2;																			
+	glm::vec2 posRing3 = glm::vec2(cam.getPosition().x - initialRingSize / 2 - 1, cam.getPosition().z - initialRingSize - 1);
+	initialRingSize *= 2;																			
+	glm::vec2 posRing4 = glm::vec2(cam.getPosition().x - initialRingSize / 2 - 1, cam.getPosition().z - initialRingSize - 1);
+
+	for (const auto& [offset, mip1] : VirtualMap->m_ChunkProperties)
+	{
+		// get position
+		uint32_t xu, yu;
+		unpackOffset(VirtualMap->m_ChunkPosition[offset], xu, yu);
+
+
+		uint32_t mip = VirtualMap->m_ChunkMip[offset];
+
+		// mip1: 128, mip2: 256, mip3: 512, mip4: 1024
+		uint32_t size = 128 * (1 << mip);
+
+		xu *= size;
+		yu *= size;
+
+		switch (mip)
+		{
+		case 0:
+			if (CheckCollision(posRing1, 129, { xu, yu }, size))
+				chunksToRender.push_back(TerrainChunk{ { xu, yu }, size, 1 });
+			break;
+
+		case 1:
+			if (CheckCollision(posRing2, 257, { xu, yu }, size))
+				chunksToRender.push_back(TerrainChunk{ { xu, yu }, size, 2 });
+			break;
+
+		case 2:
+			if (CheckCollision(posRing3, 513, { xu, yu }, size))
+				chunksToRender.push_back(TerrainChunk{ { xu, yu }, size, 4 });
+			break;
+
+		case 3:
+			if (CheckCollision(posRing4, 1025, { xu, yu }, size))
+				chunksToRender.push_back(TerrainChunk{ { xu, yu }, size, 8 });
+			break;
+		}
+
+	}
+
+	m_Terrain->tvm->updateVirtualMap(chunksToRender);
 	DynamicVirtualTerrainDeserializer::Get()->Refresh();
 
 	uint32_t m_CurrentFrame = VulkanRenderer::getCurrentFrame();

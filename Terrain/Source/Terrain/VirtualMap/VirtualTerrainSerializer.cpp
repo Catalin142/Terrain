@@ -186,11 +186,11 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& map
                     int32_t startX1 = 0, startY1 = 0;
                     int32_t startX2 = iChunkSize + 2, startY2 = iChunkSize + 2;
 
-                    if (x * iChunkSize - 1 < 0)
-                        startX1 = 1;
-
-                    if (y * iChunkSize - 1 < 0)
-                        startY1 = 1;
+                    //if (x * iChunkSize - 1 < 0)
+                    //    startX1 = 1;
+                    //
+                    //if (y * iChunkSize - 1 < 0)
+                    //    startY1 = 1;
 
                     if ((x + 1) * iChunkSize + 1 > currentSize)
                         startX2 = iChunkSize + 1;
@@ -254,5 +254,9 @@ void VirtualTerrainSerializer::Deserialize(const std::shared_ptr<TerrainVirtualM
     size_t binOffset;
 
     while (tabCache >> size >> mip >> worldOffset >> binOffset)
+    {
         virtualMap->addChunkFileOffset(getChunkID(worldOffset, mip), binOffset);
+        virtualMap->m_ChunkPosition[getChunkID(worldOffset, mip)] = worldOffset;
+        virtualMap->m_ChunkMip[getChunkID(worldOffset, mip)] = mip;
+    }
 }

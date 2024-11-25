@@ -82,6 +82,12 @@ public:
 	void prepareForDeserialization(VkCommandBuffer cmdBuffer);
 	void prepareForRendering(VkCommandBuffer cmdBuffer);
 
+	// Hash(Offset, Mip)
+	// TODO( hard refactor )
+	std::unordered_map<size_t, uint32_t> m_ChunkProperties;
+	std::unordered_map<size_t, size_t> m_ChunkPosition;
+	std::unordered_map<size_t, size_t> m_ChunkMip;
+
 private:
 	void refreshNodes();
 	void createCompute();
@@ -89,8 +95,6 @@ private:
 private:
 	VirtualTerrainMapSpecification m_Specification;
 
-	// Hash(Offset, Mip)
-	std::unordered_map<size_t, uint32_t> m_ChunkProperties;
 
 	// I keep a cache of the last Slot a Chunk occupied and the last chunk in a specified slot
 	std::unordered_map<size_t, int32_t> m_LastChunkSlot;
