@@ -41,6 +41,8 @@ static VkDescriptorType getInputType(const ShaderInputType& type)
 	{
 	case ShaderInputType::UNIFORM_BUFFER: return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	case ShaderInputType::UNIFORM_BUFFER_SET: return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	case ShaderInputType::STORAGE_BUFFER: return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	case ShaderInputType::STORAGE_BUFFER_SET: return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	case ShaderInputType::COMBINED_IMAGE_SAMPLER: return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	case ShaderInputType::TEXTURE: return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
 	case ShaderInputType::SAMPLER: return VK_DESCRIPTOR_TYPE_SAMPLER;
@@ -432,6 +434,23 @@ std::vector<ShaderInput> VulkanShaderCompiler::Reflect(ShaderStage stage, const 
 		sampleImageInput.Type = ShaderInputType::STORAGE_IMAGE;
 
 		shaderInput.push_back(sampleImageInput);
+	}
+
+	for (const spirv_cross::Resource& storageBuffer : resources.storage_buffers)
+	{
+		ShaderInput storageBufferInput;
+		storageBufferInput.Stage = stage;
+		storageBufferInput.DebugName = storageBuffer.name;
+		storageBufferInput.Set = compiler.get_decoration(storageBuffer.id, spv::DecorationDescriptorSet);
+		storageBufferInput.Binding = compiler.get_decoration(storageBuffer.id, spv::DecorationBinding);
+		storageBufferInput.Count = compiler.get_type(storageBuffer.type_id).array[0] == 0 ? 1 : compiler.get_type(storageBuffer.type_id).array[0];
+
+		if (storageBuffer.name.find("Set") != std::string::npos)
+			storageBufferInput.Type = ShaderInputType::STORAGE_BUFFER_SET;
+		else
+			storageBufferInput.Type = ShaderInputType::STORAGE_BUFFER;
+
+		shaderInput.push_back(storageBufferInput);
 	}
 
 	return shaderInput;

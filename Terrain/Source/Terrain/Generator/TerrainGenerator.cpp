@@ -4,7 +4,13 @@
 
 TerrainGenerator::TerrainGenerator(uint32_t width, uint32_t height) : m_Width(width), m_Height(height)
 {
-	m_UniformBuffer = std::make_shared<VulkanUniformBuffer>((uint32_t)sizeof(glm::vec4));
+	{
+		VulkanBufferProperties uniformBufferProperties;
+		uniformBufferProperties.Size = (uint32_t)sizeof(glm::vec4);
+		uniformBufferProperties.Type = BufferType::UNIFORM_BUFFER;
+		uniformBufferProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
+		m_UniformBuffer = std::make_shared<VulkanBuffer>(uniformBufferProperties);
+	}
 	createShaders();
 	createImages();
 	createCompute();
@@ -75,7 +81,7 @@ void TerrainGenerator::runHydraulicErosion(const std::shared_ptr<VulkanRenderCom
 	t = ((float)rand() / (float)RAND_MAX) * 17323.0f;
 	r = ((float)rand() / (float)RAND_MAX) * 238727.0f;
 	glm::vec2 a{ t, r };
-	m_UniformBuffer->setData(&a, sizeof(glm::vec2));
+	m_UniformBuffer->setDataCPU(&a, sizeof(glm::vec2));
 
 	{
 		HydraulicSimulations += 1024;

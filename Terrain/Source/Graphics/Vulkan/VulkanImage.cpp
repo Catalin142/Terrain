@@ -95,14 +95,14 @@ void VulkanImage::Release()
 	m_DeviceMemory = nullptr;
 }
 
-void VulkanImage::copyBuffer(const VulkanBaseBuffer& buffer, uint32_t layer, const glm::uvec2& srcExtent, const glm::uvec2& offset)
+void VulkanImage::copyBuffer(const VulkanBuffer& buffer, uint32_t layer, const glm::uvec2& srcExtent, const glm::uvec2& offset)
 {
 	VkCommandBuffer commandBuffer = VkUtils::beginSingleTimeCommand();
 	copyBuffer(commandBuffer, buffer, layer, offset);
 	VkUtils::endSingleTimeCommand(commandBuffer);
 }
 
-void VulkanImage::copyBuffer(VkCommandBuffer cmdBuffer, const VulkanBaseBuffer& buffer, uint32_t layer, const glm::uvec2& srcExtent, const glm::uvec2& offset)
+void VulkanImage::copyBuffer(VkCommandBuffer cmdBuffer, const VulkanBuffer& buffer, uint32_t layer, const glm::uvec2& srcExtent, const glm::uvec2& offset)
 {
 	glm::uvec2 extent = glm::uvec2(srcExtent);
 	if (srcExtent.x == 0 || srcExtent.y == 0)
@@ -110,8 +110,8 @@ void VulkanImage::copyBuffer(VkCommandBuffer cmdBuffer, const VulkanBaseBuffer& 
 
 	VkBufferImageCopy region{};
 	region.bufferOffset = 0;
-	region.bufferRowLength = extent.x;
-	region.bufferImageHeight = extent.y;
+	region.bufferRowLength = 0;
+	region.bufferImageHeight = 0;
 
 	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	region.imageSubresource.mipLevel = 0;
@@ -132,6 +132,18 @@ void VulkanImage::copyBuffer(VkCommandBuffer cmdBuffer, const VulkanBaseBuffer& 
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 		1,
 		&region
+	);
+}
+
+void VulkanImage::batchCopyBuffer(VkCommandBuffer cmdBuffer, const VulkanBuffer& buffer, const std::vector<VkBufferImageCopy>& regions)
+{
+	vkCmdCopyBufferToImage(
+		cmdBuffer,
+		buffer.getBuffer(),
+		m_Image,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		regions.size(),
+		regions.data()
 	);
 }
 

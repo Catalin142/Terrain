@@ -20,34 +20,8 @@
 #include <string>
 
 #define INVALID_SLOT -1
-#define MAX_LOD 6u
 
-enum class VirtualTextureType
-{
-	HEIGHT,
-	NORMAL,
-	COMPOSITION,
-};
-
-struct VirtualTextureLocation
-{
-	std::string Data;
-	std::string Table;
-};
-
-struct VirtualTerrainMapSpecification
-{
-	uint32_t VirtualTextureSize = 1024;
-	uint32_t ChunkSize = 128;
-
-	uint32_t IndirectionTextureSize = 64;
-	
-	uint32_t PhysicalTextureSize = 2048;
-	uint32_t LODCount = 4; 
-	VkFormat Format;
-
-	std::unordered_map<VirtualTextureType, VirtualTextureLocation> Filepaths;
-};
+class DynamicVirtualTerrainDeserializer;
 
 // offline - reads data from disk
 // we should have only one instance that includes all terrain virtual textures.
@@ -56,58 +30,63 @@ class TerrainVirtualMap
 {
 public:
 	TerrainVirtualMap(const VirtualTerrainMapSpecification& spec);
-	~TerrainVirtualMap() {}
 
 	const VirtualTerrainMapSpecification& getSpecification() {
 		return m_Specification;
 	}
 
-	const VirtualTextureLocation& getTypeLocation(const VirtualTextureType& type) {
-		return m_Specification.Filepaths[type];
-	}
+	void pushLoadTasks(const std::vector<TerrainChunk>& chunks);
+	// this is best to keep in a separate command buffer, and start the main command buffer just after this finishes
+	void updateVirtualMap(VkCommandBuffer cmdBuffer);
 
-	void updateVirtualMap(const std::vector<TerrainChunk>& chunks);
+	void blitNodes(VkCommandBuffer cmdBuffer, const std::shared_ptr<VulkanBuffer>& StagingBuffer, const std::vector<VkBufferImageCopy>& regions);
 
-	// Return location on physical texture where the node got blited
-	uint32_t blitNode(size_t chunk, VkCommandBuffer cmdBuffer, const std::shared_ptr<VulkanBuffer>& StagingBuffer);
+	const std::shared_ptr<VulkanImage>& getPhysicalTexture() { return m_PhysicalTexture; }
+	const std::shared_ptr<VulkanImage>& getIndirectionTexture() { return m_IndirectionTexture; }
+	const std::shared_ptr<VulkanImage>& getLoadStatusTexture() { return m_StatusTexture; }
 
-	void addChunkFileOffset(size_t chunk, uint32_t offset);
-	uint32_t getChunkFileOffset(size_t chunk);
+	void addVirtualChunkProperty(size_t chunk, const VirtualTerrainChunkProperties& props);
 
-	std::shared_ptr<VulkanImage> m_PhysicalTexture;
-	std::shared_ptr<VulkanImage> m_IndirectionTexture;
-
-	void updateIndirectionTexture(VkCommandBuffer cmdBuffer, std::vector<LoadedNode>& nodes);
+	void updateResources(VkCommandBuffer cmdBuffer);
 
 	void prepareForDeserialization(VkCommandBuffer cmdBuffer);
 	void prepareForRendering(VkCommandBuffer cmdBuffer);
 
-	// Hash(Offset, Mip)
-	// TODO( hard refactor )
-	std::unordered_map<size_t, uint32_t> m_ChunkProperties;
-	std::unordered_map<size_t, size_t> m_ChunkPosition;
-	std::unordered_map<size_t, size_t> m_ChunkMip;
+	void getChunksToLoad(const glm::vec2& camPosition, std::vector<TerrainChunk>& chunks);
 
 private:
-	void refreshNodes();
-	void createCompute();
+	void createIndirectionResources();
+	void createStatusResources();
+
+	void updateIndirectionTexture(VkCommandBuffer cmdBuffer);
+	void updateStatusTexture(VkCommandBuffer cmdBuffer);
 
 private:
+	std::shared_ptr<VulkanImage> m_PhysicalTexture;
+
 	VirtualTerrainMapSpecification m_Specification;
-
+	std::unordered_map<size_t, VirtualTerrainChunkProperties> m_ChunkProperties;
 
 	// I keep a cache of the last Slot a Chunk occupied and the last chunk in a specified slot
 	std::unordered_map<size_t, int32_t> m_LastChunkSlot;
 	std::vector<size_t> m_LastSlotChunk;
 
 	std::unordered_set<size_t> m_ActiveNodes;
-	std::set<int32_t> m_AvailableSlots;
+	std::unordered_set<int32_t> m_AvailableSlots;
 
 	std::unordered_set<size_t> m_NodesToUnload;
 
-	std::shared_ptr<VulkanComputePass> m_IndirectionTextureUpdatePass;
-	std::shared_ptr<VulkanUniformBuffer> m_LoadedNodesUB;
-	VirtualMapProperties m_VMProps{ };
+	std::shared_ptr<VulkanImage> m_IndirectionTexture;
+	std::shared_ptr<VulkanComputePass> m_UpdateIndirectionComputePass;
+	std::shared_ptr<VulkanBuffer> m_IndirectionNodesStorage;
+	std::vector<GPUIndirectionNode> m_IndirectionNodes;
+
+	std::shared_ptr<VulkanImage> m_StatusTexture;
+	std::shared_ptr<VulkanComputePass> m_UpdateStatusComputePass;
+	std::shared_ptr<VulkanBuffer> m_StatusNodesStorage;
+	std::vector<GPUStatusNode> m_StatusNodes;
+
+	std::shared_ptr<DynamicVirtualTerrainDeserializer> m_Deserializer;
+
+	// TODO(if needed): hold a metadata storage buffer and hold the node index in a texture
 };
-
-

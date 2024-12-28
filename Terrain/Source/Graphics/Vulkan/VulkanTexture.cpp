@@ -6,6 +6,8 @@
 
 #include "stb_image/stb_image.h"
 #include <cassert>
+#include <vector>
+#include <memory>
 
 VkFormat getFormat(uint32_t channels)
 {
@@ -35,7 +37,7 @@ VulkanTexture::~VulkanTexture()
 
 void VulkanTexture::loadTextures()
 {
-	std::vector<std::shared_ptr<VulkanBaseBuffer>> stagingBuffers;
+	std::vector<std::shared_ptr<VulkanBuffer>> stagingBuffers;
 
 	for (uint32_t layer = 0; layer < m_Specification.LayerCount; layer++)
 	{
@@ -77,17 +79,18 @@ void VulkanTexture::loadTextures()
 		if (!pixels)
 			assert(false);
 
-		BufferProperties stagingBufferProps;
-		stagingBufferProps.bufferSize = (uint32_t)imageSize;
-		stagingBufferProps.Usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-		stagingBufferProps.MemProperties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		VulkanBufferProperties imageBufferProperties;
+		imageBufferProperties.Size = (uint32_t)imageSize;
+		imageBufferProperties.Type = BufferType::TRANSFER_SRC_BUFFER | BufferType::TRANSFER_DST_BUFFER;
+		imageBufferProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
 
-		stagingBuffers.push_back(std::make_shared<VulkanBaseBuffer>(stagingBufferProps));
+		stagingBuffers.push_back(std::make_shared<VulkanBuffer>(imageBufferProperties));
 
-		void* data;
-		stagingBuffers.back()->Map(data);
-		memcpy(data, pixels, static_cast<size_t>(imageSize));
-		stagingBuffers.back()->Unmap();
+		std::shared_ptr<VulkanBuffer>& lastBuffer = stagingBuffers.back();
+
+		lastBuffer->Map();
+		memcpy(lastBuffer->getMappedData(), pixels, static_cast<size_t>(imageSize));
+		lastBuffer->Unmap();
 
 		stbi_image_free(pixels);
 	}

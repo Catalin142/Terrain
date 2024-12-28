@@ -175,3 +175,29 @@ void VulkanRenderer::dispatchCompute(VkCommandBuffer cmd, const std::shared_ptr<
 	}
 }
 
+void VulkanRenderer::dispatchCompute(VkCommandBuffer commandBuffer, 
+	const std::shared_ptr<VulkanComputePipeline>& computePipeline, const std::shared_ptr<VulkanDescriptorSet>& descriptorSet, 
+	glm::ivec3 workgroups, uint32_t pushConstantSize, void* data)
+{
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline->getVkPipeline());
+
+	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline->getVkPipelineLayout(),
+		0, descriptorSet->getNumberOfSets(),
+		descriptorSet->getDescriptorSet(VulkanRenderer::getCurrentFrame()).data(), 0, nullptr);
+
+	if (pushConstantSize != 0)
+		vkCmdPushConstants(commandBuffer, computePipeline->getVkPipelineLayout(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
+			pushConstantSize, data);
+
+	vkCmdDispatch(commandBuffer, workgroups.x, workgroups.y, workgroups.z);
+
+	VkSubmitInfo submitInfo{};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+	{
+		std::lock_guard<std::mutex> lock(queueMutex);
+		if (vkQueueSubmit(VulkanDevice::getVulkanContext()->getComputeQueue(), 1, &submitInfo, nullptr) != VK_SUCCESS)
+			assert(false);
+	}
+}
+

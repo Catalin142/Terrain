@@ -5,7 +5,6 @@
 #include <array>
 
 #include "Core/Application.h"
-#include "Graphics/Vulkan/VulkanUniformBuffer.h"
 #include "Graphics/Vulkan/VulkanTexture.h"
 #include "Graphics/Vulkan/VulkanBuffer.h"
 #include "Graphics/Vulkan/VulkanVertexBufferLayout.h"
@@ -76,4 +75,17 @@ private:
 
 	std::thread* thread;
 	bool presed = false;
+
+
+	std::shared_ptr<VulkanComputePass> m_QuadPass;
+	std::shared_ptr<VulkanBuffer> m_TempA;
+	std::shared_ptr<VulkanBuffer> m_TempB;
+	std::shared_ptr<VulkanBuffer> m_TempAux;
+	std::shared_ptr<VulkanBufferSet> m_FinalResult;
+	std::shared_ptr<VulkanBuffer> m_PassMetadata;
+
+	std::shared_ptr<VulkanComputePass> m_IndirectPass;
+	std::shared_ptr<VulkanBuffer> m_DrawIndirect;
+
+	void createQuadPass();
 };

@@ -6,6 +6,7 @@
 #include "Graphics/Vulkan/VulkanUtils.h"
 #include "Graphics/Vulkan/VulkanDevice.h"
 #include "Core/Hash.h"
+#include <Terrain/Terrain.h>
 
 static void prepareImageLayout(std::shared_ptr<VulkanImage> src, std::shared_ptr<VulkanImage> dst)
 {
@@ -81,8 +82,25 @@ static void restoreImageLayout(std::shared_ptr<VulkanImage> src, std::shared_ptr
     VkUtils::flushCommandBuffer(cmdBuffer);
 }
 
-void VirtualTerrainSerializer::Init()
+// The virtual map may be bigger than we can fit in memory, we need to combine multiple data from the file into one image
+void VirtualTerrainSerializer::Serialize(const std::shared_ptr<Terrain>& terrain, const VirtualTerrainMapSpecification& spec,
+    VirtualTextureType type, glm::uvec2 worldOffset, bool purgeContent)
 {
+    VkDevice device = VulkanDevice::getVulkanDevice();
+
+    VkImageSubresourceRange imgSubresource{};
+    VulkanImageSpecification texSpec = terrain->getHeightMap()->getSpecification();
+    imgSubresource.aspectMask = texSpec.Aspect;
+    imgSubresource.layerCount = texSpec.LayerCount;
+    imgSubresource.levelCount = texSpec.Mips;
+    imgSubresource.baseMipLevel = 0;
+
+    // Generate mips for heightmap
+    VkUtils::transitionImageLayout(terrain->getHeightMap()->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    terrain->getHeightMap()->generateMips();
+
+    std::shared_ptr<VulkanImage> auxImg;
+
     {
         VulkanImageSpecification auxSpecification{};
         auxSpecification.Width = 128 + 2;
@@ -97,26 +115,8 @@ void VirtualTerrainSerializer::Init()
         auxImg = std::make_shared<VulkanImage>(auxSpecification);
         auxImg->Create();
     }
-}
 
-// The virtual map may be bigger than we can fit in memory, we need to combine multiple data from the file into one image
-void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& map, const VirtualTerrainMapSpecification& spec,
-    VirtualTextureType type, glm::uvec2 worldOffset, bool purgeContent)
-{
-    VkDevice device = VulkanDevice::getVulkanDevice();
-
-    VkImageSubresourceRange imgSubresource{};
-    VulkanImageSpecification texSpec = map->getSpecification();
-    imgSubresource.aspectMask = texSpec.Aspect;
-    imgSubresource.layerCount = texSpec.LayerCount;
-    imgSubresource.levelCount = texSpec.Mips;
-    imgSubresource.baseMipLevel = 0;
-
-    // Generate mips for heightmap
-    VkUtils::transitionImageLayout(map->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    map->generateMips();
-
-    prepareImageLayout(map, auxImg);
+    prepareImageLayout(terrain->getHeightMap(), auxImg);
 
     {
         // MEMORY ALIGMENT
@@ -135,7 +135,6 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& map
 
         VkSubresourceLayout layout;
         vkGetImageSubresourceLayout(device, auxImg->getVkImage(), &subresource, &layout);
-
 
         std::ofstream tableOut;
         std::ofstream imgCacheOut;
@@ -160,9 +159,9 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& map
 
         // TODO: all
         // Serialize each mip 
-        for (uint32_t mip = 0; mip < spec.LODCount; mip++)
+        for (uint32_t mip = 0; mip < terrain->getInfo().LodCount; mip++)
         {
-            uint32_t currentSize = map->getSpecification().Width >> mip;
+            uint32_t currentSize = terrain->getHeightMap()->getSpecification().Width >> mip;
 
             for (int32_t y = 0; y < currentSize / spec.ChunkSize; y++)
                 for (int32_t x = 0; x < currentSize / spec.ChunkSize; x++)
@@ -206,7 +205,7 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& map
                     blit.dstSubresource.layerCount = 1;
 
                     vkCmdBlitImage(cmdBuffer,
-                        map->getVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                        terrain->getHeightMap()->getVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                         auxImg->getVkImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                         1, &blit,
                         VK_FILTER_NEAREST);
@@ -216,6 +215,7 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& map
                     // Serialize to file
                     uint32_t worldOffsetPacked = packOffset(worldOffset.x + x, worldOffset.y + y);
 
+                    // TODO: don t write size in file, just at the beggining maybe
                     tableOut << size << " ";
                     tableOut << mip << " ";
                     tableOut << worldOffsetPacked << " ";
@@ -242,21 +242,17 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& map
         vkUnmapMemory(device, memory);
     }
 
-    restoreImageLayout(map, auxImg);
+    restoreImageLayout(terrain->getHeightMap(), auxImg);
 }
 
 void VirtualTerrainSerializer::Deserialize(const std::shared_ptr<TerrainVirtualMap>& virtualMap, VirtualTextureType type)
 {
-    VirtualTextureLocation filepath = virtualMap->getTypeLocation(type);
+    VirtualTextureLocation filepath = virtualMap->getSpecification().Filepaths.at(type);
 
     std::ifstream tabCache = std::ifstream(filepath.Table);
     uint32_t size, mip, worldOffset;
     size_t binOffset;
 
     while (tabCache >> size >> mip >> worldOffset >> binOffset)
-    {
-        virtualMap->addChunkFileOffset(getChunkID(worldOffset, mip), binOffset);
-        virtualMap->m_ChunkPosition[getChunkID(worldOffset, mip)] = worldOffset;
-        virtualMap->m_ChunkMip[getChunkID(worldOffset, mip)] = mip;
-    }
+        virtualMap->addVirtualChunkProperty(getChunkID(worldOffset, mip), { worldOffset, mip, binOffset });
 }

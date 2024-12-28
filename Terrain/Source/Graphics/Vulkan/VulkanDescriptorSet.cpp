@@ -17,18 +17,19 @@ VulkanDescriptorSet::~VulkanDescriptorSet()
 void VulkanDescriptorSet::Create()
 {
 	// ================== CREATE DESCRIPTOR POOL ==================
-	VkDescriptorPoolSize poolSizes[5] = 
+	VkDescriptorPoolSize poolSizes[6] = 
 	{
 		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 100 },
 		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100 },
 		{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 100 },
 		{ VK_DESCRIPTOR_TYPE_SAMPLER, 100 },
 		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 100 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 100 }
 	};
 
 	VkDescriptorPoolCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	createInfo.poolSizeCount = 5;
+	createInfo.poolSizeCount = 6;
 	createInfo.pPoolSizes = poolSizes;
 	createInfo.maxSets = 10;
 
@@ -40,6 +41,7 @@ void VulkanDescriptorSet::Create()
 	std::vector<VkDescriptorSetLayout> descriptorLayouts = m_Shader->getDescriptorSetLayouts();
 	m_DescriptorSets.resize(FRAMES_IN_FLIGHT);
 
+	// TODO(cata): not all shaders and pipelines need 2 descriptors
 	for (uint32_t frameIndex = 0; frameIndex < FRAMES_IN_FLIGHT; frameIndex++)
 	{
 		for (uint32_t currentSet = 0; currentSet < m_Shader->getNumberOfSets(); currentSet++)
@@ -69,27 +71,27 @@ void VulkanDescriptorSet::Create()
 	}
 }
 
-void VulkanDescriptorSet::bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanUniformBuffer>& buffer)
+void VulkanDescriptorSet::bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanBuffer>& buffer)
 {
 	VkDescriptorBufferInfo bufferInfo{};
 	bufferInfo.buffer = buffer->getBuffer();
 	bufferInfo.offset = 0;
 	bufferInfo.range = buffer->getSize();
 
-	m_DescriptorBindings.UniformBufferInfos[getHash(set, binding, index)] = bufferInfo;
+	m_DescriptorBindings.BufferInfos[getHash(set, binding, index)] = bufferInfo;
 }
 
-void VulkanDescriptorSet::bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanUniformBufferSet>& bufferSet)
+void VulkanDescriptorSet::bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanBufferSet>& bufferSet)
 {
-	for (uint32_t frame = 0; frame < bufferSet->getFrameCount(); frame++)
+	for (uint32_t i = 0; i < bufferSet->getCount(); i++)
 	{
 		VkDescriptorBufferInfo bufferInfo{};
 
-		bufferInfo.buffer = bufferSet->getBuffer(frame);
+		bufferInfo.buffer = bufferSet->getBuffer(i);
 		bufferInfo.offset = 0;
 		bufferInfo.range = bufferSet->getBufferSize();
 
-		m_DescriptorBindings.UniformBufferSetInfos[getHash(set, binding, index)].push_back(bufferInfo);
+		m_DescriptorBindings.BufferSetInfos[getHash(set, binding, index)].push_back(bufferInfo);
 	}
 }
 
@@ -142,12 +144,22 @@ VkWriteDescriptorSet VulkanDescriptorSet::getWriteDescriptorSet(const ShaderInpu
 	{
 	case ShaderInputType::UNIFORM_BUFFER:
 		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		descriptorWrite.pBufferInfo = &m_DescriptorBindings.UniformBufferInfos[getHash(input.Set, input.Binding, index)];
+		descriptorWrite.pBufferInfo = &m_DescriptorBindings.BufferInfos[getHash(input.Set, input.Binding, index)];
+		break;
+
+	case ShaderInputType::STORAGE_BUFFER:
+		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		descriptorWrite.pBufferInfo = &m_DescriptorBindings.BufferInfos[getHash(input.Set, input.Binding, index)];
 		break;
 
 	case ShaderInputType::UNIFORM_BUFFER_SET:
 		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		descriptorWrite.pBufferInfo = &m_DescriptorBindings.UniformBufferSetInfos[getHash(input.Set, input.Binding, index)][frame];
+		descriptorWrite.pBufferInfo = &m_DescriptorBindings.BufferSetInfos[getHash(input.Set, input.Binding, index)][frame];
+		break;
+
+	case ShaderInputType::STORAGE_BUFFER_SET:
+		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		descriptorWrite.pBufferInfo = &m_DescriptorBindings.BufferSetInfos[getHash(input.Set, input.Binding, index)][frame];
 		break;
 
 	case ShaderInputType::COMBINED_IMAGE_SAMPLER:

@@ -1,57 +1,170 @@
 #include "VulkanBuffer.h"
+
+#include "VulkanDevice.h"
+#include "VulkanUtils.h"
+
 #include <memory>
 #include <cassert>
 
-VkMemoryPropertyFlags getFlag(BufferUsage usage)
+static uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags memFlags)
 {
-	switch (usage)
-	{
-	case BufferUsage::STATIC: return VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-	case BufferUsage::DYNAMIC: return VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+	VkPhysicalDeviceMemoryProperties memProperties;
+	vkGetPhysicalDeviceMemoryProperties(VulkanDevice::getVulkanContext()->getGPU(), &memProperties);
+
+	for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+		if (typeFilter & (1 << i) && (memProperties.memoryTypes[i].propertyFlags & memFlags) == memFlags) {
+			return i;
+		}
 	}
+
+	assert(false);
+	return 0;
 }
 
-VulkanBuffer::VulkanBuffer(uint32_t size, BufferType type, BufferUsage usage) : m_Type(type), m_Usage(usage)
+static void createBuffer(VkBufferCreateInfo bufferInfo, VkBuffer& buffer, VkDeviceMemory& memory, VkMemoryPropertyFlags memFlags)
 {
-	BufferProperties vertexBufferProps;
-	vertexBufferProps.bufferSize = size;
-	vertexBufferProps.Usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | getUsage();
-	vertexBufferProps.MemProperties = getFlag(usage);
+	VkDevice vulkanDevice = VulkanDevice::getVulkanDevice();
 
-	m_Buffer = std::make_shared<VulkanBaseBuffer>(vertexBufferProps);
+	if (vkCreateBuffer(vulkanDevice, &bufferInfo, nullptr, &buffer) != VK_SUCCESS)
+		assert(false);
+
+	VkMemoryRequirements memRequirements;
+	vkGetBufferMemoryRequirements(vulkanDevice, buffer, &memRequirements);
+
+	VkMemoryAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocInfo.allocationSize = memRequirements.size;
+	allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, memFlags);
+
+	if (vkAllocateMemory(vulkanDevice, &allocInfo, nullptr, &memory) != VK_SUCCESS)
+		assert(false);
+
+	vkBindBufferMemory(vulkanDevice, buffer, memory, 0);
 }
 
-VulkanBuffer::VulkanBuffer(void* data, uint32_t size, BufferType type, BufferUsage usage) : m_Type(type), m_Usage(usage)
+VkMemoryPropertyFlags VulkanBuffer::getMemoryUsage()
 {
-	BufferProperties vertexBufferProps;
-	vertexBufferProps.bufferSize = size;
-	vertexBufferProps.Usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | getUsage();
-	vertexBufferProps.MemProperties = getFlag(usage);
+	VkMemoryPropertyFlags flags = 0x0;
 
-	m_Buffer = std::make_shared<VulkanBaseBuffer>(vertexBufferProps);
+	if (m_Properties.Usage & BufferMemoryUsage::BUFFER_ONLY_GPU)
+		flags |= VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
-	setData(data, size);
+	if (m_Properties.Usage & BufferMemoryUsage::BUFFER_CPU_CACHED)
+		flags |= VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+
+	if (m_Properties.Usage & BufferMemoryUsage::BUFFER_CPU_VISIBLE)
+		flags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+
+	if (m_Properties.Usage & BufferMemoryUsage::BUFFER_CPU_COHERENT)
+		flags |= VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+
+	return flags;
+}
+
+VkBufferUsageFlags VulkanBuffer::getUsage()
+{
+	VkBufferUsageFlags flags = 0x0;
+
+	if (m_Properties.Type & BufferType::VERTEX_BUFFER)
+		flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+
+	if (m_Properties.Type & BufferType::INDEX_BUFFER)
+		flags |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+
+	if (m_Properties.Type & BufferType::INDIRECT_BUFFER)
+		flags |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+
+	if (m_Properties.Type & BufferType::TRANSFER_DST_BUFFER)
+		flags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+	if (m_Properties.Type & BufferType::TRANSFER_SRC_BUFFER)
+		flags |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+
+	if (m_Properties.Type & BufferType::STORAGE_BUFFER)
+		flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+
+	if (m_Properties.Type & BufferType::UNIFORM_BUFFER)
+		flags |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+
+	return flags;
+}
+
+VulkanBuffer::VulkanBuffer(const VulkanBufferProperties& props) : m_Properties(props)
+{
+	VkBufferCreateInfo bufferInfo{};
+	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferInfo.size = m_Properties.Size;
+	bufferInfo.usage = getUsage();
+	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	createBuffer(bufferInfo, m_Buffer, m_DeviceMemory, getMemoryUsage());
+}
+
+VulkanBuffer::VulkanBuffer(void* data, const VulkanBufferProperties& props) : VulkanBuffer(props)
+{
+	setData(data, m_Properties.Size);
 }
 
 VulkanBuffer::~VulkanBuffer()
 {
+	VkDevice vulkanDevice = VulkanDevice::getVulkanDevice();
+
+	vkDestroyBuffer(vulkanDevice, m_Buffer, nullptr);
+	vkFreeMemory(vulkanDevice, m_DeviceMemory, nullptr);
+}
+
+void VulkanBuffer::setDataGPU(VkCommandBuffer cmdBuffer, void* data, uint32_t size)
+{
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingMemory;
+
+	VkBufferCreateInfo stagingInfo{};
+	stagingInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	stagingInfo.size = size;
+	stagingInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+	stagingInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	createBuffer(stagingInfo, stagingBuffer, stagingMemory, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+	void* stagingBufferData;
+
+	vkMapMemory(VulkanDevice::getVulkanDevice(), stagingMemory, 0, size, 0, &stagingBufferData);
+	memcpy(stagingBufferData, data, (size_t)size);
+	vkUnmapMemory(VulkanDevice::getVulkanDevice(), stagingMemory);
+
+	VkBufferCopy copyRegion{};
+	copyRegion.srcOffset = 0;
+	copyRegion.dstOffset = 0;
+	copyRegion.size = size;
+	vkCmdCopyBuffer(cmdBuffer, stagingBuffer, m_Buffer, 1, &copyRegion);
+}
+
+void VulkanBuffer::setDataGPU(void* data, uint32_t size)
+{
+	VkCommandBuffer buffer = VkUtils::beginSingleTimeCommand();
+	setDataGPU(buffer, data, size);
+	VkUtils::endSingleTimeCommand(buffer);
+}
+
+void VulkanBuffer::setDataCPU(VkCommandBuffer cmdBuffer, void* data, uint32_t size)
+{
+	vkCmdUpdateBuffer(cmdBuffer, m_Buffer, 0, size, data);
+}
+
+void VulkanBuffer::setDataCPU(void* data, uint32_t size)
+{
+	void* bufferData;
+	vkMapMemory(VulkanDevice::getVulkanDevice(), m_DeviceMemory, 0, m_Properties.Size, 0, &bufferData);
+	memcpy(bufferData, data, (size_t)size);
+	vkUnmapMemory(VulkanDevice::getVulkanDevice(), m_DeviceMemory);
 }
 
 void VulkanBuffer::setData(void* data, uint32_t size)
 {
-	switch (m_Usage)
-	{
-	case BufferUsage::STATIC:
-		setDataGPUBuffer(data, size);
-		return;
-
-	case BufferUsage::DYNAMIC:
-		setDataGPUCPUBuffer(data, size);
-		return;
-
-	default:
-		assert(false);
-	}
+	if (m_Properties.Usage & BufferMemoryUsage::BUFFER_ONLY_GPU)
+		setDataGPU(data, size);
+	else
+		setDataCPU(data, size);
 }
 
 void VulkanBuffer::setDataDirect(void* data, uint32_t size)
@@ -61,50 +174,33 @@ void VulkanBuffer::setDataDirect(void* data, uint32_t size)
 
 void VulkanBuffer::Map()
 {
-	m_Buffer->Map(m_MappedData);
+	vkMapMemory(VulkanDevice::getVulkanDevice(), m_DeviceMemory, 0, m_Properties.Size, 0, &m_MappedData);
 }
 
 void VulkanBuffer::Unmap()
 {
-	m_Buffer->Unmap();
+	vkUnmapMemory(VulkanDevice::getVulkanDevice(), m_DeviceMemory);
 	m_MappedData = nullptr;
 }
 
-void VulkanBuffer::setDataGPUBuffer(void* data, uint32_t size)
+VulkanBufferSet::VulkanBufferSet(uint32_t frameCount, const VulkanBufferProperties& props) : m_Size(props.Size)
 {
-	BufferProperties stagingBufferProps;
-	stagingBufferProps.bufferSize = size;
-	stagingBufferProps.Usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-	stagingBufferProps.MemProperties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-
-	VulkanBaseBuffer stagingBuffer(stagingBufferProps);
-
-	void* stagingBufferData;
-
-	stagingBuffer.Map(stagingBufferData);
-	memcpy(stagingBufferData, data, (size_t)size);
-	stagingBuffer.Unmap();
-
-	m_Buffer->Copy(stagingBuffer);
+	for (uint32_t index = 0; index < frameCount; index++)
+		m_Buffers.push_back(std::make_shared<VulkanBuffer>(props));
 }
 
-void VulkanBuffer::setDataGPUCPUBuffer(void* data, uint32_t size)
+uint32_t VulkanBufferSet::getCount()
 {
-	void* bufferData;
-	m_Buffer->Map(bufferData);
-	memcpy(bufferData, data, (size_t)size);
-	m_Buffer->Unmap();
+	return (uint32_t)m_Buffers.size();
 }
 
-VkBufferUsageFlags VulkanBuffer::getUsage()
+uint32_t VulkanBufferSet::getBufferSize()
 {
-	switch (m_Type)
-	{
-	case BufferType::VERTEX: return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-	case BufferType::INDEX: return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-	case BufferType::INDIRECT: return VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
-	case BufferType::TRANSFER_SRC: return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-	default: return VK_BUFFER_USAGE_FLAG_BITS_MAX_ENUM;
+	return m_Size;
+}
 
-	}
+VkBuffer VulkanBufferSet::getBuffer(uint32_t index)
+{
+	assert(index < (uint32_t)m_Buffers.size());
+	return m_Buffers[index]->getBuffer();
 }

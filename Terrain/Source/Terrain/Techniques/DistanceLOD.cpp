@@ -18,7 +18,7 @@ void DistanceLOD::getChunksToRender(std::vector<TerrainChunk>& chunks, const glm
 	uint32_t chunksPerRow = (uint32_t)m_TerrainSpecification.Info.TerrainSize.x / minimumChunkSize;
 	uint32_t currentLOD = 0;
 
-	for (LODRange& range : m_LODRanges)
+	/*for (LODRange& range : m_LODRanges)
 	{
 		range.CurrentCount = 0;
 		for (auto& currentChunk : m_Chunks)
@@ -29,11 +29,11 @@ void DistanceLOD::getChunksToRender(std::vector<TerrainChunk>& chunks, const glm
 			{
 				m_LodMap[(uint32_t(currentChunk.Offset.y) / minimumChunkSize) * chunksPerRow + (uint32_t(currentChunk.Offset.x) / minimumChunkSize)].LOD = range.LOD;
 				range.CurrentCount++;
-				chunks.push_back({ currentChunk.Offset, minimumChunkSize, range.LOD });
+				chunks.push_back({ currentChunk.Offset, range.LOD });
 			}
 		}
 		currentLOD++;
-	}
+	}*/
 }
 
 void DistanceLOD::Initialize()
@@ -46,11 +46,11 @@ void DistanceLOD::Initialize()
 	uint32_t gridSizeX = (uint32_t)m_TerrainSpecification.Info.TerrainSize.x;
 	uint32_t gridSizeY = (uint32_t)m_TerrainSpecification.Info.TerrainSize.y;
 
-	for (uint32_t xOffset = 0; xOffset < gridSizeX / chunkSize; xOffset++)
+	/*for (uint32_t xOffset = 0; xOffset < gridSizeX / chunkSize; xOffset++)
 		for (uint32_t yOffset = 0; yOffset < gridSizeY / chunkSize; yOffset++)
 		{
 			TerrainChunk& chunk = m_Chunks.emplace_back();
 			chunk.Offset.x = float(xOffset * chunkSize);
 			chunk.Offset.y = float(yOffset * chunkSize);
-		}
+		}*/
 }

@@ -5,7 +5,7 @@
 #include "Graphics/Vulkan/VulkanPipeline.h"
 #include "Graphics/Vulkan/VulkanPass.h"
 #include "Graphics/Vulkan/VulkanImage.h"
-#include "Graphics/Vulkan/VulkanUniformBuffer.h"
+#include "Graphics/Vulkan/VulkanBuffer.h"
 #include "Graphics/Vulkan/VulkanRenderCommandBuffer.h"
 
 #include "Scene/Camera.h"
@@ -37,10 +37,17 @@ public:
 
 	void setWireframe(bool wireframe);
 
+	inline static std::shared_ptr<VulkanBufferSet> m_TerrainChunksSet;
+
+	inline static std::shared_ptr<VulkanBuffer> m_IndirectDraw;
+
+	// set private
+	void initializeRenderPass();
+	const TerrainChunkIndexBuffer& getChunkIndexBufferLOD(uint8_t lod);
+
 private:
 	void initializeBuffers();
 
-	void initializeRenderPass();
 
 	void createQuadRenderPass();
 	void createQuadPipeline();
@@ -49,8 +56,6 @@ private:
 	void createCirclePipeline();
 
 	void renderTerrain(const Camera& camera);
-
-	const TerrainChunkIndexBuffer& getChunkIndexBufferLOD(uint8_t lod);
 
 private:
 	std::shared_ptr<Terrain> m_Terrain;
@@ -70,9 +75,8 @@ private:
 	std::shared_ptr<VulkanComputePass> m_LODMapComputePass;
 	//
 
-	std::shared_ptr<VulkanUniformBuffer> m_TerrainInfo;
-	std::shared_ptr<VulkanUniformBuffer> m_CameraInfo;
-	std::shared_ptr<VulkanUniformBufferSet> m_TerrainChunksSet;
+	std::shared_ptr<VulkanBuffer> m_TerrainInfo;
+	std::shared_ptr<VulkanBuffer> m_CameraInfo;
 
 	bool m_InWireframe = false;
 

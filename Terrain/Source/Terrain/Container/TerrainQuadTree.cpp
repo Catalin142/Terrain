@@ -8,76 +8,76 @@ TerrainQuadTreeNode::TerrainQuadTreeNode()
 
 TerrainChunk TerrainQuadTreeNode::getChildren(uint8_t i)
 {
-	if (i < 0 || i > 3) assert(false);
+	//if (i < 0 || i > 3) assert(false);
 	return m_Children[i];
 }
 
 void TerrainQuadTreeNode::Divide(std::vector<TerrainQuadTreeNode*> nodePool, uint32_t& currentPoolIndex)
 {
-	uint32_t childrenSize = Load.Size / 2u;
+	//uint32_t childrenSize = Load.Size / 2u;
 
-	glm::uvec2 childrenPositions[4] =
-	{
-		glm::uvec2(Load.Offset.x, Load.Offset.y), // bl
-		glm::uvec2(Load.Offset.x + Load.Size / 2u, Load.Offset.y), // br
-		glm::uvec2(Load.Offset.x, Load.Offset.y + Load.Size / 2u), // tl
-		glm::uvec2(Load.Offset.x + Load.Size / 2u, Load.Offset.y + Load.Size / 2u) // tr
-	};
+	//glm::uvec2 childrenPositions[4] =
+	//{
+	//	glm::uvec2(Load.Offset.x, Load.Offset.y), // bl
+	//	glm::uvec2(Load.Offset.x + Load.Size / 2u, Load.Offset.y), // br
+	//	glm::uvec2(Load.Offset.x, Load.Offset.y + Load.Size / 2u), // tl
+	//	glm::uvec2(Load.Offset.x + Load.Size / 2u, Load.Offset.y + Load.Size / 2u) // tr
+	//};
 
-	for (int i = 0; i < 4; i++)
-	{
-		m_Children[i].Size = childrenSize;
-		m_Children[i].Offset = childrenPositions[i];
-		m_Children[i].Lod = Load.Lod / 2;
-	}
+	//for (int i = 0; i < 4; i++)
+	//{
+	//	m_Children[i].Size = childrenSize;
+	//	m_Children[i].Offset = childrenPositions[i];
+	//	m_Children[i].Lod = Load.Lod / 2;
+	//}
 }
 
 
 TerrainQuadTree::TerrainQuadTree(const TerrainQuadTreeProperties& props)
 {
-	m_Properties = props;
+	//m_Properties = props;
 
-	m_Leaves.reserve(128);
+	//m_Leaves.reserve(128);
 
-	m_NodePool.resize(m_PoolSize);
-	for (uint32_t index = 0; index < m_PoolSize; index++)
-		m_NodePool[index] = new TerrainQuadTreeNode();
+	//m_NodePool.resize(m_PoolSize);
+	//for (uint32_t index = 0; index < m_PoolSize; index++)
+	//	m_NodePool[index] = new TerrainQuadTreeNode();
 
-	m_Root = new TerrainQuadTreeNode();
+	//m_Root = new TerrainQuadTreeNode();
 
-	m_Root->Load.Offset = { 0.0, 0.0 }; // Position is on bottom left corner
-	m_Root->Load.Size = m_Properties.Size.x;
-	m_Root->Load.Lod = m_Properties.MaxLod * 2;
+	//m_Root->Load.Offset = { 0.0, 0.0 }; // Position is on bottom left corner
+	//m_Root->Load.Size = m_Properties.Size.x;
+	//m_Root->Load.Lod = m_Properties.MaxLod * 2;
 }
 
 TerrainQuadTree::~TerrainQuadTree()
 {
-	for (uint32_t index = 0; index < m_PoolSize; index++)
-		delete m_NodePool[index];
-	delete m_Root;
+	//for (uint32_t index = 0; index < m_PoolSize; index++)
+	//	delete m_NodePool[index];
+	//delete m_Root;
 }
 
-static bool containtsPlayer(const glm::ivec2& nodePosition, int32_t nodeSize, const glm::ivec2& playerPosition)
-{
-	return (playerPosition.x >= nodePosition.x && playerPosition.x <= nodePosition.x + nodeSize &&
-		playerPosition.y >= nodePosition.y && playerPosition.y <= nodePosition.y + nodeSize);
-}
-
-static bool isClose(const glm::ivec2& nodePosition, int32_t nodeSize, const glm::ivec2& playerPosition, int32_t minDistance)
-{
-	return  containtsPlayer(nodePosition, nodeSize, playerPosition + glm::ivec2(minDistance, 0u)) ||
-		containtsPlayer(nodePosition, nodeSize, playerPosition - glm::ivec2(minDistance, 0u)) ||
-		containtsPlayer(nodePosition, nodeSize, playerPosition + glm::ivec2(0u, minDistance)) ||
-		containtsPlayer(nodePosition, nodeSize, playerPosition - glm::ivec2(0u, minDistance)) ||
-		containtsPlayer(nodePosition, nodeSize, playerPosition + glm::ivec2(minDistance, minDistance)) ||
-		containtsPlayer(nodePosition, nodeSize, playerPosition - glm::ivec2(minDistance, minDistance)) ||
-		containtsPlayer(nodePosition, nodeSize, playerPosition + glm::ivec2(-minDistance, minDistance)) ||
-		containtsPlayer(nodePosition, nodeSize, playerPosition + glm::ivec2(minDistance, -minDistance));
-}
+//static bool containtsPlayer(const glm::ivec2& nodePosition, int32_t nodeSize, const glm::ivec2& playerPosition)
+//{
+//	return (playerPosition.x >= nodePosition.x && playerPosition.x <= nodePosition.x + nodeSize &&
+//		playerPosition.y >= nodePosition.y && playerPosition.y <= nodePosition.y + nodeSize);
+//}
+//
+//static bool isClose(const glm::ivec2& nodePosition, int32_t nodeSize, const glm::ivec2& playerPosition, int32_t minDistance)
+//{
+//	return  containtsPlayer(nodePosition, nodeSize, playerPosition + glm::ivec2(minDistance, 0u)) ||
+//		containtsPlayer(nodePosition, nodeSize, playerPosition - glm::ivec2(minDistance, 0u)) ||
+//		containtsPlayer(nodePosition, nodeSize, playerPosition + glm::ivec2(0u, minDistance)) ||
+//		containtsPlayer(nodePosition, nodeSize, playerPosition - glm::ivec2(0u, minDistance)) ||
+//		containtsPlayer(nodePosition, nodeSize, playerPosition + glm::ivec2(minDistance, minDistance)) ||
+//		containtsPlayer(nodePosition, nodeSize, playerPosition - glm::ivec2(minDistance, minDistance)) ||
+//		containtsPlayer(nodePosition, nodeSize, playerPosition + glm::ivec2(-minDistance, minDistance)) ||
+//		containtsPlayer(nodePosition, nodeSize, playerPosition + glm::ivec2(minDistance, -minDistance));
+//}
 
 void TerrainQuadTree::insertPlayer(const glm::vec2& playerPosition)
 {
-	m_Leaves.clear();
+	/*m_Leaves.clear();
 	m_VisitedNodes.clear();
 
 	int32_t lastPos = 1;
@@ -113,7 +113,7 @@ void TerrainQuadTree::insertPlayer(const glm::vec2& playerPosition)
 		m_NodePool[index]->Load = currentNode->getChildren(0);
 
 		currentNode = m_NodePool[index--];
-	}
+	}*/
 
 	//while (!BfsQueue.empty())
 	//{

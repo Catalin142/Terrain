@@ -13,7 +13,7 @@ struct VulkanComputePass
 
 struct RenderPass
 {
-	std::shared_ptr<VulkanDescriptorSet> DescriptorSet;
 	std::shared_ptr<VulkanPipeline> Pipeline;
+	std::shared_ptr<VulkanDescriptorSet> DescriptorSet;
 };
 

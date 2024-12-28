@@ -1,81 +1,68 @@
 #pragma once
 
-#include "TerrainVirtualMap.h"
+#include "VMData.h"
+#include "Graphics/Vulkan/VulkanBuffer.h"
+#include "Terrain/TerrainChunk.h"
 
 #include <thread>
 #include <vector>
 #include <queue>
 #include <unordered_map>
+#include <semaphore>
+#include <mutex>
+#include <vulkan/vulkan.h>
 
-// Data gets laoded to the virtual map in batches (for each batch i allocate a vulkan buffer to hold data)
-#define LOAD_BATCH_SIZE 16
+#define MAX_CHUNKS_LOADING_PER_FRAME 64
 
-// TODO: fix the case when we load more than 128
-#define MAX_CHUNKS_LOADING_PER_FRAME 128
+class TerrainVirtualMap;
 
-struct NodeData
-{
-	size_t Node;
-	uint32_t VirtualLocation;
-	uint32_t Mip;
-	VirtualTextureType Type;
-	uint32_t MemoryIndex = 0;
-};
-
-// we only need one instance of this class that will work on only one instance of virtual map
 class DynamicVirtualTerrainDeserializer
 {
 public:
-	static DynamicVirtualTerrainDeserializer* Get() {
-		if (m_Instance == nullptr)
-			m_Instance = new DynamicVirtualTerrainDeserializer();
-		return m_Instance;
-	}
-
-	void Initialize(const std::shared_ptr<TerrainVirtualMap>& vm);
-	void Shutdown();
+	DynamicVirtualTerrainDeserializer(const VirtualTerrainMapSpecification& spec);
+	~DynamicVirtualTerrainDeserializer();
 
 	// The deserializer loads data from the file on a different thread and holds it until i refresh the deserializer
 	// on refresh, every loaded node gets blited to it s destination virtual map 
-	void Refresh();
+	void Refresh(VkCommandBuffer cmdBuffer, TerrainVirtualMap* virtualMap);
 
-	void loadChunk(NodeData task);
-	void pushLoadTask(size_t node, uint32_t virtualLocation, uint32_t mip, VirtualTextureType type);
+	void loadChunk(LoadTask task);
+	void pushLoadTask(size_t node, int32_t virtualLocation, const VirtualTerrainChunkProperties& properties, VirtualTextureType type);
 
-	inline static std::shared_ptr<VulkanImage> auxImg;
-	VkSemaphore hahah;
+public:
+	VirtualMapDeserializerLastUpdate LastUpdate;
 
 private:
-	// Do we need this to be singleton? Maybe create a vm terrain manager to manage the loading and unloading and everything on a update cycle
-	static DynamicVirtualTerrainDeserializer* m_Instance;
-
-	std::shared_ptr<TerrainVirtualMap> m_VirtualMap;
+	VirtualTerrainMapSpecification m_VirtualMapSpecification;
 
 	std::thread m_LoadThread;
 	std::mutex m_DataMutex;
 	std::mutex m_TaskMutex;
 	std::mutex m_SlotsMutex;
 
+	// in case we want to load mare than MAX_CHUNKS_LOADING_PER_FRAME, we stop the loading thread and wait for a batch to be sent to the GPU
+	std::counting_semaphore<MAX_CHUNKS_LOADING_PER_FRAME> m_MaxLoadSemaphore{ 0 };
+	std::counting_semaphore<1024> m_LoadThreadSemaphore{ 1 };
 	bool m_ThreadRunning = true;
 
-	std::vector<NodeData> m_NodesToBlit;
-	std::queue<NodeData> m_LoadTasks;
+	std::vector<VkBufferImageCopy> m_RegionsToCopy;
+	std::vector<uint32_t> m_UsedIndices;
+	std::queue<LoadTask> m_LoadTasks;
 
-	std::vector<std::shared_ptr<VulkanBuffer>> m_BufferPool;
+	std::shared_ptr<VulkanBuffer> m_RawImageData;
 
 	// Cache of file handlers
 	// IDK if it impacts performance if i keep them open all the time
 	// Guess it s better than opening and closing them all the time
 	std::unordered_map<std::string, std::ifstream*> m_FileHandlerCache;
 
-	std::shared_ptr<VulkanComputePass> m_IndirectionTextureUpdatePass;
-	std::shared_ptr<VulkanUniformBuffer> m_LoadedNodesUB;
-	VirtualMapProperties m_VMProps{ };
-
-	// have a big buffer of data to load and unload nodes in
-	char* m_TextureDataBuffer;
 	// in memory buffer
 	std::queue<uint32_t> m_AvailableSlots;
 	uint32_t m_TextureDataStride = 0;
-	uint32_t m_OccupiedSlots = 0;
+
+	// Compute shader to update the state of the loaded/not loaded texture
+
+	// I prefer having different vectors for these 2 so I can create them on the fly and just send them to the GPU
+	std::vector<GPUIndirectionNode> m_IndirectionNodes;
+	std::vector<GPUStatusNode> m_StatusNodes;
 };

@@ -76,7 +76,7 @@ private:
 
 	GenerationParameters m_OldNoise{ };
 
-	std::shared_ptr<VulkanUniformBuffer> m_UniformBuffer;
+	std::shared_ptr<VulkanBuffer> m_UniformBuffer;
 
 	bool m_Valid = false;
 

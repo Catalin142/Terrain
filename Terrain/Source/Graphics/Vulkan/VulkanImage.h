@@ -1,8 +1,7 @@
 #pragma once
 
-#include "VulkanBaseBuffer.h"
-
 #include "glm/glm.hpp"
+#include "VulkanBuffer.h"
 
 #include <vector>
 #include <vulkan/vulkan.h>
@@ -47,10 +46,11 @@ public:
 	VkSampler getVkSampler() const { return m_Sampler; }
 
 	const VulkanImageSpecification& getSpecification() { return m_Specification; }
-	void copyBuffer(const VulkanBaseBuffer& buffer, uint32_t layer = 0, const glm::uvec2& srcExtent = glm::uvec2(0u, 0u),
+	void copyBuffer(const VulkanBuffer& buffer, uint32_t layer = 0, const glm::uvec2& srcExtent = glm::uvec2(0u, 0u),
 		const glm::uvec2& offset = glm::ivec2(0u, 0u));
-	void copyBuffer(VkCommandBuffer cmdBuffer, const VulkanBaseBuffer& buffer, uint32_t layer = 0, const glm::uvec2& srcExtent = glm::uvec2(0u, 0u),
+	void copyBuffer(VkCommandBuffer cmdBuffer, const VulkanBuffer& buffer, uint32_t layer = 0, const glm::uvec2& srcExtent = glm::uvec2(0u, 0u),
 		const glm::uvec2& offset = glm::ivec2(0u, 0u));
+	void batchCopyBuffer(VkCommandBuffer cmdBuffer, const VulkanBuffer& buffer, const std::vector<VkBufferImageCopy>& regions);
 
 	void generateMips();
 

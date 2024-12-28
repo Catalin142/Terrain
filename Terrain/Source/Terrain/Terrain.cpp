@@ -11,6 +11,8 @@ Terrain::Terrain(const TerrainSpecification& spec) : m_Specification(spec)
 
 const std::vector<TerrainChunk>& Terrain::getChunksToRender(const glm::vec3& cameraPosition)
 {
+	return ctr;
+
 	m_ChunksToRender.clear();
 
 	switch (m_CurrentLODTechnique)
@@ -78,4 +80,8 @@ void Terrain::setTechnique(LODTechnique tech)
 
 		break;
 	}
+}
+
+void Terrain::Update(VkCommandBuffer cmdBuffer)
+{
 }

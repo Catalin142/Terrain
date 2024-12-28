@@ -36,6 +36,7 @@ struct TerrainInfo
 	glm::vec2 TerrainSize{ 0.0f };
 	float HeightMultiplier = 0.0f;
 	uint32_t MinimumChunkSize = 128;
+	uint32_t LodCount;
 };
 
 struct TerrainSpecification
@@ -66,12 +67,16 @@ public:
 	const std::shared_ptr<SinkingLOD>& getSinkingCircleLODTechnique() { return m_SinkingCircleLOD; }
 
 	TerrainInfo getInfo() { return m_Specification.Info; }
+	uint32_t getSectorCount() { return uint32_t(m_Specification.Info.TerrainSize.x) / m_Specification.Info.MinimumChunkSize; }
 	void setHeightMultiplier(float mul) { m_Specification.Info.HeightMultiplier = mul; }
 
-	std::shared_ptr<TerrainVirtualMap> tvm;
+	void Update(VkCommandBuffer cmdBuffer);
 
-	const std::shared_ptr<VulkanImage>& getHeightMap() { return tvm->m_PhysicalTexture; }
-	const std::shared_ptr<VulkanImage>& getIndirectionTexture() { return tvm->m_IndirectionTexture; }
+	std::vector<TerrainChunk> ctr;
+	std::shared_ptr<TerrainVirtualMap> m_VirtualMap;
+
+	const std::shared_ptr<VulkanImage>& getHeightMap() { return m_VirtualMap->getPhysicalTexture(); }
+	const std::shared_ptr<VulkanImage>& getIndirectionTexture() { return m_VirtualMap->getIndirectionTexture(); }
 	const std::shared_ptr<VulkanImage>& getNormalMap() { return m_Specification.NormalMap; }
 	const std::shared_ptr<VulkanImage>& getCompositionMap() { return m_Specification.CompositionMap; }
 	const std::shared_ptr<VulkanTexture>& getTerrainTextures() { return m_Specification.TerrainTextures; }

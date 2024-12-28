@@ -1,6 +1,6 @@
 #pragma once
 
-#include "VulkanUniformBuffer.h"
+#include "VulkanBuffer.h"
 #include "VulkanShader.h"
 #include "VulkanTexture.h"
 
@@ -11,8 +11,8 @@
 
 struct DescriptorBindings
 {
-	std::unordered_map<uint32_t, VkDescriptorBufferInfo> UniformBufferInfos;
-	std::unordered_map<uint32_t, std::vector<VkDescriptorBufferInfo>> UniformBufferSetInfos;
+	std::unordered_map<uint32_t, VkDescriptorBufferInfo> BufferInfos;
+	std::unordered_map<uint32_t, std::vector<VkDescriptorBufferInfo>> BufferSetInfos;
 	std::unordered_map<uint32_t, VkDescriptorImageInfo> ImageInfos;
 };
 
@@ -24,8 +24,8 @@ public:
 
 	void Create();
 
-	void bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanUniformBuffer>& buffer);
-	void bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanUniformBufferSet>& bufferSet);
+	void bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanBuffer>& buffer);
+	void bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanBufferSet>& bufferSet);
 	void bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanTexture>& texture);
 	void bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanImage>& image, uint32_t mip = 0);
 	void bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanSampler>& sampler);

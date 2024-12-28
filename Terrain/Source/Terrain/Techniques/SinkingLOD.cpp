@@ -7,7 +7,7 @@ SinkingLOD::SinkingLOD(const TerrainSpecification& spec) : m_TerrainSpecificatio
 
 void SinkingLOD::getChunksToRender(std::vector<TerrainChunk>& chunks, const glm::vec3& cameraPosition)
 {
-	int32_t chunkSize = (uint32_t)m_TerrainSpecification.Info.MinimumChunkSize;
+	/*int32_t chunkSize = (uint32_t)m_TerrainSpecification.Info.MinimumChunkSize;
 	while (chunkSize <= m_TerrainSpecification.Info.TerrainSize.x)
 	{
 		TerrainChunk newChunk;
@@ -18,6 +18,6 @@ void SinkingLOD::getChunksToRender(std::vector<TerrainChunk>& chunks, const glm:
 		
 		chunks.push_back(newChunk);
 		chunkSize *= 2;
-	}
+	}*/
 
 }

@@ -61,7 +61,7 @@ TerrainRenderer::TerrainRenderer(const std::shared_ptr<VulkanFramebuffer>& targe
 	texSpec.Filepath = filepaths;
 	m_NoiseMap = std::make_shared<VulkanTexture>(texSpec);
 
-	initializeRenderPass();
+	//initializeRenderPass();
 }
 
 void TerrainRenderer::Render(const Camera& camera)
@@ -89,9 +89,24 @@ void TerrainRenderer::initializeBuffers()
 	uint32_t framesInFlight = VulkanRenderer::getFramesInFlight();
 
 	// TODO: Get rid of hard coded values
-	m_TerrainChunksSet = std::make_shared<VulkanUniformBufferSet>(uint32_t(8 * 8 * sizeof(TerrainChunk)), framesInFlight);
-	m_TerrainInfo = std::make_shared<VulkanUniformBuffer>((uint32_t)sizeof(TerrainInfo));
-	m_CameraInfo = std::make_shared<VulkanUniformBuffer>((uint32_t)sizeof(glm::vec4));
+	//m_TerrainChunksSet = std::make_shared<VulkanUniformBufferSet>(uint32_t(8 * 8 * sizeof(TerrainChunk)), framesInFlight);
+
+	{
+		VulkanBufferProperties terrainInfoProperties;
+		terrainInfoProperties.Size = ((uint32_t)sizeof(TerrainInfo));
+		terrainInfoProperties.Type = BufferType::UNIFORM_BUFFER;
+		terrainInfoProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
+
+		m_TerrainInfo = std::make_shared<VulkanBuffer>(terrainInfoProperties);
+	}
+	{
+		VulkanBufferProperties cameraInfoProperties;
+		cameraInfoProperties.Size = (uint32_t)sizeof(glm::vec4);
+		cameraInfoProperties.Type = BufferType::UNIFORM_BUFFER;
+		cameraInfoProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
+
+		m_CameraInfo = std::make_shared<VulkanBuffer>(cameraInfoProperties);
+	}
 }
 
 void TerrainRenderer::initializeRenderPass()
@@ -100,7 +115,9 @@ void TerrainRenderer::initializeRenderPass()
 	
 	// TODO: Destory the one that is not used
 	createQuadRenderPass();
-	createCircleRenderPass();
+	
+	// TODO: fix, it s creating a lot of  image view must not be VK_NULL_HANDLE. errors
+	//createCircleRenderPass();
 }
 
 void TerrainRenderer::createQuadRenderPass()
@@ -222,25 +239,27 @@ void TerrainRenderer::renderTerrain(const Camera& camera)
 
 	uint32_t m_CurrentFrame = VulkanRenderer::getCurrentFrame();
 
-	m_TerrainChunksSet->setData(chunksToRender.data(), chunksToRender.size() * sizeof(TerrainChunk), m_CurrentFrame);
+	//m_TerrainChunksSet->setData(chunksToRender.data(), chunksToRender.size() * sizeof(TerrainChunk), m_CurrentFrame);
 
 	// compute LODMap in compute shader
 	if (m_Terrain->getCurrentTechnique() != LODTechnique::SINKING_CIRCLE)
 	{
+		uint32_t sectorCount = m_Terrain->getSectorCount();
+
 		LODComputeConstants LODpc;
 		LODpc.leavesCount = (int32_t)chunksToRender.size();
 		LODpc.terrinSize = m_Terrain->getInfo().MinimumChunkSize;
-
-		VulkanRenderer::dispatchCompute(m_RenderCommandBuffer, m_LODMapComputePass, { 1, 1, 1 },
-			sizeof(LODComputeConstants), &LODpc);
-
-		m_LODMapComputePass->Pipeline->imageMemoryBarrier(m_RenderCommandBuffer, m_LODMap, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+	
+		//VulkanRenderer::dispatchCompute(m_RenderCommandBuffer, m_LODMapComputePass, { 8, 8, 1 },
+		//	sizeof(LODComputeConstants), &LODpc);
+	
+		//m_LODMapComputePass->Pipeline->imageMemoryBarrier(m_RenderCommandBuffer, m_LODMap, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		//	VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
 	}
 
 	TerrainInfo terrainInfo = m_Terrain->getInfo();
 	//terrainInfo.CamPos = { camera.getPosition().x, camera.getPosition().z };
-	m_TerrainInfo->setData(&terrainInfo, sizeof(TerrainInfo));
+	m_TerrainInfo->setDataCPU(&terrainInfo, sizeof(TerrainInfo));
 
 	glm::vec4 cameraPos = { camera.getPosition().x, camera.getPosition().z, 0.0f, 0.0f};
 	m_CameraInfo->setData(&cameraPos, sizeof(cameraPos));
@@ -282,7 +301,9 @@ void TerrainRenderer::renderTerrain(const Camera& camera)
 		TerrainChunkIndexBuffer idxBuffer = getChunkIndexBufferLOD(1);
 
 		vkCmdBindIndexBuffer(commandBuffer, idxBuffer.IndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
-		vkCmdDrawIndexed(commandBuffer, idxBuffer.IndicesCount, (uint32_t)chunksToRender.size(), 0, 0, 0);
+		//vkCmdDrawIndexed(commandBuffer, idxBuffer.IndicesCount, (uint32_t)chunksToRender.size(), 0, 0, 0);
+		//vkCmdDrawIndexed(commandBuffer, idxBuffer.IndicesCount, chunkCount, 0, 0, 0);
+		vkCmdDrawIndexedIndirect(commandBuffer, m_IndirectDraw->getBuffer(), 0, 1, sizeof(VkDrawIndexedIndirectCommand));
 
 		break;
 	}
@@ -325,8 +346,13 @@ const TerrainChunkIndexBuffer& TerrainRenderer::getChunkIndexBufferLOD(uint8_t l
 	TerrainChunkIndexBuffer current;
 
 	current.IndicesCount = (uint32_t)indices.size();
-	current.IndexBuffer = std::make_shared<VulkanBuffer>(indices.data(), (uint32_t)(sizeof(indices[0]) * (uint32_t)indices.size()),
-		BufferType::INDEX, BufferUsage::STATIC);
+
+	VulkanBufferProperties indexBufferProperties;
+	indexBufferProperties.Size = (uint32_t)(sizeof(indices[0]) * (uint32_t)indices.size());
+	indexBufferProperties.Type = BufferType::INDEX_BUFFER | BufferType::TRANSFER_DST_BUFFER;
+	indexBufferProperties.Usage = BufferMemoryUsage::BUFFER_ONLY_GPU;
+
+	current.IndexBuffer = std::make_shared<VulkanBuffer>(indices.data(), indexBufferProperties);
 	
 	m_LODIndexBuffer[lod] = current;
 
