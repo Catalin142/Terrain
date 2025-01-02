@@ -303,7 +303,7 @@ void TerrainRenderer::renderTerrain(const Camera& camera)
 		vkCmdBindIndexBuffer(commandBuffer, idxBuffer.IndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
 		//vkCmdDrawIndexed(commandBuffer, idxBuffer.IndicesCount, (uint32_t)chunksToRender.size(), 0, 0, 0);
 		//vkCmdDrawIndexed(commandBuffer, idxBuffer.IndicesCount, chunkCount, 0, 0, 0);
-		vkCmdDrawIndexedIndirect(commandBuffer, m_IndirectDraw->getBuffer(), 0, 1, sizeof(VkDrawIndexedIndirectCommand));
+		vkCmdDrawIndexedIndirect(commandBuffer, m_IndirectDraw->getVkBuffer(VulkanRenderer::getCurrentFrame()), 0, 1, sizeof(VkDrawIndexedIndirectCommand));
 
 		break;
 	}

@@ -173,6 +173,20 @@ void DynamicVirtualTerrainDeserializer::Refresh(VkCommandBuffer cmdBuffer, Terra
     virtualMap->blitNodes(cmdBuffer, m_RawImageData, regionsCopy);
     virtualMap->prepareForRendering(cmdBuffer);
 
+    VkMemoryBarrier barrier2 = {};
+    barrier2.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    barrier2.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+    barrier2.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+
+    vkCmdPipelineBarrier(
+        cmdBuffer,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        0,
+        1, &barrier2,
+        0, nullptr, 0, nullptr
+    );
+
     for (uint32_t index : indicesCopy)
     {
         {

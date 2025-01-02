@@ -87,7 +87,7 @@ void VulkanDescriptorSet::bindInput(uint32_t set, uint32_t binding, uint32_t ind
 	{
 		VkDescriptorBufferInfo bufferInfo{};
 
-		bufferInfo.buffer = bufferSet->getBuffer(i);
+		bufferInfo.buffer = bufferSet->getVkBuffer(i);
 		bufferInfo.offset = 0;
 		bufferInfo.range = bufferSet->getBufferSize();
 
