@@ -186,7 +186,7 @@ void TerrainVirtualMap::updateStatusTexture(VkCommandBuffer cmdBuffer)
             sizeof(GPUVirtualMapProperties), &size);
 
         VulkanComputePipeline::imageMemoryBarrier(cmdBuffer, m_StatusTexture, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+            VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 6);
     }
 }
 

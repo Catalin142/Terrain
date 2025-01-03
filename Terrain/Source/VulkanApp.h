@@ -78,14 +78,13 @@ private:
 
 
 	std::shared_ptr<VulkanComputePass> m_QuadPass;
-	std::shared_ptr<VulkanBuffer> m_TempA;
-	std::shared_ptr<VulkanBuffer> m_TempB;
-	std::shared_ptr<VulkanBuffer> m_TempAux;
+	std::shared_ptr<VulkanBufferSet> m_TempA;
+	std::shared_ptr<VulkanBufferSet> m_TempB;
 	std::shared_ptr<VulkanBufferSet> m_FinalResult;
-	std::shared_ptr<VulkanBuffer> m_PassMetadata;
+	std::shared_ptr<VulkanBufferSet> m_PassMetadata;
 
 	std::shared_ptr<VulkanComputePass> m_IndirectPass;
-	std::shared_ptr<VulkanBuffer> m_DrawIndirect;
+	std::shared_ptr<VulkanBufferSet> m_DrawIndirect;
 
 	void createQuadPass();
 };

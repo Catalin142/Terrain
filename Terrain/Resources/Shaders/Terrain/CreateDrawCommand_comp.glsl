@@ -22,12 +22,12 @@ struct PassMetadata
     uint LoadedSize;
 };
 
-layout(std430, set = 0, binding = 0) writeonly buffer _DrawCommand
+layout(std430, set = 0, binding = 0) writeonly buffer _DrawCommandSet
 {
     VkDrawIndexedIndirectCommand drawCommand;
 };
 
-layout(std430, set = 0, binding = 1) buffer _Metadata {
+layout(std430, set = 0, binding = 1) buffer _MetadataSet {
     PassMetadata metadata;
 };
 

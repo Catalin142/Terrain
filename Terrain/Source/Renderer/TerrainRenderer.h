@@ -39,7 +39,7 @@ public:
 
 	inline static std::shared_ptr<VulkanBufferSet> m_TerrainChunksSet;
 
-	inline static std::shared_ptr<VulkanBuffer> m_IndirectDraw;
+	inline static std::shared_ptr<VulkanBufferSet> m_IndirectDraw;
 
 	// set private
 	void initializeRenderPass();

@@ -199,8 +199,14 @@ uint32_t VulkanBufferSet::getBufferSize()
 	return m_Size;
 }
 
-VkBuffer VulkanBufferSet::getBuffer(uint32_t index)
+VkBuffer VulkanBufferSet::getVkBuffer(uint32_t index)
 {
 	assert(index < (uint32_t)m_Buffers.size());
 	return m_Buffers[index]->getBuffer();
+}
+
+const std::shared_ptr<VulkanBuffer>& VulkanBufferSet::getBuffer(uint32_t index)
+{
+	assert(index < (uint32_t)m_Buffers.size());
+	return m_Buffers[index];
 }

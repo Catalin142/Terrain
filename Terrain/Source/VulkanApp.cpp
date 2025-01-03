@@ -39,7 +39,7 @@
 - Change how image barriers are implemented, i want to put barries on all mips
 */
 
-void SwapBuffers(VkCommandBuffer cmd, std::shared_ptr<VulkanBuffer>& a, std::shared_ptr<VulkanBuffer>& b, int howMuch);
+void SwapBuffers(VkCommandBuffer cmd, const std::shared_ptr<VulkanBuffer>& a, const std::shared_ptr<VulkanBuffer>& b, int howMuch);
 
 VulkanApp::VulkanApp(const std::string& title, uint32_t width, uint32_t height) : Application(title, width, height)
 { }
@@ -56,7 +56,7 @@ void VulkanApp::onCreate()
 			tempAProperties.Type = BufferType::STORAGE_BUFFER | BufferType::TRANSFER_DST_BUFFER;
 			tempAProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
 
-			m_TempA = std::make_shared<VulkanBuffer>(tempAProperties);
+			m_TempA = std::make_shared<VulkanBufferSet>(2, tempAProperties);
 		}
 		{
 			VulkanBufferProperties tempBProperties;
@@ -64,7 +64,7 @@ void VulkanApp::onCreate()
 			tempBProperties.Type = BufferType::STORAGE_BUFFER | BufferType::TRANSFER_SRC_BUFFER;
 			tempBProperties.Usage = BufferMemoryUsage::BUFFER_ONLY_GPU;
 
-			m_TempB = std::make_shared<VulkanBuffer>(tempBProperties);
+			m_TempB = std::make_shared<VulkanBufferSet>(2, tempBProperties);
 		}
 		{
 			VulkanBufferProperties resultProperties;
@@ -80,7 +80,7 @@ void VulkanApp::onCreate()
 			passMetadataProperties.Type = BufferType::STORAGE_BUFFER | BufferType::TRANSFER_DST_BUFFER;
 			passMetadataProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
 
-			m_PassMetadata = std::make_shared<VulkanBuffer>(passMetadataProperties);
+			m_PassMetadata = std::make_shared<VulkanBufferSet>(2, passMetadataProperties);
 		}
 		{
 			VulkanBufferProperties indirectProperties;
@@ -88,7 +88,7 @@ void VulkanApp::onCreate()
 			indirectProperties.Type = BufferType::INDIRECT_BUFFER | BufferType::STORAGE_BUFFER;
 			indirectProperties.Usage = BufferMemoryUsage::BUFFER_ONLY_GPU;
 
-			m_DrawIndirect = std::make_shared<VulkanBuffer>(indirectProperties);
+			m_DrawIndirect = std::make_shared<VulkanBufferSet>(2, indirectProperties);
 		}
 	}
 
@@ -270,6 +270,15 @@ void VulkanApp::onUpdate()
 
 	m_Terrain->m_VirtualMap->pushLoadTasks(chunksToRender);
 
+	QuadTreePassMetadata metadata;
+	metadata.ResultArrayIndex = 0;
+	metadata.TMPArray1Index = 0;
+	metadata.DataLoaded = firstPass.size();
+
+	m_TempA->getBuffer(VulkanRenderer::getCurrentFrame())->setDataCPU(firstPass.data(), firstPass.size() * sizeof(TerrainChunkNoPadding));
+	uint32_t sizefp = firstPass.size();
+
+	m_PassMetadata->getBuffer(VulkanRenderer::getCurrentFrame())->setDataCPU(&metadata, sizeof(QuadTreePassMetadata));
 
 	uint32_t m_CurrentFrame = VulkanRenderer::getCurrentFrame();
 
@@ -289,20 +298,18 @@ void VulkanApp::onUpdate()
 
 		m_Terrain->m_VirtualMap->updateResources(commandBuffer);
 
-		QuadTreePassMetadata metadata;
-		metadata.ResultArrayIndex = 0;
-		metadata.TMPArray1Index = 0;
-		metadata.DataLoaded = firstPass.size();
-
-		m_TempA->setDataCPU(firstPass.data(), firstPass.size() * sizeof(TerrainChunkNoPadding));
-		uint32_t sizefp = firstPass.size();
-
-		m_PassMetadata->setDataCPU(&metadata, sizeof(QuadTreePassMetadata));
-
 		for (uint32_t lod = 0; lod < 4; lod++)
 		{
 		    VulkanRenderer::dispatchCompute(commandBuffer, m_QuadPass, { 1, 1, 1 },
 		        sizeof(uint32_t), &sizefp);
+
+			VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, m_TempA->getBuffer(VulkanRenderer::getCurrentFrame()), VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+			VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, m_TempB->getBuffer(VulkanRenderer::getCurrentFrame()), VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+			VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, m_FinalResult->getBuffer(VulkanRenderer::getCurrentFrame()), VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+
 
 		    VkMemoryBarrier barrier1 = {};
 		    barrier1.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
@@ -318,9 +325,9 @@ void VulkanApp::onUpdate()
 		        0, nullptr, 0, nullptr               
 		    );
 
-		    SwapBuffers(commandBuffer, m_TempA, m_TempB, 1024);
+		    SwapBuffers(commandBuffer, m_TempA->getBuffer(VulkanRenderer::getCurrentFrame()), m_TempB->getBuffer(VulkanRenderer::getCurrentFrame()), 1024);
 		    uint32_t indexSSBO = 0;
-		    vkCmdUpdateBuffer(commandBuffer, m_PassMetadata->getBuffer(), 0, sizeof(uint32_t), &indexSSBO);
+		    vkCmdUpdateBuffer(commandBuffer, m_PassMetadata->getVkBuffer(VulkanRenderer::getCurrentFrame()), 0, sizeof(uint32_t), &indexSSBO);
 
 		    VkMemoryBarrier barrier2 = {};
 		    barrier2.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
@@ -342,6 +349,15 @@ void VulkanApp::onUpdate()
 		uint32_t idxBuffer = m_TerrainRenderer->getChunkIndexBufferLOD(1).IndicesCount;
 		VulkanRenderer::dispatchCompute(commandBuffer, m_IndirectPass, { 1, 1, 1 },
 			sizeof(uint32_t), &idxBuffer);
+
+		VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, m_DrawIndirect->getBuffer(VulkanRenderer::getCurrentFrame()), VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_MEMORY_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+
+		VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, m_PassMetadata->getBuffer(VulkanRenderer::getCurrentFrame()), VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+
+		VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, m_FinalResult->getBuffer(VulkanRenderer::getCurrentFrame()), VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
 
 		/*CameraCompParams compParams;
 
@@ -544,7 +560,7 @@ void VulkanApp::createQuadPass()
 	}
 }
 
-void SwapBuffers(VkCommandBuffer cmd, std::shared_ptr<VulkanBuffer>& a, std::shared_ptr<VulkanBuffer>& b, int howMuch)
+void SwapBuffers(VkCommandBuffer cmd, const std::shared_ptr<VulkanBuffer>& a, const std::shared_ptr<VulkanBuffer>& b, int howMuch)
 {
 	{
 		VkBufferCopy copyRegion{};

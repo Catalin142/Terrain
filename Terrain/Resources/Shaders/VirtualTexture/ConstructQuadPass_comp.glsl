@@ -9,13 +9,13 @@ struct NodeMetadata
 };
 
 // this holds the nodes that we curently process
-layout(std430, set = 1, binding = 0) readonly buffer _TMPArray0
+layout(std430, set = 1, binding = 0) readonly buffer _TMPArray0Set
 {
     NodeMetadata nodes[];
 } TMPArray0;
 
 // this holds the nodes that will be processed next iteration of the compute
-layout(std430, set = 1, binding = 1) writeonly buffer _TMPArray1
+layout(std430, set = 1, binding = 1) writeonly buffer _TMPArray1Set
 {
     NodeMetadata nodes[];
 } TMPArray1;
@@ -33,7 +33,7 @@ struct PassMetadata
     uint LoadedSize;
 };
 
-layout(std430, set = 2, binding = 0) buffer _Metadata {
+layout(std430, set = 2, binding = 0) buffer _MetadataSet {
     PassMetadata metadata;
 };
 
