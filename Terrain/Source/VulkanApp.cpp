@@ -35,7 +35,7 @@
 #include "System/Disk.h"
 
 /*
-- Change the way buffers are created, i need to manually set their visibility (CPU OR GPU OR BOTH)
+- Change descriptor set creation, i don t need two identical descriptors if i don t use a bufferset. Also, i want to force some pipelines to use different descritors
 - Change how image barriers are implemented, i want to put barries on all mips
 */
 
