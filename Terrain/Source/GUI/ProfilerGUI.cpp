@@ -9,7 +9,7 @@
 ProfilerGUI::ProfilerGUI(const std::string& name, uint32_t sampleCount) : m_SampleCount(sampleCount), m_Name(name)
 { }
 
-void ProfilerGUI::addProfileValue(const std::string& name, float value, uint32_t color)
+void ProfilerGUI::pushValue(const std::string& name, float value, uint32_t color)
 {
 	m_MaxValue = std::max(m_MaxValue, value);
 	if (m_ProfilerValues.find(name) == m_ProfilerValues.end())
@@ -132,7 +132,7 @@ void ProfilerManager::Render()
 	{
 		profiler->nextFrame();
 		if (ImGui::CollapsingHeader(name.c_str()))
-			profiler->Render({ Width, 150.0f });
+			profiler->Render({ Width, Height });
 	}
 	ImGui::End();
 }

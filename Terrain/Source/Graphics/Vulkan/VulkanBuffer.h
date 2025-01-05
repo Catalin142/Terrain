@@ -75,6 +75,7 @@ public:
 	uint32_t getBufferSize();
 	VkBuffer getVkBuffer(uint32_t index);
 	const std::shared_ptr<VulkanBuffer>& getBuffer(uint32_t index);
+	const std::shared_ptr<VulkanBuffer>& getCurrentFrameBuffer();
 
 private:
 	std::vector<std::shared_ptr<VulkanBuffer>> m_Buffers;

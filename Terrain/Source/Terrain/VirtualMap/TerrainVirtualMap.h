@@ -78,12 +78,12 @@ private:
 
 	std::shared_ptr<VulkanImage> m_IndirectionTexture;
 	std::shared_ptr<VulkanComputePass> m_UpdateIndirectionComputePass;
-	std::shared_ptr<VulkanBuffer> m_IndirectionNodesStorage;
+	std::shared_ptr<VulkanBufferSet> m_IndirectionNodesStorage;
 	std::vector<GPUIndirectionNode> m_IndirectionNodes;
 
 	std::shared_ptr<VulkanImage> m_StatusTexture;
 	std::shared_ptr<VulkanComputePass> m_UpdateStatusComputePass;
-	std::shared_ptr<VulkanBuffer> m_StatusNodesStorage;
+	std::shared_ptr<VulkanBufferSet> m_StatusNodesStorage;
 	std::vector<GPUStatusNode> m_StatusNodes;
 
 	std::shared_ptr<DynamicVirtualTerrainDeserializer> m_Deserializer;

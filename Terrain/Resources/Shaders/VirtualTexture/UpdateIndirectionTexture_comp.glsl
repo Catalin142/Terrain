@@ -12,7 +12,7 @@ struct indirectionNode
     uint mip;
 };
 
-layout(std430, set = 1, binding = 0) readonly buffer NodesUniformBuffer
+layout(std430, set = 1, binding = 0) readonly buffer NodesUniformBufferSet
 {
     indirectionNode lNode[];
 } Nodes;

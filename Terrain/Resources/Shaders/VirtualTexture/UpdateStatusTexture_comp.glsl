@@ -11,9 +11,9 @@ struct StatusNode
     uint mip;
 };
 
-layout(set = 1, binding = 0) readonly buffer NodesUniformBuffer
+layout(set = 1, binding = 0) readonly buffer NodesUniformBufferSet
 {
-    StatusNode lNode[1024];
+    StatusNode lNode[];
 } Nodes;
 
 layout (push_constant) uniform VirtualMapProperties

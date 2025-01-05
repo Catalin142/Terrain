@@ -83,21 +83,21 @@ static void restoreImageLayout(std::shared_ptr<VulkanImage> src, std::shared_ptr
 }
 
 // The virtual map may be bigger than we can fit in memory, we need to combine multiple data from the file into one image
-void VirtualTerrainSerializer::Serialize(const std::shared_ptr<Terrain>& terrain, const VirtualTerrainMapSpecification& spec,
+void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& terrain, const VirtualTerrainMapSpecification& spec,
     VirtualTextureType type, glm::uvec2 worldOffset, bool purgeContent)
 {
     VkDevice device = VulkanDevice::getVulkanDevice();
 
     VkImageSubresourceRange imgSubresource{};
-    VulkanImageSpecification texSpec = terrain->getHeightMap()->getSpecification();
+    VulkanImageSpecification texSpec = terrain->getSpecification();
     imgSubresource.aspectMask = texSpec.Aspect;
     imgSubresource.layerCount = texSpec.LayerCount;
     imgSubresource.levelCount = texSpec.Mips;
     imgSubresource.baseMipLevel = 0;
 
     // Generate mips for heightmap
-    VkUtils::transitionImageLayout(terrain->getHeightMap()->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    terrain->getHeightMap()->generateMips();
+    VkUtils::transitionImageLayout(terrain->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    terrain->generateMips();
 
     std::shared_ptr<VulkanImage> auxImg;
 
@@ -116,7 +116,7 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<Terrain>& terrain
         auxImg->Create();
     }
 
-    prepareImageLayout(terrain->getHeightMap(), auxImg);
+    prepareImageLayout(terrain, auxImg);
 
     {
         // MEMORY ALIGMENT
@@ -159,9 +159,9 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<Terrain>& terrain
 
         // TODO: all
         // Serialize each mip 
-        for (uint32_t mip = 0; mip < terrain->getInfo().LodCount; mip++)
+        for (uint32_t mip = 0; mip < 4; mip++)
         {
-            uint32_t currentSize = terrain->getHeightMap()->getSpecification().Width >> mip;
+            uint32_t currentSize = terrain->getSpecification().Width >> mip;
 
             for (int32_t y = 0; y < currentSize / spec.ChunkSize; y++)
                 for (int32_t x = 0; x < currentSize / spec.ChunkSize; x++)
@@ -185,15 +185,15 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<Terrain>& terrain
                     int32_t startX1 = 0, startY1 = 0;
                     int32_t startX2 = iChunkSize + 2, startY2 = iChunkSize + 2;
 
-                    //if (x * iChunkSize - 1 < 0)
-                    //    startX1 = 1;
-                    //
-                    //if (y * iChunkSize - 1 < 0)
-                    //    startY1 = 1;
+                    if (x * iChunkSize - 1 < 0)
+                        startX1 = 1;
+                    
+                    if (y * iChunkSize - 1 < 0)
+                        startY1 = 1;
 
                     if ((x + 1) * iChunkSize + 1 > currentSize)
                         startX2 = iChunkSize + 1;
-
+                    
                     if ((y + 1) * iChunkSize + 1 > currentSize)
                         startY2 = iChunkSize + 1;
 
@@ -205,7 +205,7 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<Terrain>& terrain
                     blit.dstSubresource.layerCount = 1;
 
                     vkCmdBlitImage(cmdBuffer,
-                        terrain->getHeightMap()->getVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                        terrain->getVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                         auxImg->getVkImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                         1, &blit,
                         VK_FILTER_NEAREST);
@@ -233,8 +233,6 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<Terrain>& terrain
                         }
                         imageData += layout.rowPitch;
                     }
-                    int r = -5;
-
                     //imgCacheOut.write(imageData, size);
                 }
         }
@@ -242,7 +240,7 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<Terrain>& terrain
         vkUnmapMemory(device, memory);
     }
 
-    restoreImageLayout(terrain->getHeightMap(), auxImg);
+    restoreImageLayout(terrain, auxImg);
 }
 
 void VirtualTerrainSerializer::Deserialize(const std::shared_ptr<TerrainVirtualMap>& virtualMap, VirtualTextureType type)

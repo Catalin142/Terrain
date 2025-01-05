@@ -153,7 +153,7 @@ void TerrainVirtualMap::updateIndirectionTexture(VkCommandBuffer cmdBuffer)
     if (m_IndirectionNodes.empty())
         return;
 
-    m_IndirectionNodesStorage->setDataCPU(m_IndirectionNodes.data(), m_IndirectionNodes.size() * sizeof(GPUIndirectionNode));
+    m_IndirectionNodesStorage->getCurrentFrameBuffer()->setDataCPU(m_IndirectionNodes.data(), m_IndirectionNodes.size() * sizeof(GPUIndirectionNode));
 
     uint32_t size = (uint32_t)m_IndirectionNodes.size();
     int32_t invokes = (int32_t)glm::ceil(float(size) / 32.0f);
@@ -176,7 +176,7 @@ void TerrainVirtualMap::updateStatusTexture(VkCommandBuffer cmdBuffer)
     if (m_StatusNodes.empty())
         return;
 
-    m_StatusNodesStorage->setDataCPU(m_StatusNodes.data(), m_StatusNodes.size() * sizeof(GPUStatusNode));
+    m_StatusNodesStorage->getCurrentFrameBuffer()->setDataCPU(m_StatusNodes.data(), m_StatusNodes.size() * sizeof(GPUStatusNode));
 
     uint32_t size = (uint32_t)m_StatusNodes.size();
     int32_t invokes = (int32_t)glm::ceil(float(size) / 32.0f);
@@ -246,7 +246,7 @@ void TerrainVirtualMap::createIndirectionResources()
         indirectionBufferProperties.Type = BufferType::STORAGE_BUFFER;
         indirectionBufferProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
 
-        m_IndirectionNodesStorage = std::make_shared<VulkanBuffer>(indirectionBufferProperties);
+        m_IndirectionNodesStorage = std::make_shared<VulkanBufferSet>(2, indirectionBufferProperties);
     }
 
     {
@@ -296,7 +296,7 @@ void TerrainVirtualMap::createStatusResources()
         statusBufferProperties.Type = BufferType::STORAGE_BUFFER;
         statusBufferProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
 
-        m_StatusNodesStorage = std::make_shared<VulkanBuffer>(statusBufferProperties);
+        m_StatusNodesStorage = std::make_shared<VulkanBufferSet>(2, statusBufferProperties);
     }
 
     {

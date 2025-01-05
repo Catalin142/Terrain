@@ -23,7 +23,6 @@
 #include <GLFW/glfw3.h>
 
 #include "Graphics/Vulkan/VulkanShader.h"
-#include "Terrain/Techniques/DistanceLOD.h"
 #include "Terrain/VirtualMap/DynamicVirtualTerrainDeserializer.h"
 #include "Terrain/VirtualMap/VirtualTerrainSerializer.h"
 #include "Terrain/VirtualMap/VMUtils.h"
@@ -35,6 +34,7 @@
 #include "System/Disk.h"
 
 /*
+- Quad tree abstraction
 - Change descriptor set creation, i don t need two identical descriptors if i don t use a bufferset. Also, i want to force some pipelines to use different descritors
 - Change how image barriers are implemented, i want to put barries on all mips
 */
@@ -168,14 +168,6 @@ void VulkanApp::onCreate()
 		TerrainGUI = std::make_shared<TerrainGenerationGUI>(m_TerrainGenerator, m_Terrain, 300, ImVec2(1290.0f, 10.0f));
 	}
 
-	{
-		TerrainQuadTreeProperties terrainQuadProps;
-		terrainQuadProps.Size = { 1024, 1024 };
-		terrainQuadProps.MaxLod = 4;
-		terrainQuadProps.LodDistance = 32;
-		terrainQuadTree = new TerrainQuadTree(terrainQuadProps);
-	}
-
 	//VirtualTerrainSerializer::Init();
 
 	createFinalPass();
@@ -184,7 +176,7 @@ void VulkanApp::onCreate()
 	spec.Filepaths[VirtualTextureType::HEIGHT].Data = "heightData.tc";
 	spec.Filepaths[VirtualTextureType::HEIGHT].Table = "heightTable.tb";
 	spec.Format = VK_FORMAT_R16_SFLOAT;
-	spec.PhysicalTextureSize = 1024;
+	spec.PhysicalTextureSize = 1024 * 2;
 	spec.RingSizes = std::array<uint32_t, MAX_LOD>{6, 9, 13, 6, 0, 0};
 	VirtualMap = std::make_shared<TerrainVirtualMap>(spec);
 
@@ -196,6 +188,7 @@ void VulkanApp::onCreate()
 	TerrainRenderer::m_TerrainChunksSet = m_FinalResult;
 	m_TerrainRenderer = std::make_shared<TerrainRenderer>(m_Output, m_Terrain);
 	m_TerrainRenderer->m_IndirectDraw = m_DrawIndirect;
+	m_TerrainRenderer->m_MetadataSet = m_PassMetadata;
 	m_TerrainRenderer->initializeRenderPass();
 
 	m_HeightMapDescriptor = ImGui_ImplVulkan_AddTexture(m_Sampler->Get(),
@@ -203,15 +196,6 @@ void VulkanApp::onCreate()
 
 	createQuadPass();
 
-}
-
-static bool CheckCollision(glm::vec2 onePos, int oneSize, glm::vec2 twoPos, int twoSize)
-{
-	bool collisionX = onePos.x + oneSize >= twoPos.x &&
-		twoPos.x + twoSize >= onePos.x;
-	bool collisionY = onePos.y + oneSize >= twoPos.y &&
-		twoPos.y + twoSize >= onePos.y;
-	return collisionX && collisionY;
 }
 
 void VulkanApp::onUpdate()
@@ -258,8 +242,6 @@ void VulkanApp::onUpdate()
 	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_2))
 		m_TerrainRenderer->setWireframe(false);
 
-	terrainQuadTree->insertPlayer({ cam.getPosition().x, cam.getPosition().z });
-
 	std::vector<TerrainChunk> chunksToRender;
 	std::vector<TerrainChunkNoPadding> firstPass;
 
@@ -291,67 +273,79 @@ void VulkanApp::onUpdate()
 			m_TerrainGenerator->runHydraulicErosion(CommandBuffer);
 
 		CommandBuffer->beginQuery("Terrain");
-		m_Terrain->m_VirtualMap->updateVirtualMap(commandBuffer);
 
-		VulkanComputePipeline::imageMemoryBarrier(commandBuffer, m_Terrain->m_VirtualMap->getPhysicalTexture(), VK_ACCESS_MEMORY_WRITE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 1);
-
-		m_Terrain->m_VirtualMap->updateResources(commandBuffer);
-
-		for (uint32_t lod = 0; lod < 4; lod++)
+		// deserialize to texture
 		{
-		    VulkanRenderer::dispatchCompute(commandBuffer, m_QuadPass, { 1, 1, 1 },
-		        sizeof(uint32_t), &sizefp);
+			CommandBuffer->beginQuery("DeserializeGPU");
 
-			VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, m_TempA->getBuffer(VulkanRenderer::getCurrentFrame()), VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-				VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-			VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, m_TempB->getBuffer(VulkanRenderer::getCurrentFrame()), VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-				VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-			VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, m_FinalResult->getBuffer(VulkanRenderer::getCurrentFrame()), VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-				VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+			m_Terrain->m_VirtualMap->updateVirtualMap(commandBuffer);
 
+			VulkanComputePipeline::imageMemoryBarrier(commandBuffer, m_Terrain->m_VirtualMap->getPhysicalTexture(), VK_ACCESS_MEMORY_WRITE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+				VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 1);
 
-		    VkMemoryBarrier barrier1 = {};
-		    barrier1.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-		    barrier1.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-		    barrier1.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			CommandBuffer->endQuery("DeserializeGPU");
+		}
 
-		    vkCmdPipelineBarrier(
-				commandBuffer,
-		        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 
-		        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		        0,                                   
-		        1, &barrier1,                        
-		        0, nullptr, 0, nullptr               
-		    );
+		{
+			CommandBuffer->beginQuery("IndiStatus");
+			m_Terrain->m_VirtualMap->updateResources(commandBuffer);
+			CommandBuffer->endQuery("IndiStatus");
+		}
+		{
+			CommandBuffer->beginQuery("QuadTree");
+			for (uint32_t lod = 0; lod < 4; lod++)
+			{
+				VulkanRenderer::dispatchCompute(commandBuffer, m_QuadPassPipeline, m_DescriptorSets[lod % 2], {1, 1, 1},
+					sizeof(uint32_t), &sizefp);
 
-		    SwapBuffers(commandBuffer, m_TempA->getBuffer(VulkanRenderer::getCurrentFrame()), m_TempB->getBuffer(VulkanRenderer::getCurrentFrame()), 1024);
-		    uint32_t indexSSBO = 0;
-		    vkCmdUpdateBuffer(commandBuffer, m_PassMetadata->getVkBuffer(VulkanRenderer::getCurrentFrame()), 0, sizeof(uint32_t), &indexSSBO);
+				VkMemoryBarrier barrier1 = {};
+				barrier1.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+				barrier1.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+				barrier1.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-		    VkMemoryBarrier barrier2 = {};
-		    barrier2.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-		    barrier2.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
-		    barrier2.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+				vkCmdPipelineBarrier(
+					commandBuffer,
+					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+					0,
+					1, &barrier1,
+					0, nullptr, 0, nullptr
+				);
 
-		    vkCmdPipelineBarrier(
-				commandBuffer,
-		        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 
-		        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 
-		        0,                                  
-		        1, &barrier2,                       
-		        0, nullptr, 0, nullptr              
-		    );
+				uint32_t indexSSBO = 0;
+				vkCmdUpdateBuffer(commandBuffer, m_PassMetadata->getVkBuffer(VulkanRenderer::getCurrentFrame()), 0, sizeof(uint32_t), &indexSSBO);
+
+				VkMemoryBarrier barrier2 = {};
+				barrier2.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+				barrier2.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+				barrier2.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+
+				vkCmdPipelineBarrier(
+					commandBuffer,
+					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+					0,
+					1, &barrier2,
+					0, nullptr, 0, nullptr
+				);
+			}
+			CommandBuffer->endQuery("QuadTree");
 		}
 
 		CommandBuffer->endQuery("Terrain");
 
-		uint32_t idxBuffer = m_TerrainRenderer->getChunkIndexBufferLOD(1).IndicesCount;
-		VulkanRenderer::dispatchCompute(commandBuffer, m_IndirectPass, { 1, 1, 1 },
-			sizeof(uint32_t), &idxBuffer);
+		{
+			CommandBuffer->beginQuery("IndirectCommand");
 
-		VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, m_DrawIndirect->getBuffer(VulkanRenderer::getCurrentFrame()), VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			VK_ACCESS_MEMORY_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+			uint32_t idxBuffer = m_TerrainRenderer->getChunkIndexBufferLOD(1).IndicesCount;
+			VulkanRenderer::dispatchCompute(commandBuffer, m_IndirectPass, { 1, 1, 1 },
+				sizeof(uint32_t), &idxBuffer);
+
+			VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, m_DrawIndirect->getBuffer(VulkanRenderer::getCurrentFrame()), VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				VK_ACCESS_MEMORY_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+
+			CommandBuffer->endQuery("IndirectCommand");
+		}
 
 		VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, m_PassMetadata->getBuffer(VulkanRenderer::getCurrentFrame()), VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
@@ -367,8 +361,6 @@ void VulkanApp::onUpdate()
 		compParams.right = glm::vec2(cam.Right().x, cam.Right().z);*/
 
 		glm::vec2 cameraPosition = { (cam.getPosition().x), (cam.getPosition().z) };
-
-		static int xHH = 0, yHH = 0, mipHH = 0;
 
 		// Geometry pass
 		{
@@ -391,19 +383,27 @@ void VulkanApp::onUpdate()
 			CommandBuffer->beginQuery("Imgui");
 			beginImGuiFrame();
 
-			static ProfilerManager manager({ 10.0f, 10.0f }, 400.0f);
+			static ProfilerManager manager({ 10.0f, 10.0f }, 440.0f);
 			{
 				manager.addProfiler("GPUProfiler", 100);
-				manager["GPUProfiler"]->addProfileValue("TotalGPU", CommandBuffer->getCommandBufferTime(), 0xffff00ff);
-				manager["GPUProfiler"]->addProfileValue("GeometryPass", CommandBuffer->getTime("GeometryPass"), 0xffffffff);
-				manager["GPUProfiler"]->addProfileValue("Terrain", CommandBuffer->getTime("Terrain"), 0xff0f0fff);
-				manager["GPUProfiler"]->addProfileValue("PresentPass", CommandBuffer->getTime("PresentPass"), 0xff0000ff);
-				manager["GPUProfiler"]->addProfileValue("Imgui", CommandBuffer->getTime("Imgui"), 0xff00ffff);
+				manager["GPUProfiler"]->pushValue("TotalGPU", CommandBuffer->getCommandBufferTime(), 0xffff00ff);
+				manager["GPUProfiler"]->pushValue("GeometryPass", CommandBuffer->getTime("GeometryPass"), 0xffffffff);
+				manager["GPUProfiler"]->pushValue("PresentPass", CommandBuffer->getTime("PresentPass"), 0xff0000ff);
+				manager["GPUProfiler"]->pushValue("Imgui", CommandBuffer->getTime("Imgui"), 0xff00ffff);
 			}
 			{
 				manager.addProfiler("CPUProfiler", 100);
-				manager["CPUProfiler"]->addProfileValue("Total Time", Instrumentor::Get().getTime("_TotalTime"), 0xffffffff);
-				manager["CPUProfiler"]->addProfileValue("Update", Instrumentor::Get().getTime("_Update"), 0xffff00ff);
+				manager["CPUProfiler"]->pushValue("Total Time", Instrumentor::Get().getTime("_TotalTime"), 0xffffffff);
+				manager["CPUProfiler"]->pushValue("Update", Instrumentor::Get().getTime("_Update"), 0xffff00ff);
+			}
+
+			{
+				manager.addProfiler("Terrain", 100);
+				manager["Terrain"]->pushValue("Total Time", CommandBuffer->getTime("Terrain"), 0xfffff0ff);
+				manager["Terrain"]->pushValue("Deserialize", CommandBuffer->getTime("DeserializeGPU"), 0xff0f00ff);
+				manager["Terrain"]->pushValue("IndiStatus", CommandBuffer->getTime("IndiStatus"), 0xffff00f0);
+				manager["Terrain"]->pushValue("QuadTree", CommandBuffer->getTime("QuadTree"), 0xffff0000);
+				manager["Terrain"]->pushValue("IndirectCommand", CommandBuffer->getTime("IndirectCommand"), 0xff0f00ff);
 			}
 
 			manager.Render();
@@ -413,13 +413,7 @@ void VulkanApp::onUpdate()
 			m_Terrain->setHeightMultiplier(100.0f);
 
 			ImGui::Begin("VirtualHeightMapDebug");
-
-			ImGui::Image(m_HeightMapDescriptor, ImVec2{ 512, 512 });
-
-			ImGui::DragInt("x", &xHH);
-			ImGui::DragInt("y", &yHH);
-			ImGui::DragInt("mip", &mipHH);
-
+			ImGui::Image(m_HeightMapDescriptor, ImVec2{ 520, 520 });
 			ImGui::End();
 
 			endImGuiFrame();
@@ -435,8 +429,8 @@ void VulkanApp::onUpdate()
 		CommandBuffer->End();
 		CommandBuffer->Submit();
 	}
-	//if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_O))
-		//VirtualTerrainSerializer::Serialize(m_TerrainGenerator->getHeightMap(), VirtualMap->getSpecification(), VirtualTextureType::HEIGHT);
+	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_O))
+		VirtualTerrainSerializer::Serialize(m_TerrainGenerator->getHeightMap(), VirtualMap->getSpecification(), VirtualTextureType::HEIGHT);
 	//if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_P))
 	//{
 	//	VirtualTerrainSerializer::Deserialize(VirtualMap, VirtualTextureType::HEIGHT);
@@ -529,18 +523,30 @@ void VulkanApp::createQuadPass()
 
 	// create pass
 	{
-		m_QuadPass = std::make_shared<VulkanComputePass>();
-		m_QuadPass->DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("_QuadCompute"));
+		m_DescriptorSets.resize(2);
+		m_DescriptorSets[0] = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("_QuadCompute"));
 		for (uint32_t i = 0; i < MAX_LOD; i++)
 		{
-			m_QuadPass->DescriptorSet->bindInput(0, 0, i, m_Terrain->m_VirtualMap->getLoadStatusTexture(), (uint32_t)i);
+			m_DescriptorSets[0]->bindInput(0, 0, i, m_Terrain->m_VirtualMap->getLoadStatusTexture(), (uint32_t)i);
 		}
-		m_QuadPass->DescriptorSet->bindInput(1, 0, 0, m_TempA);
-		m_QuadPass->DescriptorSet->bindInput(1, 1, 0, m_TempB);
-		m_QuadPass->DescriptorSet->bindInput(1, 2, 0, m_FinalResult);
-		m_QuadPass->DescriptorSet->bindInput(2, 0, 0, m_PassMetadata);
-		m_QuadPass->DescriptorSet->Create();
-		m_QuadPass->Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader("_QuadCompute"),
+		m_DescriptorSets[0]->bindInput(1, 0, 0, m_TempA);
+		m_DescriptorSets[0]->bindInput(1, 1, 0, m_TempB);
+		m_DescriptorSets[0]->bindInput(1, 2, 0, m_FinalResult);
+		m_DescriptorSets[0]->bindInput(2, 0, 0, m_PassMetadata);
+		m_DescriptorSets[0]->Create();
+
+		m_DescriptorSets[1] = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("_QuadCompute"));
+		for (uint32_t i = 0; i < MAX_LOD; i++)
+		{
+			m_DescriptorSets[1]->bindInput(0, 0, i, m_Terrain->m_VirtualMap->getLoadStatusTexture(), (uint32_t)i);
+		}
+		m_DescriptorSets[1]->bindInput(1, 0, 0, m_TempB);
+		m_DescriptorSets[1]->bindInput(1, 1, 0, m_TempA);
+		m_DescriptorSets[1]->bindInput(1, 2, 0, m_FinalResult);
+		m_DescriptorSets[1]->bindInput(2, 0, 0, m_PassMetadata);
+		m_DescriptorSets[1]->Create();
+
+		m_QuadPassPipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader("_QuadCompute"),
 			uint32_t(sizeof(uint32_t) * 4));
 	}
 

@@ -11,7 +11,7 @@ class VirtualTerrainSerializer
 	friend class TerrainVirtualMap;
 
 public:
-	static void Serialize(const std::shared_ptr<Terrain>& terrain, const VirtualTerrainMapSpecification& spec, VirtualTextureType type,
+	static void Serialize(const std::shared_ptr<VulkanImage>& terrain, const VirtualTerrainMapSpecification& spec, VirtualTextureType type,
 		glm::uvec2 worldOffset = { 0u, 0u }, bool purgeContent = true);
 	static void Deserialize(const std::shared_ptr<TerrainVirtualMap>& virtualMap, VirtualTextureType type);
 };

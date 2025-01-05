@@ -22,8 +22,6 @@
 #include "Scene/Camera.h"
 #include "GUI/TerrainGenerationGUI.h"
 
-#include "Terrain/Container/TerrainQuadTree.h"
-
 #include <thread>
 #include "Terrain/VirtualMap/TerrainVirtualMap.h"
 
@@ -70,14 +68,14 @@ private:
 	Camera cam{45.0f, 1600.0f / 900.0f, 0.1f, 10000.0f};
 	bool Wireframe = false;
 
-	TerrainQuadTree* terrainQuadTree;
 	VkDescriptorSet m_HeightMapDescriptor;
 
 	std::thread* thread;
 	bool presed = false;
 
 
-	std::shared_ptr<VulkanComputePass> m_QuadPass;
+	std::shared_ptr<VulkanComputePipeline> m_QuadPassPipeline;
+	std::vector<std::shared_ptr<VulkanDescriptorSet>> m_DescriptorSets;
 	std::shared_ptr<VulkanBufferSet> m_TempA;
 	std::shared_ptr<VulkanBufferSet> m_TempB;
 	std::shared_ptr<VulkanBufferSet> m_FinalResult;

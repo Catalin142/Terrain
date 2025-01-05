@@ -31,8 +31,8 @@ DynamicVirtualTerrainDeserializer::DynamicVirtualTerrainDeserializer(const Virtu
     m_RegionsToCopy.reserve(MAX_CHUNKS_LOADING_PER_FRAME);
     m_UsedIndices.reserve(MAX_CHUNKS_LOADING_PER_FRAME);
 
-    m_IndirectionNodes.reserve(1024);
-    m_StatusNodes.reserve(1024);
+    m_IndirectionNodes.reserve(MAX_CHUNKS_LOADING_PER_FRAME);
+    m_StatusNodes.reserve(MAX_CHUNKS_LOADING_PER_FRAME * 2);
 
     m_MaxLoadSemaphore.release(MAX_CHUNKS_LOADING_PER_FRAME);
 
@@ -172,20 +172,6 @@ void DynamicVirtualTerrainDeserializer::Refresh(VkCommandBuffer cmdBuffer, Terra
     virtualMap->prepareForDeserialization(cmdBuffer);
     virtualMap->blitNodes(cmdBuffer, m_RawImageData, regionsCopy);
     virtualMap->prepareForRendering(cmdBuffer);
-
-    VkMemoryBarrier barrier2 = {};
-    barrier2.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-    barrier2.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
-    barrier2.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
-
-    vkCmdPipelineBarrier(
-        cmdBuffer,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        0,
-        1, &barrier2,
-        0, nullptr, 0, nullptr
-    );
 
     for (uint32_t index : indicesCopy)
     {

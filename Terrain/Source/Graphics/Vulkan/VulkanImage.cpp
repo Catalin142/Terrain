@@ -202,7 +202,7 @@ void VulkanImage::generateMips()
 			m_Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 			m_Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			1, &blit,
-			VK_FILTER_LINEAR);
+			VK_FILTER_NEAREST);
 
 		barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 		barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;

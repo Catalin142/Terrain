@@ -85,7 +85,7 @@ public:
 private:
 	TerrainSpecification m_Specification;
 
-	LODTechnique m_CurrentLODTechnique = LODTechnique::DISTANCE_BASED;
+	LODTechnique m_CurrentLODTechnique = LODTechnique::QUAD_TREE;
 
 	std::vector<TerrainChunk> m_ChunksToRender;
 	std::vector<LODLevel> m_LodLevelMap;

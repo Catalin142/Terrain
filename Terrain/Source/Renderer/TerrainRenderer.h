@@ -38,6 +38,7 @@ public:
 	void setWireframe(bool wireframe);
 
 	inline static std::shared_ptr<VulkanBufferSet> m_TerrainChunksSet;
+	inline static std::shared_ptr<VulkanBufferSet> m_MetadataSet;
 
 	inline static std::shared_ptr<VulkanBufferSet> m_IndirectDraw;
 

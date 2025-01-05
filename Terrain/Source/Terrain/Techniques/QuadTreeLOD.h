@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Terrain/Terrain.h"
-#include "Terrain/Container/TerrainQuadTree.h"
 
 class QuadTreeLOD
 {
@@ -14,5 +13,4 @@ public:
 
 private:
 	TerrainSpecification m_TerrainSpecification;
-	std::shared_ptr<TerrainQuadTree> m_TerrainQuadTree;
 };
