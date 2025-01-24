@@ -43,7 +43,7 @@ void ProfilerGUI::Render(ImVec2 size)
 
 	// Graph Render
 	{
-		ImGui::BeginChild((m_Name + " Graph").c_str(), { size.x - 200.0f, size.y});
+		ImGui::BeginChild((m_Name + " Graph").c_str(), { size.x - 350.0f, size.y});
 
 		auto position = ImGui::GetCursorScreenPos();
 		auto size = ImGui::GetWindowSize();

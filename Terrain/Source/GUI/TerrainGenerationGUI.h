@@ -31,6 +31,5 @@ private:
 	VkDescriptorSet m_HeightMapDescriptor;
 	VkDescriptorSet m_NormalMapDescriptor;
 
-	std::unordered_map<std::string, LODTechnique> m_LODTechniques;
 	std::vector<std::string> m_LODNames;
 };

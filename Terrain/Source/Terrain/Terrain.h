@@ -11,20 +11,7 @@
 #include <vector>
 #include <memory>
 
-class DistanceLOD;
-class QuadTreeLOD;
-class SinkingLOD;
-
 // 128 = 64m
-
-enum class LODTechnique
-{
-	DISTANCE_BASED,
-	QUAD_TREE,
-	SINKING_CIRCLE,
-
-	NONE
-};
 
 struct LODLevel
 {
@@ -56,27 +43,13 @@ public:
 	Terrain(const TerrainSpecification& spec);
 	~Terrain() = default;
 
-	const std::vector<TerrainChunk>& getChunksToRender(const glm::vec3& cameraPosition);
-	const std::vector<TerrainChunk>& getQuadTreeVisitedNodes();
-
-	LODTechnique getCurrentTechnique() { return m_CurrentLODTechnique; }
-	void setTechnique(LODTechnique tech);
-
-	const std::shared_ptr<DistanceLOD>& getDistanceLODTechnique() { return m_DistanceLOD; }
-	const std::shared_ptr<QuadTreeLOD>& getQuadTreeLODTechnique() { return m_QuadTreeLOD; }
-	const std::shared_ptr<SinkingLOD>& getSinkingCircleLODTechnique() { return m_SinkingCircleLOD; }
-
 	TerrainInfo getInfo() { return m_Specification.Info; }
+	TerrainSpecification getSpecification() { return m_Specification; }
+
 	uint32_t getSectorCount() { return uint32_t(m_Specification.Info.TerrainSize.x) / m_Specification.Info.MinimumChunkSize; }
 	void setHeightMultiplier(float mul) { m_Specification.Info.HeightMultiplier = mul; }
 
-	void Update(VkCommandBuffer cmdBuffer);
-
-	std::vector<TerrainChunk> ctr;
-	std::shared_ptr<TerrainVirtualMap> m_VirtualMap;
-
-	const std::shared_ptr<VulkanImage>& getHeightMap() { return m_VirtualMap->getPhysicalTexture(); }
-	const std::shared_ptr<VulkanImage>& getIndirectionTexture() { return m_VirtualMap->getIndirectionTexture(); }
+	const std::shared_ptr<VulkanImage>& getHeightMap() { return m_Specification.HeightMap; }
 	const std::shared_ptr<VulkanImage>& getNormalMap() { return m_Specification.NormalMap; }
 	const std::shared_ptr<VulkanImage>& getCompositionMap() { return m_Specification.CompositionMap; }
 	const std::shared_ptr<VulkanTexture>& getTerrainTextures() { return m_Specification.TerrainTextures; }
@@ -84,13 +57,4 @@ public:
 
 private:
 	TerrainSpecification m_Specification;
-
-	LODTechnique m_CurrentLODTechnique = LODTechnique::QUAD_TREE;
-
-	std::vector<TerrainChunk> m_ChunksToRender;
-	std::vector<LODLevel> m_LodLevelMap;
-
-	std::shared_ptr<DistanceLOD> m_DistanceLOD;
-	std::shared_ptr<QuadTreeLOD> m_QuadTreeLOD;
-	std::shared_ptr<SinkingLOD> m_SinkingCircleLOD;
 };

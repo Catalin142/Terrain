@@ -30,16 +30,10 @@ layout(set = 0, binding = 1) uniform TerrainInfoUniformBuffer
     int minimumChunkSize;
 } terrainInfo;
 
-layout(set = 0, binding = 2) uniform CameraPositionBuffer
-{
-    vec2 Position;
-} cameraInfo;
+layout (set = 0, binding = 2, r8ui) uniform readonly uimage2D LODMap;
 
-layout (set = 0, binding = 3, r8ui) uniform readonly uimage2D LODMap;
-
-layout (set = 1, binding = 0) uniform sampler terrainSampler;
-layout (set = 1, binding = 1, r16f) uniform readonly image2D heightMapPhysicalTexture;
-layout (set = 1, binding = 2, r32ui) uniform readonly uimage2D indirectionTexture[6];
+layout (set = 1, binding = 0, r16f) uniform readonly image2D heightMapPhysicalTexture;
+layout (set = 1, binding = 1, r32ui) uniform readonly uimage2D indirectionTexture[6];
 
 int getLod(int posX, int posY)
 {
@@ -90,6 +84,7 @@ void main()
     
     uint chunkPhysicalLocation;
     
+    // move this to be handled by the compute shader that creates the nodes, when a node gets inserted in the final render list, fetch the location and pass it
     switch (chunk.Lod) 
     {
         case 0: chunkPhysicalLocation = imageLoad(indirectionTexture[0], chunkPosition / int(multiplier)).r; break;
@@ -108,9 +103,16 @@ void main()
 
     terrainPhLoc.x += float(chunkPhyX);
     terrainPhLoc.y += float(chunkPhyY);
+    
+    // this is for coordinate 0, where there is no height data in the chunks
+    terrainPhLoc.x += position.x == 0 ? 1 : 0;
+    terrainPhLoc.y += position.z == 0 ? 1 : 0;
 
     cameraPosition = vec2(chunkPhyX, chunkPhysicalLocation);
 
+    position.x += position.x == 0 ? 1 : 0;
+    position.z += position.z == 0 ? 1 : 0;
+    
     position.y = -imageLoad(heightMapPhysicalTexture, ivec2(terrainPhLoc.x, terrainPhLoc.y)).r * terrainInfo.heightMultiplier;
     //position.y = terrainPhLoc.y * terrainInfo.heightMultiplier;
 

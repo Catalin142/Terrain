@@ -1,6 +1,6 @@
 #pragma once
 
-#include "VMData.h"
+#include "VirtualMapUtils.h"
 #include "Graphics/Vulkan/VulkanBuffer.h"
 #include "Terrain/TerrainChunk.h"
 
@@ -27,7 +27,7 @@ public:
 	void Refresh(VkCommandBuffer cmdBuffer, TerrainVirtualMap* virtualMap);
 
 	void loadChunk(LoadTask task);
-	void pushLoadTask(size_t node, int32_t virtualLocation, const VirtualTerrainChunkProperties& properties, VirtualTextureType type);
+	void pushLoadTask(size_t node, int32_t virtualLocation, const VirtualTerrainChunkProperties& properties);
 
 public:
 	VirtualMapDeserializerLastUpdate LastUpdate;

@@ -9,13 +9,11 @@ layout(location = 0) out vec4 outColor;
 
 precision highp float;
 
-layout (set = 1, binding = 0) uniform sampler terrainSampler;
 layout (set = 1, binding = 3, r8ui) uniform readonly uimage2D Composition;
 layout (set = 1, binding = 4) uniform texture2D normalMap;
 
 layout (set = 2, binding = 0) uniform sampler2DArray texturePack;
 layout (set = 2, binding = 1) uniform sampler2DArray normalPack;
-layout (set = 2, binding = 2) uniform texture2D noiseMap;
 
 vec3 lightDirection = normalize(vec3(100.0, -50.0, 0.0));
 
@@ -165,15 +163,15 @@ void triplanarMapping(ivec4 surroundingLayers, vec3 normal, out vec3 outColor, o
 
 void main() 
 {
-    vec3 normal = texture(sampler2D(normalMap, terrainSampler), terrainUV).xyz;
-
-    ivec4 surroundingLayers = aquireMaterialIndices(ivec2(fragPos.x, fragPos.z));
+//    vec3 normal = vec3(0.0, 1.0, 0.0);
+//
+//    ivec4 surroundingLayers = aquireMaterialIndices(ivec2(fragPos.x, fragPos.z));
+//    
+//    vec3 finalColor = vec3(0.0);
+//    vec3 finalNormal = vec3(0.0);
+//    triplanarMapping(surroundingLayers, normal, finalColor, finalNormal);
+//
+//    float intensity = max(dot(finalNormal, -lightDirection), 0.2);
     
-    vec3 finalColor = vec3(0.0);
-    vec3 finalNormal = vec3(0.0);
-    triplanarMapping(surroundingLayers, normal, finalColor, finalNormal);
-
-    float intensity = max(dot(finalNormal, -lightDirection), 0.2);
-    
-    outColor = vec4(finalColor * intensity, 1.0);
+    outColor = vec4(vec3(0.7, 0.5, 0.9), 1.0);
 }

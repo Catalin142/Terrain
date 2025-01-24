@@ -14,7 +14,7 @@
 #include "Graphics/Vulkan/VulkanImgui.h"
 #include "Graphics/VirtualTexture.h"
 
-#include "Renderer/TerrainRenderer.h"
+#include "Renderer/QuadTreeTerrainRenderer.h"
 
 #include "Terrain/Terrain.h"
 #include "Terrain/Generator/TerrainGenerator.h"
@@ -57,7 +57,6 @@ private:
 	std::shared_ptr<VulkanFramebuffer> m_Output;
 
 	std::shared_ptr<Terrain> m_Terrain;
-	std::shared_ptr<TerrainRenderer> m_TerrainRenderer;
 	std::shared_ptr<TerrainGenerator> m_TerrainGenerator;
 
 	std::shared_ptr<VulkanSampler> m_Sampler;
@@ -68,21 +67,10 @@ private:
 	Camera cam{45.0f, 1600.0f / 900.0f, 0.1f, 10000.0f};
 	bool Wireframe = false;
 
+	std::shared_ptr<QuadTreeTerrainRenderer> m_Renderer;
+
 	VkDescriptorSet m_HeightMapDescriptor;
 
 	std::thread* thread;
 	bool presed = false;
-
-
-	std::shared_ptr<VulkanComputePipeline> m_QuadPassPipeline;
-	std::vector<std::shared_ptr<VulkanDescriptorSet>> m_DescriptorSets;
-	std::shared_ptr<VulkanBufferSet> m_TempA;
-	std::shared_ptr<VulkanBufferSet> m_TempB;
-	std::shared_ptr<VulkanBufferSet> m_FinalResult;
-	std::shared_ptr<VulkanBufferSet> m_PassMetadata;
-
-	std::shared_ptr<VulkanComputePass> m_IndirectPass;
-	std::shared_ptr<VulkanBufferSet> m_DrawIndirect;
-
-	void createQuadPass();
 };

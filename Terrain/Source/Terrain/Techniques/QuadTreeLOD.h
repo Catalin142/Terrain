@@ -2,15 +2,38 @@
 
 #include "Terrain/Terrain.h"
 
+// Technique highly inspired by Far Cry 5: https://www.gdcvault.com/play/1025261/Terrain-Rendering-in-Far-Cry
+
+struct QuadTreePassMetadata
+{
+	uint32_t TMPArray1Index;
+	uint32_t ResultArrayIndex;
+	uint32_t DataLoaded;
+};
+
+// Everything happens on the GPU, highly performant
+// Works only with virtual maps
 class QuadTreeLOD
 {
 public:
-	QuadTreeLOD(const TerrainSpecification& spec);
+	QuadTreeLOD(const TerrainSpecification& spec, const std::shared_ptr<TerrainVirtualMap>& virtualMap);
 	~QuadTreeLOD() = default;
 
-	void getChunksToRender(std::vector<TerrainChunk>& chunks, const glm::vec3& cameraPosition);
-	const std::vector<TerrainChunk>& getVisitedNodes();
+	void Generate(VkCommandBuffer commandBuffer);
+
+private:
+	void createResources(const std::shared_ptr<TerrainVirtualMap>& virtualMap);
+
+public:
+	std::shared_ptr<VulkanBufferSet> chunksToRender;
+	std::shared_ptr<VulkanBufferSet> passMetadata;
 
 private:
 	TerrainSpecification m_TerrainSpecification;
+
+	std::shared_ptr<VulkanComputePipeline> m_ConstructQuadTreePipeline;
+	std::vector<std::shared_ptr<VulkanDescriptorSet>> m_DescriptorSets;
+	
+	std::shared_ptr<VulkanBufferSet> m_TempA;
+	std::shared_ptr<VulkanBufferSet> m_TempB;
 };

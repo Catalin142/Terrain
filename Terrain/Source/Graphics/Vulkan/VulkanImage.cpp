@@ -147,7 +147,7 @@ void VulkanImage::batchCopyBuffer(VkCommandBuffer cmdBuffer, const VulkanBuffer&
 	);
 }
 
-void VulkanImage::generateMips()
+void VulkanImage::generateMips(VkFilter filter)
 {
 	VkFormatProperties formatProperties;
 	vkGetPhysicalDeviceFormatProperties(VulkanDevice::getVulkanContext()->getGPU(), VK_FORMAT_R8G8B8A8_SRGB, &formatProperties);
@@ -202,7 +202,7 @@ void VulkanImage::generateMips()
 			m_Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 			m_Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			1, &blit,
-			VK_FILTER_NEAREST);
+			filter);
 
 		barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 		barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;

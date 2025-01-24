@@ -4,7 +4,7 @@
 #include "Terrain/Generator/TerrainGenerator.h"
 #include "Graphics/Vulkan/VulkanBuffer.h"
 #include "Terrain/TerrainChunk.h"
-#include "VMData.h"
+#include "VirtualMapUtils.h"
 
 #include <cstdint>
 #include <memory>
@@ -35,9 +35,11 @@ public:
 		return m_Specification;
 	}
 
-	void pushLoadTasks(const std::vector<TerrainChunk>& chunks);
+	void pushLoadTasks(const glm::vec2& camPosition);
+	void createLoadTask(const TerrainChunk& chunks);
+
 	// this is best to keep in a separate command buffer, and start the main command buffer just after this finishes
-	void updateVirtualMap(VkCommandBuffer cmdBuffer);
+	void updateMap(VkCommandBuffer cmdBuffer);
 
 	void blitNodes(VkCommandBuffer cmdBuffer, const std::shared_ptr<VulkanBuffer>& StagingBuffer, const std::vector<VkBufferImageCopy>& regions);
 
@@ -47,19 +49,16 @@ public:
 
 	void addVirtualChunkProperty(size_t chunk, const VirtualTerrainChunkProperties& props);
 
-	void updateResources(VkCommandBuffer cmdBuffer);
+	void updateIndirectionTexture(VkCommandBuffer cmdBuffer);
+	void updateStatusTexture(VkCommandBuffer cmdBuffer);
 
 	void prepareForDeserialization(VkCommandBuffer cmdBuffer);
 	void prepareForRendering(VkCommandBuffer cmdBuffer);
 
-	void getChunksToLoad(const glm::vec2& camPosition, std::vector<TerrainChunk>& chunks);
 
 private:
 	void createIndirectionResources();
 	void createStatusResources();
-
-	void updateIndirectionTexture(VkCommandBuffer cmdBuffer);
-	void updateStatusTexture(VkCommandBuffer cmdBuffer);
 
 private:
 	std::shared_ptr<VulkanImage> m_PhysicalTexture;

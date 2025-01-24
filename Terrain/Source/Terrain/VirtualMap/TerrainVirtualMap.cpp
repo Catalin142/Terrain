@@ -5,7 +5,7 @@
 #include "Core/Hash.h"
 
 #include "DynamicVirtualTerrainDeserializer.h"
-#include "VMUtils.h"
+#include "VirtualMapUtils.h"
 
 #include "stb_image/stb_image_write.h"
 
@@ -13,7 +13,9 @@
 #include <cassert>
 #include <fstream>
 #include <execution>
-#include <Core/Instrumentor.h>
+
+#define INDIRECTION_COMPUTE_SHADER "Terrain/QuadTree/UpdateIndirectionTexture_comp.glsl"
+#define STATUS_COMPUTE_SHADER "Terrain/QuadTree/UpdateStatusTexture_comp.glsl"
 
 TerrainVirtualMap::TerrainVirtualMap(const VirtualTerrainMapSpecification& spec) : m_Specification(spec)
 {
@@ -45,63 +47,36 @@ TerrainVirtualMap::TerrainVirtualMap(const VirtualTerrainMapSpecification& spec)
     m_Deserializer = std::make_shared<DynamicVirtualTerrainDeserializer>(m_Specification);
 }
 
-void TerrainVirtualMap::pushLoadTasks(const std::vector<TerrainChunk>& chunks)
+void TerrainVirtualMap::pushLoadTasks(const glm::vec2& camPosition)
 {
-    Instrumentor::Get().beginTimer("VirtualMap Update");
-
     // Search for nodes that need to be loaded/unloaded
     m_NodesToUnload = m_ActiveNodes;
 
     m_IndirectionNodes.clear();
     m_StatusNodes.clear();
 
-    // Check for nodes to load / unload
-    for (const TerrainChunk& chunk : chunks)
+    // find a way to optimizie this, multithread?
+    for (uint32_t lod = 0; lod < MAX_LOD; lod++)
     {
-        size_t chunkHashValue = getChunkID(chunk.Offset, chunk.Lod);
+        int32_t ringLODSize = m_Specification.RingSizes[lod];
+        if (ringLODSize <= 0)
+            break;
 
-        if (m_ChunkProperties.find(chunkHashValue) == m_ChunkProperties.end())
-            assert(false);
+        int32_t chunkSize = m_Specification.ChunkSize * (1 << lod);
 
-        // Check for nodes to unload from disk
-        if (m_NodesToUnload.find(chunkHashValue) != m_NodesToUnload.end())
-            m_NodesToUnload.erase(chunkHashValue);
+        glm::ivec2 snapedPosition;
+        snapedPosition.x = int32_t(camPosition.x) / chunkSize;
+        snapedPosition.y = int32_t(camPosition.y) / chunkSize;
 
-        // check for nodes that need to be loaded
-        if (m_ActiveNodes.find(chunkHashValue) == m_ActiveNodes.end())
-        {
-            m_ActiveNodes.insert(chunkHashValue);
-            int32_t avSlot = -1;
+        int32_t minY = glm::max(int32_t(snapedPosition.y) - ringLODSize / 2, 0);
+        int32_t maxY = glm::min(int32_t(snapedPosition.y) + ringLODSize / 2, (int32_t)m_Specification.VirtualTextureSize / chunkSize);
 
-            if (m_LastChunkSlot.find(chunkHashValue) != m_LastChunkSlot.end())
-                avSlot = m_LastChunkSlot.at(chunkHashValue);
+        int32_t minX = glm::max(int32_t(snapedPosition.x) - ringLODSize / 2, 0);
+        int32_t maxX = glm::min(int32_t(snapedPosition.x) + ringLODSize / 2, (int32_t)m_Specification.VirtualTextureSize / chunkSize);
 
-            // check if the node may be already in the map but unloaded, if so, just remeber id
-            if (avSlot != -1 && m_LastSlotChunk.at(avSlot) == chunkHashValue)
-            {
-                m_AvailableSlots.erase(avSlot);
-
-                int32_t slotsPerRow = m_Specification.PhysicalTextureSize / m_Specification.ChunkSize;
-                int32_t x = avSlot / slotsPerRow;
-                int32_t y = avSlot % slotsPerRow;
-
-                m_IndirectionNodes.push_back(GPUIndirectionNode(chunk.Offset, packOffset(x, y), chunk.Lod));
-                m_StatusNodes.push_back(GPUStatusNode(chunk.Offset, chunk.Lod, 1));
-            }
-            else
-            {
-                assert(m_AvailableSlots.size() != 0);
-
-                int32_t availableLoc = *m_AvailableSlots.begin();
-                m_AvailableSlots.erase(availableLoc);
-
-                // Cache
-                m_LastChunkSlot[chunkHashValue] = availableLoc;
-                m_LastSlotChunk[availableLoc] = chunkHashValue;
-
-                m_Deserializer->pushLoadTask(chunkHashValue, availableLoc, m_ChunkProperties[chunkHashValue], VirtualTextureType::HEIGHT);
-            }
-        }
+        for (int32_t y = minY; y < maxY; y++)
+            for (int32_t x = minX; x < maxX; x++)
+                createLoadTask(TerrainChunk{ packOffset(x, y), lod });
     }
 
     // unload nodes
@@ -115,14 +90,60 @@ void TerrainVirtualMap::pushLoadTasks(const std::vector<TerrainChunk>& chunks)
         m_AvailableSlots.insert(slot);
 
         const VirtualTerrainChunkProperties& props = m_ChunkProperties[node];
-        
+
         m_StatusNodes.push_back(GPUStatusNode(props.Position, props.Mip, 0));
     }
-
-    Instrumentor::Get().endTimer("VirtualMap Update");
 }
 
-void TerrainVirtualMap::updateVirtualMap(VkCommandBuffer cmdBuffer)
+void TerrainVirtualMap::createLoadTask(const TerrainChunk& chunk)
+{
+    size_t chunkHashValue = getChunkID(chunk.Offset, chunk.Lod);
+
+    if (m_ChunkProperties.find(chunkHashValue) == m_ChunkProperties.end())
+        assert(false);
+
+    // Check for nodes to unload from disk
+    if (m_NodesToUnload.find(chunkHashValue) != m_NodesToUnload.end())
+        m_NodesToUnload.erase(chunkHashValue);
+
+    // check for nodes that need to be loaded
+    if (m_ActiveNodes.find(chunkHashValue) == m_ActiveNodes.end())
+    {
+        m_ActiveNodes.insert(chunkHashValue);
+        int32_t avSlot = -1;
+
+        if (m_LastChunkSlot.find(chunkHashValue) != m_LastChunkSlot.end())
+            avSlot = m_LastChunkSlot.at(chunkHashValue);
+
+        // check if the node may be already in the map but unloaded, if so, just remeber id
+        if (avSlot != -1 && m_LastSlotChunk.at(avSlot) == chunkHashValue)
+        {
+            m_AvailableSlots.erase(avSlot);
+
+            int32_t slotsPerRow = m_Specification.PhysicalTextureSize / m_Specification.ChunkSize;
+            int32_t x = avSlot / slotsPerRow;
+            int32_t y = avSlot % slotsPerRow;
+
+            m_IndirectionNodes.push_back(GPUIndirectionNode(chunk.Offset, packOffset(x, y), chunk.Lod));
+            m_StatusNodes.push_back(GPUStatusNode(chunk.Offset, chunk.Lod, 1));
+        }
+        else
+        {
+            assert(m_AvailableSlots.size() != 0);
+
+            int32_t availableLoc = *m_AvailableSlots.begin();
+            m_AvailableSlots.erase(availableLoc);
+
+            // Cache
+            m_LastChunkSlot[chunkHashValue] = availableLoc;
+            m_LastSlotChunk[availableLoc] = chunkHashValue;
+
+            m_Deserializer->pushLoadTask(chunkHashValue, availableLoc, m_ChunkProperties[chunkHashValue]);
+        }
+    }
+}
+
+void TerrainVirtualMap::updateMap(VkCommandBuffer cmdBuffer)
 {
     m_Deserializer->Refresh(cmdBuffer, this);
 }
@@ -136,12 +157,6 @@ void TerrainVirtualMap::blitNodes(VkCommandBuffer cmdBuffer, const std::shared_p
 void TerrainVirtualMap::addVirtualChunkProperty(size_t chunk, const VirtualTerrainChunkProperties& props)
 {
     m_ChunkProperties[chunk] = props;
-}
-
-void TerrainVirtualMap::updateResources(VkCommandBuffer cmdBuffer)
-{
-    updateIndirectionTexture(cmdBuffer);
-    updateStatusTexture(cmdBuffer);
 }
 
 void TerrainVirtualMap::updateIndirectionTexture(VkCommandBuffer cmdBuffer)
@@ -187,33 +202,6 @@ void TerrainVirtualMap::updateStatusTexture(VkCommandBuffer cmdBuffer)
 
         VulkanComputePipeline::imageMemoryBarrier(cmdBuffer, m_StatusTexture, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 6);
-    }
-}
-
-void TerrainVirtualMap::getChunksToLoad(const glm::vec2& camPosition, std::vector<TerrainChunk>& chunks)
-{
-    // find a way to optimizie this, multithread?
-    for (uint32_t lod = 0; lod < MAX_LOD; lod++)
-    {
-        int32_t ringLODSize = m_Specification.RingSizes[lod];
-        if (ringLODSize <= 0)
-            break;
-        
-        int32_t chunkSize = m_Specification.ChunkSize * (1 << lod);
-
-        glm::ivec2 snapedPosition;
-        snapedPosition.x = int32_t(camPosition.x) / chunkSize;
-        snapedPosition.y = int32_t(camPosition.y) / chunkSize;
-
-        int32_t minY = glm::max(int32_t(snapedPosition.y) - ringLODSize / 2, 0);
-        int32_t maxY = glm::min(int32_t(snapedPosition.y) + ringLODSize / 2, (int32_t)m_Specification.VirtualTextureSize / chunkSize);
-
-        int32_t minX = glm::max(int32_t(snapedPosition.x) - ringLODSize / 2, 0);
-        int32_t maxX = glm::min(int32_t(snapedPosition.x) + ringLODSize / 2, (int32_t)m_Specification.VirtualTextureSize / chunkSize);
-
-        for (int32_t y = minY; y < maxY; y++)
-            for (int32_t x = minX; x < maxX; x++)
-                chunks.push_back(TerrainChunk{ packOffset(x, y), lod });
     }
 }
 
@@ -268,22 +256,22 @@ void TerrainVirtualMap::createIndirectionResources()
 
     // create shader
     {
-        std::shared_ptr<VulkanShader>& indirectionCompute = ShaderManager::createShader("_UpdateIndirectionCompute");
-        indirectionCompute->addShaderStage(ShaderStage::COMPUTE, "VirtualTexture/UpdateIndirectionTexture_comp.glsl");
+        std::shared_ptr<VulkanShader>& indirectionCompute = ShaderManager::createShader(INDIRECTION_COMPUTE_SHADER);
+        indirectionCompute->addShaderStage(ShaderStage::COMPUTE, INDIRECTION_COMPUTE_SHADER);
         indirectionCompute->createDescriptorSetLayouts();
     }
 
     // create pass
     {
         m_UpdateIndirectionComputePass = std::make_shared<VulkanComputePass>();
-        m_UpdateIndirectionComputePass->DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("_UpdateIndirectionCompute"));
+        m_UpdateIndirectionComputePass->DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader(INDIRECTION_COMPUTE_SHADER));
 
         for (uint32_t i = 0; i < MAX_LOD; i++)
             m_UpdateIndirectionComputePass->DescriptorSet->bindInput(0, 0, i, m_IndirectionTexture, (uint32_t)i);
 
         m_UpdateIndirectionComputePass->DescriptorSet->bindInput(1, 0, 0, m_IndirectionNodesStorage);
         m_UpdateIndirectionComputePass->DescriptorSet->Create();
-        m_UpdateIndirectionComputePass->Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader("_UpdateIndirectionCompute"),
+        m_UpdateIndirectionComputePass->Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader(INDIRECTION_COMPUTE_SHADER),
             uint32_t(sizeof(uint32_t) * 4));
     }
 }
@@ -318,22 +306,22 @@ void TerrainVirtualMap::createStatusResources()
 
     // create shader
     {
-        std::shared_ptr<VulkanShader>& statusCompute = ShaderManager::createShader("_UpdateStatusCompute");
-        statusCompute->addShaderStage(ShaderStage::COMPUTE, "VirtualTexture/UpdateStatusTexture_comp.glsl");
+        std::shared_ptr<VulkanShader>& statusCompute = ShaderManager::createShader(STATUS_COMPUTE_SHADER);
+        statusCompute->addShaderStage(ShaderStage::COMPUTE, STATUS_COMPUTE_SHADER);
         statusCompute->createDescriptorSetLayouts();
     }
 
     // create pass
     {
         m_UpdateStatusComputePass = std::make_shared<VulkanComputePass>();
-        m_UpdateStatusComputePass->DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("_UpdateStatusCompute"));
+        m_UpdateStatusComputePass->DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader(STATUS_COMPUTE_SHADER));
 
         for (uint32_t i = 0; i < MAX_LOD; i++)
             m_UpdateStatusComputePass->DescriptorSet->bindInput(0, 0, i, m_StatusTexture, (uint32_t)i);
 
         m_UpdateStatusComputePass->DescriptorSet->bindInput(1, 0, 0, m_StatusNodesStorage);
         m_UpdateStatusComputePass->DescriptorSet->Create();
-        m_UpdateStatusComputePass->Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader("_UpdateStatusCompute"),
+        m_UpdateStatusComputePass->Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader(STATUS_COMPUTE_SHADER),
             uint32_t(sizeof(uint32_t) * 4));
     }
 }

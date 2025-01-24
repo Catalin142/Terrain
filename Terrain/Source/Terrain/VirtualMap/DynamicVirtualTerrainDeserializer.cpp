@@ -3,7 +3,7 @@
 #include "TerrainVirtualMap.h"
 #include "Graphics/Vulkan/VulkanRenderer.h"
 #include "Graphics/Vulkan/VulkanUtils.h"
-#include "VMUtils.h"
+#include "VirtualMapUtils.h"
 #include "Core/Instrumentor.h"
 
 #include <Graphics/Vulkan/VulkanDevice.h>
@@ -73,18 +73,18 @@ DynamicVirtualTerrainDeserializer::~DynamicVirtualTerrainDeserializer()
     m_FileHandlerCache.clear();
 }
 
-void DynamicVirtualTerrainDeserializer::pushLoadTask(size_t node, int32_t virtualSlot, const VirtualTerrainChunkProperties& properties, VirtualTextureType type)
+void DynamicVirtualTerrainDeserializer::pushLoadTask(size_t node, int32_t virtualSlot, const VirtualTerrainChunkProperties& properties)
 {
     {
         std::lock_guard<std::mutex> lock(m_TaskMutex);
-        m_LoadTasks.push(LoadTask{node, virtualSlot, properties, type });
+        m_LoadTasks.push(LoadTask{node, virtualSlot, properties});
     }
     m_LoadThreadSemaphore.release();
 }
 
 void DynamicVirtualTerrainDeserializer::loadChunk(LoadTask task)
 {
-    VirtualTextureLocation location = m_VirtualMapSpecification.Filepaths[task.Type];
+    VirtualTextureLocation location = m_VirtualMapSpecification.Filepath;
 
     if (m_FileHandlerCache.find(location.Data) == m_FileHandlerCache.end())
         m_FileHandlerCache[location.Data] = new std::ifstream(location.Data, std::ios::binary);

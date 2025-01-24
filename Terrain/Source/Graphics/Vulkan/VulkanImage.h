@@ -52,7 +52,7 @@ public:
 		const glm::uvec2& offset = glm::ivec2(0u, 0u));
 	void batchCopyBuffer(VkCommandBuffer cmdBuffer, const VulkanBuffer& buffer, const std::vector<VkBufferImageCopy>& regions);
 
-	void generateMips();
+	void generateMips(VkFilter filter = VK_FILTER_LINEAR);
 
 private:
 	void createImage();
