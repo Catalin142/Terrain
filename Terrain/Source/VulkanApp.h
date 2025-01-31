@@ -67,7 +67,23 @@ private:
 	Camera cam{45.0f, 1600.0f / 900.0f, 0.1f, 10000.0f};
 	bool Wireframe = false;
 
-	std::shared_ptr<QuadTreeTerrainRenderer> m_Renderer;
+	std::shared_ptr<VulkanBufferSet> ChunksToRender;
+	std::shared_ptr<VulkanBuffer> TerrainInfdo;
+	std::shared_ptr<VulkanBuffer> CamInfo;
+	std::shared_ptr<VulkanImage> m_Clipmap;
+	std::unordered_map<size_t, VirtualTerrainChunkProperties> m_ChunkProperties;
+	std::ifstream heightData;
+	std::shared_ptr<VulkanBuffer> m_RawImageData;
+
+	std::shared_ptr<RenderPass> m_TerrainRenderPass;
+	std::shared_ptr<VulkanPipeline> m_TerrainPipeline;
+
+	std::shared_ptr<VulkanBuffer> indexBuffer;
+	uint32_t idxCount;
+
+	void createClipmapBuffers();
+	void renderClipmap(Camera camera);
+	void renderTerrain(Camera camera);
 
 	VkDescriptorSet m_HeightMapDescriptor;
 

@@ -1,7 +1,5 @@
 #version 460 core
 
-#extension GL_EXT_debug_printf : enable
-
 layout(location = 0) out vec3 fragPos;
 layout(location = 1) out vec2 terrainUV;
 layout(location = 2) flat out vec2 cameraPosition;

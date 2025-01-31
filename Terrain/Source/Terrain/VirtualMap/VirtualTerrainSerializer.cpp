@@ -426,6 +426,151 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& tex
     restoreImageLayout(texture, auxImg);
 }
 
+void VirtualTerrainSerializer::SerializeClipmap(const std::shared_ptr<VulkanImage>& texture, const std::string& table, const std::string& datafile, uint32_t chunkSize, glm::uvec2 worldOffset, bool purgeContent)
+{
+    VkDevice device = VulkanDevice::getVulkanDevice();
+
+    VkImageSubresourceRange imgSubresource{};
+    VulkanImageSpecification texSpec = texture->getSpecification();
+    imgSubresource.aspectMask = texSpec.Aspect;
+    imgSubresource.layerCount = texSpec.LayerCount;
+    imgSubresource.levelCount = texSpec.Mips;
+    imgSubresource.baseMipLevel = 0;
+
+    // Generate mips for heightmap
+    VkUtils::transitionImageLayout(texture->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    texture->generateMips(VK_FILTER_NEAREST);
+
+    std::shared_ptr<VulkanImage> auxImg;
+
+    {
+        VulkanImageSpecification auxSpecification{};
+        auxSpecification.Width = chunkSize;
+        auxSpecification.Height = chunkSize;
+        auxSpecification.Format = VK_FORMAT_R16_SFLOAT;
+        auxSpecification.UsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        auxSpecification.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+        auxSpecification.MemoryType = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+        auxSpecification.Tiling = VK_IMAGE_TILING_LINEAR;
+        auxSpecification.Mips = 1;
+
+        auxImg = std::make_shared<VulkanImage>(auxSpecification);
+        auxImg->Create();
+    }
+
+    prepareImageLayout(texture, auxImg);
+
+    {
+        // MEMORY ALIGMENT
+        // Map memory once
+        VkDeviceMemory memory = auxImg->getVkDeviceMemory();
+        const char* data = nullptr;
+
+        VkResult result = vkMapMemory(device, memory, 0, VK_WHOLE_SIZE, 0, (void**)&data);
+        if (result != VK_SUCCESS) {
+            std::cout << "Failed to map Vulkan memory: " << result << std::endl;
+            return;
+        }
+
+        VkImageSubresource subresource = {};
+        subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+        VkSubresourceLayout layout;
+        vkGetImageSubresourceLayout(device, auxImg->getVkImage(), &subresource, &layout);
+
+        std::ofstream tableOut;
+        std::ofstream imgCacheOut;
+
+        if (purgeContent)
+        {
+            tableOut = std::ofstream(table, std::ios::trunc);
+            imgCacheOut = std::ofstream(datafile, std::ios::binary | std::ios::trunc);
+        }
+        else
+        {
+            tableOut = std::ofstream(table, std::ios::app);
+            imgCacheOut = std::ofstream(datafile, std::ios::binary | std::ios::app);
+        }
+
+        VkMemoryRequirements memRequirements;
+        vkGetImageMemoryRequirements(VulkanDevice::getVulkanDevice(), auxImg->getVkImage(), &memRequirements);
+
+        uint32_t chunkSizePadding = chunkSize;
+
+        uint32_t size = chunkSizePadding * chunkSizePadding * 2;
+        size_t binOffset = 0;
+
+        // TODO: all
+        // Serialize each mip 
+        for (uint32_t mip = 0; mip < 4; mip++)
+        {
+            uint32_t currentSize = texture->getSpecification().Width >> mip;
+
+            for (int32_t y = 0; y < currentSize / chunkSize; y++)
+                for (int32_t x = 0; x < currentSize / chunkSize; x++)
+                {
+                    const char* imageData = data + layout.offset;
+                    memset((void*)imageData, 0, layout.size);
+                    VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
+
+                    // Blit portion of heightmap to dstImage
+                    VkImageBlit blit{};
+
+                    int32_t iChunkSize = chunkSize;
+
+                    blit.srcOffsets[0] = { glm::max(x * iChunkSize, 0), glm::max(y * iChunkSize, 0), 0 };
+                    blit.srcOffsets[1] = { glm::min((x + 1) * iChunkSize, int32_t(currentSize)), glm::min((y + 1) * iChunkSize, int32_t(currentSize)), 1 };
+                    blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                    blit.srcSubresource.mipLevel = mip;
+                    blit.srcSubresource.baseArrayLayer = 0;
+                    blit.srcSubresource.layerCount = 1;
+
+                    blit.dstOffsets[0] = { 0, 0, 0 };
+                    blit.dstOffsets[1] = { 128, 128, 1 };
+                    blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                    blit.dstSubresource.mipLevel = 0;
+                    blit.dstSubresource.baseArrayLayer = 0;
+                    blit.dstSubresource.layerCount = 1;
+
+                    vkCmdBlitImage(cmdBuffer,
+                        texture->getVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                        auxImg->getVkImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        1, &blit,
+                        VK_FILTER_NEAREST);
+
+                    VkUtils::flushCommandBuffer(cmdBuffer);
+
+                    // Serialize to file
+                    uint32_t worldOffsetPacked = packOffset(worldOffset.x + x, worldOffset.y + y);
+
+                    // TODO: don t write size in file, just at the beggining maybe
+                    tableOut << size << " ";
+                    tableOut << mip << " ";
+                    tableOut << worldOffsetPacked << " ";
+                    tableOut << binOffset << " ";
+
+                    binOffset += size;
+
+                    for (uint32_t y1 = 0; y1 < 128; y1++)
+                    {
+                        uint16_t* row = (uint16_t*)imageData;
+                        for (uint32_t x1 = 0; x1 < 128; x1++)
+                        {
+                            imgCacheOut.write((char*)row, 2);
+                            row++;
+                        }
+                        imageData += layout.rowPitch;
+                    }
+                    //imgCacheOut.write(imageData, size);
+                }
+        }
+
+        vkUnmapMemory(device, memory);
+    }
+
+    restoreImageLayout(texture, auxImg);
+}
+
 void VirtualTerrainSerializer::Deserialize(const std::shared_ptr<TerrainVirtualMap>& virtualMap)
 {
     VirtualTextureLocation filepath = virtualMap->getSpecification().Filepath;
@@ -436,4 +581,14 @@ void VirtualTerrainSerializer::Deserialize(const std::shared_ptr<TerrainVirtualM
 
     while (tabCache >> size >> mip >> worldOffset >> binOffset)
         virtualMap->addVirtualChunkProperty(getChunkID(worldOffset, mip), { worldOffset, mip, binOffset });
+}
+
+void VirtualTerrainSerializer::Deserialize(std::unordered_map<size_t, VirtualTerrainChunkProperties>& virtualMap, std::string tab)
+{
+    std::ifstream tabCache = std::ifstream(tab);
+    uint32_t size, mip, worldOffset;
+    size_t binOffset;
+
+    while (tabCache >> size >> mip >> worldOffset >> binOffset)
+        virtualMap[getChunkID(worldOffset, mip)] = { worldOffset, mip, binOffset };
 }

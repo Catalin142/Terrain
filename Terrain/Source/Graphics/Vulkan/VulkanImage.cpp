@@ -98,7 +98,7 @@ void VulkanImage::Release()
 void VulkanImage::copyBuffer(const VulkanBuffer& buffer, uint32_t layer, const glm::uvec2& srcExtent, const glm::uvec2& offset)
 {
 	VkCommandBuffer commandBuffer = VkUtils::beginSingleTimeCommand();
-	copyBuffer(commandBuffer, buffer, layer, offset);
+	copyBuffer(commandBuffer, buffer, layer, srcExtent, offset);
 	VkUtils::endSingleTimeCommand(commandBuffer);
 }
 
