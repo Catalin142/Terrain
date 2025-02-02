@@ -169,7 +169,7 @@ void VulkanApp::onUpdate()
 	if (camVelocity != glm::vec3(0.0f, 0.0f, 0.0f))
 	{
 		if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_SPACE))
-			cam.Move(glm::normalize(camVelocity) * 2.0f);
+			cam.Move(glm::normalize(camVelocity) * 10.0f);
 		else
 			cam.Move(glm::normalize(camVelocity) * 0.10f);
 	}
@@ -342,7 +342,7 @@ struct TerrainChunkWithPos
 
 void VulkanApp::createClipmapBuffers()
 {
-	uint32_t vertCount = 1024 + 1;
+	uint32_t vertCount = 128 + 1;
 	std::vector<uint32_t> indices = TerrainChunk::generateIndices(1, vertCount);
 
 	idxCount = (uint32_t)indices.size();
@@ -355,7 +355,7 @@ void VulkanApp::createClipmapBuffers()
 	indexBuffer = std::make_shared<VulkanBuffer>(indices.data(), indexBufferProperties);
 
 	VulkanBufferProperties resultProperties;
-	resultProperties.Size = 1024 * (uint32_t)sizeof(TerrainChunkWithPos);
+	resultProperties.Size = 1024 * (uint32_t)sizeof(TerrainChunk);
 	resultProperties.Type = BufferType::STORAGE_BUFFER;
 	resultProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
 
@@ -525,24 +525,49 @@ void VulkanApp::renderTerrain(Camera camera)
 	vkCmdPushConstants(CommandBuffer->getCurrentCommandBuffer(), m_TerrainRenderPass->Pipeline->getVkPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0,
 		sizeof(CameraRenderMatrices), &matrices);
 
-	std::vector<TerrainChunkWithPos> chunks;
+	std::vector<TerrainChunk> chunks;
 	for (int32_t lod = 0; lod < 3; lod++)
 	{
-		TerrainChunkWithPos tc;
-		tc.lod = lod;
+		TerrainChunk tc;
+		tc.Lod = lod;
 
-		int32_t size = 1024 << lod;
+		int32_t size = 128 << lod;
 
-		tc.position.x = glm::clamp((int32_t)camPos.x - size / 2, 0, 4096);
-		tc.position.y = glm::clamp((int32_t)camPos.z - size / 2, 0, 4096);
+		int32_t chunkSize = 128 * (1 << lod);
 
-		chunks.push_back(tc);
+		glm::ivec2 snapedPosition;
+		snapedPosition.x = int32_t(camPos.x) / chunkSize;
+		snapedPosition.y = int32_t(camPos.z) / chunkSize;
+
+		int32_t minY = glm::max(int32_t(snapedPosition.y) - 8 / 2, 0);
+		int32_t maxY = glm::min(int32_t(snapedPosition.y) + 8 / 2, 9098 / chunkSize);
+
+		int32_t minX = glm::max(int32_t(snapedPosition.x) - 8 / 2, 0);
+		int32_t maxX = glm::min(int32_t(snapedPosition.x) + 8 / 2, 9098 / chunkSize);
+
+		for (int32_t y = minY; y < maxY; y++)
+			for (int32_t x = minX; x < maxX; x++)
+			{
+				tc.Offset = packOffset(x, y);
+
+				if (lod != 0)
+				{
+					bool add = true;
+					if (x >= snapedPosition.x - 2 && x < snapedPosition.x + 2 && y >= snapedPosition.y - 2 && y < snapedPosition.y + 2)
+						add = false;
+
+					if (add)
+						chunks.push_back(tc);
+				}
+				else
+					chunks.push_back(tc);
+			}
 	}
 
-	ChunksToRender->getCurrentFrameBuffer()->setDataCPU(chunks.data(), chunks.size() * sizeof(TerrainChunkWithPos));
+	ChunksToRender->getCurrentFrameBuffer()->setDataCPU(chunks.data(), chunks.size() * sizeof(TerrainChunk));
 
 	vkCmdBindIndexBuffer(CommandBuffer->getCurrentCommandBuffer(), indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
-	vkCmdDrawIndexed(CommandBuffer->getCurrentCommandBuffer(), idxCount, 3, 0, 0, 0);
+	vkCmdDrawIndexed(CommandBuffer->getCurrentCommandBuffer(), idxCount, chunks.size(), 0, 0, 0);
 
 	VulkanRenderer::endRenderPass(CommandBuffer);
 }

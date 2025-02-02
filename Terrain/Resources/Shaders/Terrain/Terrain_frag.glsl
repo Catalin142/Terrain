@@ -173,5 +173,5 @@ void main()
 //
 //    float intensity = max(dot(finalNormal, -lightDirection), 0.2);
     
-    outColor = vec4(vec3(0.7, 0.5, 0.9), 1.0);
+    outColor = vec4(fragPos, 1.0);
 }

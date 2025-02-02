@@ -64,7 +64,7 @@ private:
 
 	std::shared_ptr<TerrainVirtualMap> VirtualMap;
 
-	Camera cam{45.0f, 1600.0f / 900.0f, 0.1f, 10000.0f};
+	Camera cam{45.0f, 1600.0f / 900.0f, 0.1f, 5000.0f};
 	bool Wireframe = false;
 
 	std::shared_ptr<VulkanBufferSet> ChunksToRender;

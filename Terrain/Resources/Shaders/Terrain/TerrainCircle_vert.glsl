@@ -12,7 +12,7 @@ layout(push_constant) uniform CameraPushConstant
 
 struct TerrainChunk
 {
-    vec2 Position;
+    uint Offset;
     uint Lod;
 };
 
@@ -40,13 +40,34 @@ void main()
     vec4 position = vec4(0.0, 0.0, 0.0, 1.0);
     TerrainChunk chunk = Chunks.chunk[gl_InstanceIndex];
 
-    uint chunkSize = 1024 << chunk.Lod;
-    float multiplier = float(chunkSize) / 1024;
-    int chunkSizePlusOne = 1024 + 1;
+    vec2 offset;
+    offset.x = float(chunk.Offset & 0x0000ffffu);
+    offset.y = float((chunk.Offset >> 16) & 0x0000ffffu);
+
+    int chunkSize = 128 << chunk.Lod;
+    offset.x *= chunkSize;
+    offset.y *= chunkSize;
+
+    float multiplier = float(chunkSize) / 128;
+
+    int chunkSizePlusOne = 128 + 1;
     position.x = floor(gl_VertexIndex / chunkSizePlusOne) * multiplier;
     position.z = gl_VertexIndex % chunkSizePlusOne * multiplier;
-
+    
+    position.x += offset.x;
+    position.z += offset.y;
+    
     gl_Position = Camera.Projection * Camera.View * position;
+
+    if (chunk.Lod == 0)
+        fragPos = vec3(1.0, 0.0, 0.0);
+        
+    if (chunk.Lod == 1)
+        fragPos = vec3(0.0, 1.0, 0.0);
+        
+    if (chunk.Lod == 2)
+        fragPos = vec3(0.0, 0.0, 1.0);
+
 
 //    vec4 position = vec4(0.0, 0.0, 0.0, 1.0);
 //    TerrainChunk chunk = Chunks.chunk[gl_InstanceIndex];
