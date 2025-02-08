@@ -72,7 +72,8 @@ struct ImageViewSpecification
 {
 	VkImage Image;
 	VkFormat Format;
-	uint32_t Mips;
+	uint32_t Mip;
+	uint32_t Layer;
 	VkImageAspectFlags Aspect = VK_IMAGE_ASPECT_NONE;
 };
 

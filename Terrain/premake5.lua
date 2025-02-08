@@ -15,6 +15,7 @@
 		"%{wks.location}/Terrain/External/imgui",
 		"External/glm",
 		"%{IncludeDir.stb_image}",
+		"%{IncludeDir.zstd}",
 
 	}
 	
@@ -27,6 +28,7 @@
 	{
 		"%{wks.location}/Terrain/External/GLFW/lib-vc2022/",
 		"%{wks.location}/Terrain/External/vulkan_lib/",
+		"%{wks.location}/Terrain/External/zstd/static/",
 	}
 
 	links
@@ -34,6 +36,7 @@
 		"vulkan-1.lib",
 		"GLFW",
 		"imgui",
+		"libzstd_static.lib"
 	}
 
 	files

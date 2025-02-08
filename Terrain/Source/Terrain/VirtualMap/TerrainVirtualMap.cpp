@@ -89,7 +89,7 @@ void TerrainVirtualMap::pushLoadTasks(const glm::vec2& camPosition)
         int32_t slot = m_LastChunkSlot[node];
         m_AvailableSlots.insert(slot);
 
-        const VirtualTerrainChunkProperties& props = m_ChunkProperties[node];
+        const FileChunkProperties& props = m_ChunkProperties[node];
 
         m_StatusNodes.push_back(GPUStatusNode(props.Position, props.Mip, 0));
     }
@@ -154,7 +154,7 @@ void TerrainVirtualMap::blitNodes(VkCommandBuffer cmdBuffer, const std::shared_p
     m_PhysicalTexture->batchCopyBuffer(cmdBuffer, *StagingBuffer, regions);
 }
 
-void TerrainVirtualMap::addVirtualChunkProperty(size_t chunk, const VirtualTerrainChunkProperties& props)
+void TerrainVirtualMap::addVirtualChunkProperty(size_t chunk, const FileChunkProperties& props)
 {
     m_ChunkProperties[chunk] = props;
 }

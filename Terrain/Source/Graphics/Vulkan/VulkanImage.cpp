@@ -372,9 +372,9 @@ VulkanImageView::VulkanImageView(const ImageViewSpecification& spec) : m_Specifi
 	viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
 	viewInfo.format = m_Specification.Format;
 	viewInfo.subresourceRange.aspectMask = m_Specification.Aspect;
-	viewInfo.subresourceRange.baseMipLevel = 0;
-	viewInfo.subresourceRange.levelCount = m_Specification.Mips;
-	viewInfo.subresourceRange.baseArrayLayer = 0;
+	viewInfo.subresourceRange.baseMipLevel = m_Specification.Mip;
+	viewInfo.subresourceRange.levelCount = 1;
+	viewInfo.subresourceRange.baseArrayLayer = m_Specification.Layer;
 	viewInfo.subresourceRange.layerCount = 1;
 
 	if (vkCreateImageView(VulkanDevice::getVulkanDevice(), &viewInfo, nullptr, &m_ImageView) != VK_SUCCESS)

@@ -73,7 +73,7 @@ void VulkanApp::onCreate()
 	}
 
 	{
-		m_TerrainGenerator = std::make_shared<TerrainGenerator>(1024, 1024);
+		m_TerrainGenerator = std::make_shared<TerrainGenerator>(1024 * 4, 1024 * 4);
 	}
 
 
@@ -116,7 +116,7 @@ void VulkanApp::onCreate()
 			terrainSpec.NormalTextures = std::make_shared<VulkanTexture>(texSpec);
 		}
 
-		terrainSpec.Info.TerrainSize = { 1024.0 * 4.0, 1024.0 * 4.0 };
+		terrainSpec.Info.TerrainSize = { 1024.0, 1024.0 };
 		terrainSpec.Info.LodCount = 4;
 
 		m_Terrain = std::make_shared<Terrain>(terrainSpec);
@@ -131,13 +131,78 @@ void VulkanApp::onCreate()
 
 	createFinalPass();
 
+	ClipmapSpecification clipmap;
+	clipmap.ChunkSize = 128;
+	clipmap.TerrainSize = 1024 * 4;
+	clipmap.Filepath = TerrainFileLocation{ "compress_clipmapdata.tc", "compress_clipmaptable.tb" };
+	clipmap.LODCount = 3;
+	clipmap.TextureSize = 1024;
+
+	m_Clipmap = std::make_shared<TerrainClipmap>(clipmap);
+
+	VirtualTerrainSerializer::Deserialize(m_Clipmap);
 	createClipmapBuffers();
 
-	m_HeightMapDescriptor = ImGui_ImplVulkan_AddTexture(m_Sampler->Get(),
-		m_Clipmap->getVkImageView(), VK_IMAGE_LAYOUT_GENERAL);
+	{
+		{
+			ImageViewSpecification imvSpec;
+			imvSpec.Image = m_Clipmap->getMap()->getVkImage();
+			imvSpec.Aspect = m_Clipmap->getMap()->getSpecification().Aspect;
+			imvSpec.Format = m_Clipmap->getMap()->getSpecification().Format;
+			imvSpec.Layer = 0;
+			imvSpec.Mip = 0;
 
-	VirtualTerrainSerializer::Deserialize(m_ChunkProperties, "clipmaptable.tb");
-	heightData = std::ifstream("clipmapdata.tc", std::ios::binary);
+			imageView = std::make_shared<VulkanImageView>(imvSpec);
+
+			m_HeightMapDescriptor = ImGui_ImplVulkan_AddTexture(m_Sampler->Get(),
+				imageView->getImageView(), VK_IMAGE_LAYOUT_GENERAL);
+		}
+
+		{
+			ImageViewSpecification imvSpec;
+			imvSpec.Image = m_Clipmap->getMap()->getVkImage();
+			imvSpec.Aspect = m_Clipmap->getMap()->getSpecification().Aspect;
+			imvSpec.Format = m_Clipmap->getMap()->getSpecification().Format;
+			imvSpec.Layer = 1;
+			imvSpec.Mip = 0;
+
+			imageView1 = std::make_shared<VulkanImageView>(imvSpec);
+
+			m_HeightMapDescriptor1 = ImGui_ImplVulkan_AddTexture(m_Sampler->Get(),
+				imageView1->getImageView(), VK_IMAGE_LAYOUT_GENERAL);
+		}
+
+		{
+			ImageViewSpecification imvSpec;
+			imvSpec.Image = m_Clipmap->getMap()->getVkImage();
+			imvSpec.Aspect = m_Clipmap->getMap()->getSpecification().Aspect;
+			imvSpec.Format = m_Clipmap->getMap()->getSpecification().Format;
+			imvSpec.Layer = 2;
+			imvSpec.Mip = 0;
+
+			imageView2 = std::make_shared<VulkanImageView>(imvSpec);
+
+			m_HeightMapDescriptor2 = ImGui_ImplVulkan_AddTexture(m_Sampler->Get(),
+				imageView2->getImageView(), VK_IMAGE_LAYOUT_GENERAL);
+		}
+
+		/*{
+			ImageViewSpecification imvSpec;
+			imvSpec.Image = m_Clipmap->getMap()->getVkImage();
+			imvSpec.Aspect = m_Clipmap->getMap()->getSpecification().Aspect;
+			imvSpec.Format = m_Clipmap->getMap()->getSpecification().Format;
+			imvSpec.Layer = 3;
+			imvSpec.Mip = 0;
+
+			imageView3 = std::make_shared<VulkanImageView>(imvSpec);
+
+			m_HeightMapDescriptor3 = ImGui_ImplVulkan_AddTexture(m_Sampler->Get(),
+				imageView3->getImageView(), VK_IMAGE_LAYOUT_GENERAL);
+		}*/
+
+		glm::vec2 camPosss = { cam.getPosition().x, cam.getPosition().z };
+		m_Clipmap->hardLoad(camPosss);
+	}
 }
 
 void VulkanApp::onUpdate()
@@ -188,6 +253,12 @@ void VulkanApp::onUpdate()
 
 		if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_3))
 			m_TerrainGenerator->runHydraulicErosion(CommandBuffer);
+
+		glm::vec2 camPosss = { cam.getPosition().x, cam.getPosition().z };
+
+		Instrumentor::Get().beginTimer(QuadTreeRendererMetrics::CPU_LOAD_NEEDED_NODES);
+		m_Clipmap->Refresh(commandBuffer, camPosss);
+		Instrumentor::Get().endTimer(QuadTreeRendererMetrics::CPU_LOAD_NEEDED_NODES);
 
 		// Geometry pass
 		{
@@ -242,7 +313,17 @@ void VulkanApp::onUpdate()
 			m_Terrain->setHeightMultiplier(100.0f);
 
 			ImGui::Begin("VirtualHeightMapDebug");
-			//ImGui::Image(m_HeightMapDescriptor, ImVec2{ 512, 512 });
+			static float maxTime = 0;
+			maxTime = glm::max(Instrumentor::Get().getTime(QuadTreeRendererMetrics::CPU_LOAD_NEEDED_NODES), maxTime);
+			ImGui::Text(std::to_string(maxTime).c_str());
+
+			
+			ImGui::Image(m_HeightMapDescriptor,  ImVec2{ 256, 256 });
+			ImGui::SameLine();
+			ImGui::Image(m_HeightMapDescriptor1, ImVec2{ 256, 256 });
+			ImGui::Image(m_HeightMapDescriptor2, ImVec2{ 256, 256 });
+			//ImGui::SameLine();
+			//ImGui::Image(m_HeightMapDescriptor3, ImVec2{ 256, 256 });
 			ImGui::End();
 
 			endImGuiFrame();
@@ -259,8 +340,8 @@ void VulkanApp::onUpdate()
 		CommandBuffer->Submit();
 	}
 	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_O))
-		VirtualTerrainSerializer::SerializeClipmap(m_TerrainGenerator->getHeightMap(), "clipmaptable.tb",
-			"clipmapdata.tc", 128);
+		VirtualTerrainSerializer::SerializeClipmap(m_TerrainGenerator->getHeightMap(), "compress_clipmaptable.tb",
+			"compress_clipmapdata.tc", 128);
 	//if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_P))
 	//{
 	//	VirtualTerrainSerializer::Deserialize(VirtualMap, VirtualTextureType::HEIGHT);
@@ -361,35 +442,6 @@ void VulkanApp::createClipmapBuffers()
 
 	ChunksToRender = std::make_shared<VulkanBufferSet>(VulkanRenderer::getFramesInFlight(), resultProperties);
 
-	VulkanImageSpecification clipmapSpecification{};
-	clipmapSpecification.Width = 1024; 
-	clipmapSpecification.Height = 1024;
-	clipmapSpecification.Format = VK_FORMAT_R16_SFLOAT;
-	clipmapSpecification.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-	clipmapSpecification.LayerCount = 4;
-	clipmapSpecification.UsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;;
-	clipmapSpecification.MemoryType = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-	m_Clipmap = std::make_shared<VulkanImage>(clipmapSpecification);
-	m_Clipmap->Create();
-
-	VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
-	VkImageSubresourceRange imgSubresource{};
-	imgSubresource.aspectMask = m_Clipmap->getSpecification().Aspect;
-	imgSubresource.layerCount = 4;
-	imgSubresource.levelCount = 1;
-	imgSubresource.baseMipLevel = 0;
-	VkUtils::transitionImageLayout(cmdBuffer, m_Clipmap->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-	VkUtils::endSingleTimeCommand(cmdBuffer);
-
-	{
-		VulkanBufferProperties RawDataProperties;
-		RawDataProperties.Size = 128 * 128 * 2;
-		RawDataProperties.Type = BufferType::TRANSFER_SRC_BUFFER | BufferType::TRANSFER_DST_BUFFER;
-		RawDataProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
-
-		m_RawImageData = std::make_shared<VulkanBuffer>(RawDataProperties);
-		m_RawImageData->Map();
-	}
 
 	{
 		VulkanBufferProperties camInfoProperties;
@@ -422,7 +474,7 @@ void VulkanApp::createClipmapBuffers()
 		DescriptorSet->bindInput(0, 0, 0, ChunksToRender);
 		DescriptorSet->bindInput(0, 1, 0, TerrainInfdo);
 		DescriptorSet->bindInput(0, 2, 0, CamInfo);
-		DescriptorSet->bindInput(1, 0, 0, m_Clipmap);
+		DescriptorSet->bindInput(1, 0, 0, m_Clipmap->getMap());
 		DescriptorSet->bindInput(1, 3, 0, m_Terrain->getCompositionMap());
 		DescriptorSet->bindInput(1, 4, 0, m_Terrain->getNormalMap());
 		DescriptorSet->bindInput(2, 0, 0, m_Terrain->getTerrainTextures());
@@ -436,7 +488,7 @@ void VulkanApp::createClipmapBuffers()
 	spec.Framebuffer = m_Output;
 	spec.depthTest = true;
 	spec.depthWrite = true;
-	spec.Wireframe = true;
+	spec.Wireframe = false;
 	spec.Culling = true;
 	spec.Shader = ShaderManager::getShader("CircleShader");
 	spec.vertexBufferLayout = VulkanVertexBufferLayout{};
@@ -451,59 +503,6 @@ void VulkanApp::createClipmapBuffers()
 
 void VulkanApp::renderClipmap(Camera camera)
 {
-	/*{
-		VkImageSubresourceRange imgSubresource{};
-		imgSubresource.aspectMask = m_Clipmap->getSpecification().Aspect;
-		imgSubresource.layerCount = 4;
-		imgSubresource.levelCount = 1;
-		imgSubresource.baseMipLevel = 0;
-		VkUtils::transitionImageLayout(m_Clipmap->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-	}
-
-	uint32_t RingSize = 8;
-
-	for (int32_t lod = 0; lod < 3; lod++)
-	{
-		int32_t ringLODSize = RingSize;
-		if (ringLODSize <= 0)
-			break;
-
-		int32_t chunkSize = 128;
-
-		glm::ivec2 snapedPosition;
-		snapedPosition.x = int32_t(camera.getPosition().x) / chunkSize;
-		snapedPosition.y = int32_t(camera.getPosition().z) / chunkSize;
-
-		int32_t divisor = 1 << lod;
-
-		int32_t minY = glm::max(int32_t(snapedPosition.y) - ringLODSize / 2, 0);
-		int32_t maxY = glm::min(int32_t(snapedPosition.y) + ringLODSize / 2, (4096 / divisor) / 128);
-
-		int32_t minX = glm::max(int32_t(snapedPosition.x) - ringLODSize / 2, 0);
-		int32_t maxX = glm::min(int32_t(snapedPosition.x) + ringLODSize / 2, (4096 / divisor) / 128);
-
-		for (int32_t y = minY; y < maxY; y++)
-			for (int32_t x = minX; x < maxX; x++)
-			{
-				size_t id = getChunkID(packOffset(x, y), lod);
-				heightData.seekg(m_ChunkProperties[id].inFileOffset, std::ios::beg);
-
-				int32_t x_tex = x % RingSize;
-				int32_t y_tex = y % RingSize;
-
-				char* charData = (char*)m_RawImageData->getMappedData();
-				heightData.read(charData, 128 * 128 * 2);
-				m_Clipmap->copyBuffer(*m_RawImageData, lod, {128, 128}, { x_tex * 128, y_tex * 128});
-			}
-	}
-	{
-		VkImageSubresourceRange imgSubresource{};
-		imgSubresource.aspectMask = m_Clipmap->getSpecification().Aspect;
-		imgSubresource.layerCount = 4;
-		imgSubresource.levelCount = 1;
-		imgSubresource.baseMipLevel = 0;
-		VkUtils::transitionImageLayout(m_Clipmap->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
-	}*/
 }
 
 void VulkanApp::renderTerrain(Camera camera)
@@ -526,6 +525,12 @@ void VulkanApp::renderTerrain(Camera camera)
 		sizeof(CameraRenderMatrices), &matrices);
 
 	std::vector<TerrainChunk> chunks;
+
+	int32_t prevminY;
+	int32_t prevmaxY;
+	int32_t prevminX;
+	int32_t prevmaxX;
+
 	for (int32_t lod = 0; lod < 3; lod++)
 	{
 		TerrainChunk tc;
@@ -536,14 +541,32 @@ void VulkanApp::renderTerrain(Camera camera)
 		int32_t chunkSize = 128 * (1 << lod);
 
 		glm::ivec2 snapedPosition;
-		snapedPosition.x = int32_t(camPos.x) / chunkSize;
-		snapedPosition.y = int32_t(camPos.z) / chunkSize;
+		glm::vec3 newCamPos = camPos;
+		newCamPos.x = glm::max(newCamPos.x, chunkSize * 4.0f);
+		newCamPos.z = glm::max(newCamPos.z, chunkSize * 4.0f);
+		newCamPos.x = glm::min(newCamPos.x, 1024.0f * 4.0f - chunkSize * 4.0f);
+		newCamPos.z = glm::min(newCamPos.z, 1024.0f * 4.0f - chunkSize * 4.0f);
+
+		snapedPosition.x = int32_t(newCamPos.x) / chunkSize;
+		snapedPosition.y = int32_t(newCamPos.z) / chunkSize;
 
 		int32_t minY = glm::max(int32_t(snapedPosition.y) - 8 / 2, 0);
-		int32_t maxY = glm::min(int32_t(snapedPosition.y) + 8 / 2, 9098 / chunkSize);
+		int32_t maxY = glm::min(int32_t(snapedPosition.y) + 8 / 2, 1024 * 4 / chunkSize);
 
 		int32_t minX = glm::max(int32_t(snapedPosition.x) - 8 / 2, 0);
-		int32_t maxX = glm::min(int32_t(snapedPosition.x) + 8 / 2, 9098 / chunkSize);
+		int32_t maxX = glm::min(int32_t(snapedPosition.x) + 8 / 2, 1024 * 4 / chunkSize);
+
+		if (snapedPosition.x % 2 != 0)
+		{
+			minX -= 1;
+			maxX -= 1;
+		}
+
+		if (snapedPosition.y % 2 != 0)
+		{
+			minY -= 1;
+			maxY -= 1;
+		}
 
 		for (int32_t y = minY; y < maxY; y++)
 			for (int32_t x = minX; x < maxX; x++)
@@ -553,7 +576,13 @@ void VulkanApp::renderTerrain(Camera camera)
 				if (lod != 0)
 				{
 					bool add = true;
-					if (x >= snapedPosition.x - 2 && x < snapedPosition.x + 2 && y >= snapedPosition.y - 2 && y < snapedPosition.y + 2)
+					
+					uint32_t marginminY	= prevminY / 2;
+					uint32_t marginmaxY	= prevmaxY / 2;
+					uint32_t marginminX	= prevminX / 2;
+					uint32_t marginmaxX	= prevmaxX / 2;
+
+					if (x >= marginminX && x < marginmaxX && y >= marginminY && y < marginmaxY)
 						add = false;
 
 					if (add)
@@ -562,6 +591,11 @@ void VulkanApp::renderTerrain(Camera camera)
 				else
 					chunks.push_back(tc);
 			}
+
+		prevminY = minY;
+		prevmaxY = maxY;
+		prevminX = minX;
+		prevmaxX = maxX;
 	}
 
 	ChunksToRender->getCurrentFrameBuffer()->setDataCPU(chunks.data(), chunks.size() * sizeof(TerrainChunk));

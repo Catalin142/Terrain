@@ -47,7 +47,7 @@ public:
 	const std::shared_ptr<VulkanImage>& getIndirectionTexture() { return m_IndirectionTexture; }
 	const std::shared_ptr<VulkanImage>& getLoadStatusTexture() { return m_StatusTexture; }
 
-	void addVirtualChunkProperty(size_t chunk, const VirtualTerrainChunkProperties& props);
+	void addVirtualChunkProperty(size_t chunk, const FileChunkProperties& props);
 
 	void updateIndirectionTexture(VkCommandBuffer cmdBuffer);
 	void updateStatusTexture(VkCommandBuffer cmdBuffer);
@@ -64,7 +64,7 @@ private:
 	std::shared_ptr<VulkanImage> m_PhysicalTexture;
 
 	VirtualTerrainMapSpecification m_Specification;
-	std::unordered_map<size_t, VirtualTerrainChunkProperties> m_ChunkProperties;
+	std::unordered_map<size_t, FileChunkProperties> m_ChunkProperties;
 
 	// I keep a cache of the last Slot a Chunk occupied and the last chunk in a specified slot
 	std::unordered_map<size_t, int32_t> m_LastChunkSlot;

@@ -11,9 +11,6 @@
 
 DynamicVirtualTerrainDeserializer::DynamicVirtualTerrainDeserializer(const VirtualTerrainMapSpecification& spec) : m_VirtualMapSpecification(spec)
 {
-    VkSemaphoreCreateInfo semaphoreCreateInfo = {};
-    semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
     uint32_t chunkSize = m_VirtualMapSpecification.ChunkSize + 2;
     m_TextureDataStride = chunkSize * chunkSize * 2;
 
@@ -44,7 +41,7 @@ DynamicVirtualTerrainDeserializer::DynamicVirtualTerrainDeserializer(const Virtu
         {
             m_LoadThreadSemaphore.acquire();
 
-            LoadTask task;
+            VirtualMapLoadTask task;
             // the main thread pushes tasks
             {
                 std::lock_guard<std::mutex> lock(m_TaskMutex);
@@ -73,18 +70,18 @@ DynamicVirtualTerrainDeserializer::~DynamicVirtualTerrainDeserializer()
     m_FileHandlerCache.clear();
 }
 
-void DynamicVirtualTerrainDeserializer::pushLoadTask(size_t node, int32_t virtualSlot, const VirtualTerrainChunkProperties& properties)
+void DynamicVirtualTerrainDeserializer::pushLoadTask(size_t node, int32_t virtualSlot, const FileChunkProperties& properties)
 {
     {
         std::lock_guard<std::mutex> lock(m_TaskMutex);
-        m_LoadTasks.push(LoadTask{node, virtualSlot, properties});
+        m_LoadTasks.push(VirtualMapLoadTask{node, virtualSlot, properties});
     }
     m_LoadThreadSemaphore.release();
 }
 
-void DynamicVirtualTerrainDeserializer::loadChunk(LoadTask task)
+void DynamicVirtualTerrainDeserializer::loadChunk(VirtualMapLoadTask task)
 {
-    VirtualTextureLocation location = m_VirtualMapSpecification.Filepath;
+    TerrainFileLocation location = m_VirtualMapSpecification.Filepath;
 
     if (m_FileHandlerCache.find(location.Data) == m_FileHandlerCache.end())
         m_FileHandlerCache[location.Data] = new std::ifstream(location.Data, std::ios::binary);

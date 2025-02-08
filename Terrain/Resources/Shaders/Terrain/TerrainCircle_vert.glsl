@@ -68,6 +68,9 @@ void main()
     if (chunk.Lod == 2)
         fragPos = vec3(0.0, 0.0, 1.0);
 
+    if (chunk.Lod == 3)
+        fragPos = vec3(0.0, 1.0, 1.0);
+
 
 //    vec4 position = vec4(0.0, 0.0, 0.0, 1.0);
 //    TerrainChunk chunk = Chunks.chunk[gl_InstanceIndex];

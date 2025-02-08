@@ -3,6 +3,7 @@
 #include "Graphics/Vulkan/VulkanImage.h"
 #include "TerrainVirtualMap.h"
 #include "Terrain/Terrain.h"
+#include "Terrain/Clipmap/TerrainClipmap.h"
 
 #include <memory>
 
@@ -36,5 +37,6 @@ public:
 		glm::uvec2 worldOffset = { 0u, 0u }, bool purgeContent = true);
 
 	static void Deserialize(const std::shared_ptr<TerrainVirtualMap>& virtualMap);
-	static void Deserialize(std::unordered_map<size_t, VirtualTerrainChunkProperties>& virtualMap, std::string tab);
+	static void Deserialize(const std::shared_ptr<TerrainClipmap>& virtualMap);
+	static void Deserialize(std::unordered_map<size_t, FileChunkProperties>& virtualMap, std::string tab);
 };

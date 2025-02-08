@@ -26,8 +26,8 @@ public:
 	// on refresh, every loaded node gets blited to it s destination virtual map 
 	void Refresh(VkCommandBuffer cmdBuffer, TerrainVirtualMap* virtualMap);
 
-	void loadChunk(LoadTask task);
-	void pushLoadTask(size_t node, int32_t virtualLocation, const VirtualTerrainChunkProperties& properties);
+	void loadChunk(VirtualMapLoadTask task);
+	void pushLoadTask(size_t node, int32_t virtualLocation, const FileChunkProperties& properties);
 
 public:
 	VirtualMapDeserializerLastUpdate LastUpdate;
@@ -47,7 +47,7 @@ private:
 
 	std::vector<VkBufferImageCopy> m_RegionsToCopy;
 	std::vector<uint32_t> m_UsedIndices;
-	std::queue<LoadTask> m_LoadTasks;
+	std::queue<VirtualMapLoadTask> m_LoadTasks;
 
 	std::shared_ptr<VulkanBuffer> m_RawImageData;
 

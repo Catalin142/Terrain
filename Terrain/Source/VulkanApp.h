@@ -24,6 +24,7 @@
 
 #include <thread>
 #include "Terrain/VirtualMap/TerrainVirtualMap.h"
+#include "Terrain/Clipmap/TerrainClipmap.h"
 
 #define MAX_FRAMES_IN_FLIGHT 2
 
@@ -70,10 +71,6 @@ private:
 	std::shared_ptr<VulkanBufferSet> ChunksToRender;
 	std::shared_ptr<VulkanBuffer> TerrainInfdo;
 	std::shared_ptr<VulkanBuffer> CamInfo;
-	std::shared_ptr<VulkanImage> m_Clipmap;
-	std::unordered_map<size_t, VirtualTerrainChunkProperties> m_ChunkProperties;
-	std::ifstream heightData;
-	std::shared_ptr<VulkanBuffer> m_RawImageData;
 
 	std::shared_ptr<RenderPass> m_TerrainRenderPass;
 	std::shared_ptr<VulkanPipeline> m_TerrainPipeline;
@@ -86,6 +83,15 @@ private:
 	void renderTerrain(Camera camera);
 
 	VkDescriptorSet m_HeightMapDescriptor;
+	VkDescriptorSet m_HeightMapDescriptor1;
+	VkDescriptorSet m_HeightMapDescriptor2;
+	VkDescriptorSet m_HeightMapDescriptor3;
+	std::shared_ptr<VulkanImageView> imageView;
+	std::shared_ptr<VulkanImageView> imageView1;
+	std::shared_ptr<VulkanImageView> imageView2;
+	std::shared_ptr<VulkanImageView> imageView3;
+
+	std::shared_ptr<TerrainClipmap> m_Clipmap;
 
 	std::thread* thread;
 	bool presed = false;

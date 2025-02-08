@@ -14,6 +14,7 @@ outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 	IncludeDir["glm"] = "%{wks.location}/Terrain/External/glm"
 	IncludeDir["stb_image"] = "%{wks.location}/Terrain/External/stb_image"
 	IncludeDir["imgui"] = "%{wks.location}/Terrain/External/imgui"
+	IncludeDir["zstd"] = "%{wks.location}/Terrain/External/zstd/include"
 	
 	group "Dependencies"
 	include "Terrain/External/GLFW"
