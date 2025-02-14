@@ -39,7 +39,7 @@ public:
 	void beginImGuiFrame() { m_ImguiLayer->beginFrame(); }
 	void endImGuiFrame() { m_ImguiLayer->endFrame(); }
 
-private:
+protected:
 	static Application* m_Instance;
 
 	std::shared_ptr<Window> m_Window;

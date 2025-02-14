@@ -112,6 +112,11 @@ void VulkanRenderer::beginSwapchainRenderPass(const std::shared_ptr<VulkanRender
 
 void VulkanRenderer::preparePipeline(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer, const std::shared_ptr<RenderPass>& renderPass)
 {
+	preparePipeline(commandBuffer, renderPass, m_Swapchain->getCurrentFrame());
+}
+
+void VulkanRenderer::preparePipeline(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer, const std::shared_ptr<RenderPass>& renderPass, uint32_t descriptorSetIndex)
+{
 	VkCommandBuffer VulkanCommandBuffer = commandBuffer->getCurrentCommandBuffer();
 
 	VkExtent2D extent = { m_Swapchain->getWidth(), m_Swapchain->getHeight() };
@@ -139,7 +144,7 @@ void VulkanRenderer::preparePipeline(const std::shared_ptr<VulkanRenderCommandBu
 	if (renderPass->DescriptorSet != nullptr)
 		vkCmdBindDescriptorSets(VulkanCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderPass->Pipeline->getVkPipelineLayout(),
 			0, renderPass->DescriptorSet->getNumberOfSets(),
-			renderPass->DescriptorSet->getDescriptorSet(m_Swapchain->getCurrentFrame()).data(), 0, nullptr);
+			renderPass->DescriptorSet->getDescriptorSet(descriptorSetIndex).data(), 0, nullptr);
 }
 
 static std::mutex queueMutex;

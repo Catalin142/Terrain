@@ -65,21 +65,11 @@ std::vector<uint32_t> TerrainChunk::generateIndices(uint32_t lod, uint32_t vertC
 	return indices;
 }
 
-void TerrainChunk::generateIndicesAndVertices(uint32_t vertCount, std::vector<uint32_t>& indices, std::vector<glm::vec2>& vertices)
+void TerrainChunk::generateIndicesAndVertices(uint32_t vertCount, std::vector<uint32_t>& indices, std::vector<glm::ivec2>& vertices)
 {
 	for (uint32_t y = 0; y < vertCount; y++) {
 		for (uint32_t x = 0; x < vertCount; x++) {
-			glm::vec2 a{x, y};
-
-			if (x == 0 || x == vertCount - 1)
-				if (y % 2 != 0)
-					a.y += 1;
-
-			if (y == 0 || y == vertCount - 1)
-				if (x % 2 != 0)
-					a.x += 1;
-
-			vertices.push_back(a);
+			vertices.push_back({ x, y });
 		}
 	}
 

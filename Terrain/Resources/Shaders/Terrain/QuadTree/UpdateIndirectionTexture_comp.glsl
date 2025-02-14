@@ -30,8 +30,8 @@ void main()
 
     indirectionNode node = Nodes.lNode[gl_GlobalInvocationID.x];
 
-    int virtualLocX = int(node.virtualLocation & 0x0000FFFF);
-    int virtualLocY = int(node.virtualLocation & 0xFFFF0000) >> 16;
+    int virtualLocX = int(node.virtualLocation & 0x0000ffffu);
+    int virtualLocY = int(node.virtualLocation & 0xffff0000u) >> 16;
 
     ivec2 texel;
     texel.x = virtualLocX;

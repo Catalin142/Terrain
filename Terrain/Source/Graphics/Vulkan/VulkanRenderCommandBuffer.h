@@ -27,6 +27,7 @@ public:
 
 	float getCommandBufferTime();
 	float getTime(const std::string& name);
+	bool getCurrentBufferStatus();
 
 private:
 	VkCommandPool m_CommandPool = VK_NULL_HANDLE;

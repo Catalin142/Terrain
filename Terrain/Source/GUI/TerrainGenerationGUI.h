@@ -14,7 +14,7 @@
 class TerrainGenerationGUI
 {
 public:
-	TerrainGenerationGUI(const std::shared_ptr<TerrainGenerator>& generator, const std::shared_ptr<Terrain>& terrain,
+	TerrainGenerationGUI(const std::shared_ptr<TerrainGenerator>& generator, const std::unique_ptr<TerrainData>& terrain,
 		uint32_t width, ImVec2 pos);
 
 	void Render();
@@ -26,7 +26,7 @@ public:
 private:
 	std::shared_ptr<TerrainGenerator> m_Generator;
 	std::shared_ptr<VulkanSampler> m_Sampler;
-	std::shared_ptr<Terrain> m_Terrain;
+	const std::unique_ptr<TerrainData>& m_Terrain;
 
 	VkDescriptorSet m_HeightMapDescriptor;
 	VkDescriptorSet m_NormalMapDescriptor;

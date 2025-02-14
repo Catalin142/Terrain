@@ -1,9 +1,7 @@
 #version 460 core
 
-
 layout(location = 0) in vec3 fragPos;
 layout(location = 1) in vec2 terrainUV;
-layout(location = 2) flat in vec2 cameraPosition;
 
 layout(location = 0) out vec4 outColor;
 

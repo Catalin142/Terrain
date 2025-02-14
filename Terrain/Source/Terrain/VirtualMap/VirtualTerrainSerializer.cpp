@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-#include "VirtualMapUtils.h"
+#include "VirtualMapData.h"
 #include "Graphics/Vulkan/VulkanUtils.h"
 #include "Graphics/Vulkan/VulkanDevice.h"
 #include "Core/Hash.h"
@@ -510,6 +510,7 @@ void VirtualTerrainSerializer::SerializeClipmap(const std::shared_ptr<VulkanImag
         // TODO: all
         // Serialize each mip 
         char* compressedData = new char[size];
+        delete[] compressedData;
 
         for (uint32_t mip = 0; mip < 4; mip++)
         {
@@ -552,17 +553,23 @@ void VirtualTerrainSerializer::SerializeClipmap(const std::shared_ptr<VulkanImag
                     // Serialize to file
                     uint32_t worldOffsetPacked = packOffset(worldOffset.x + x, worldOffset.y + y);
 
-                    size_t comperssionSize = comperssor.Compress(compressedData, size, imageData, size);
-                    imgCacheOut.write(compressedData, comperssionSize);
-
-                    tableOut << comperssionSize << " ";
+                    tableOut << size << " ";
                     tableOut << mip << " ";
                     tableOut << worldOffsetPacked << " ";
                     tableOut << binOffset << " ";
 
-                    binOffset += comperssionSize;
+                    binOffset += size;
 
-                    //imgCacheOut.write(imageData, size);
+                    for (uint32_t y1 = 0; y1 < 128; y1++)
+                    {
+                        uint16_t* row = (uint16_t*)imageData;
+                        for (uint32_t x1 = 0; x1 < 128; x1++)
+                        {
+                            imgCacheOut.write((char*)row, 2);
+                            row++;
+                        }
+                        imageData += layout.rowPitch;
+                    }
                 }
         }
 
@@ -570,39 +577,4 @@ void VirtualTerrainSerializer::SerializeClipmap(const std::shared_ptr<VulkanImag
     }
 
     restoreImageLayout(texture, auxImg);
-}
-
-void VirtualTerrainSerializer::Deserialize(const std::shared_ptr<TerrainVirtualMap>& virtualMap)
-{
-    TerrainFileLocation filepath = virtualMap->getSpecification().Filepath;
-
-    std::ifstream tabCache = std::ifstream(filepath.Table);
-    uint32_t size, mip, worldOffset;
-    size_t binOffset;
-
-    while (tabCache >> size >> mip >> worldOffset >> binOffset)
-        virtualMap->addVirtualChunkProperty(getChunkID(worldOffset, mip), { worldOffset, mip, binOffset, size });
-}
-
-void VirtualTerrainSerializer::Deserialize(const std::shared_ptr<TerrainClipmap>& virtualMap)
-{
-    TerrainFileLocation filepath = virtualMap->getSpecification().Filepath;
-
-    std::ifstream tabCache = std::ifstream(filepath.Table);
-    uint32_t size, mip, worldOffset;
-    size_t binOffset;
-
-    while (tabCache >> size >> mip >> worldOffset >> binOffset)
-        virtualMap->addChunkProperty(getChunkID(worldOffset, mip), { worldOffset, mip, binOffset, size });
-}
-
-
-void VirtualTerrainSerializer::Deserialize(std::unordered_map<size_t, FileChunkProperties>& virtualMap, std::string tab)
-{
-    std::ifstream tabCache = std::ifstream(tab);
-    uint32_t size, mip, worldOffset;
-    size_t binOffset;
-
-    while (tabCache >> size >> mip >> worldOffset >> binOffset)
-        virtualMap[getChunkID(worldOffset, mip)] = { worldOffset, mip, binOffset };
 }

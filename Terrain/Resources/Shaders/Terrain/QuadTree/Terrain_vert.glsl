@@ -16,16 +16,17 @@ struct TerrainChunk
     uint Lod;
 };
 
-layout(set = 0, binding = 0) readonly buffer ChunksStorageBufferSet
+layout(set = 0, binding = 0) readonly buffer ChunksStorageBuffer
 {
     TerrainChunk chunk[];
 } Chunks;
 
 layout(set = 0, binding = 1) uniform TerrainInfoUniformBuffer
 {
-    vec2 Size;
+    int Size;
     float heightMultiplier;
     int minimumChunkSize;
+    uint LODCount;
 } terrainInfo;
 
 layout (set = 0, binding = 2, r8ui) uniform readonly uimage2D LODMap;
@@ -35,8 +36,8 @@ layout (set = 1, binding = 1, r32ui) uniform readonly uimage2D indirectionTextur
 
 int getLod(int posX, int posY)
 {
-    posX = clamp(posX, 0, (int(terrainInfo.Size.x) / terrainInfo.minimumChunkSize) - 1);
-    posY = clamp(posY, 0, (int(terrainInfo.Size.y) / terrainInfo.minimumChunkSize) - 1);
+    posX = clamp(posX, 0, (int(terrainInfo.Size) / terrainInfo.minimumChunkSize) - 1);
+    posY = clamp(posY, 0, (int(terrainInfo.Size) / terrainInfo.minimumChunkSize) - 1);
     return int(imageLoad(LODMap, ivec2(posX, posY)).r);
 }
 
@@ -48,8 +49,22 @@ void main()
     vec2 offset;
     offset.x = float(chunk.Offset & 0x0000ffffu);
     offset.y = float((chunk.Offset >> 16) & 0x0000ffffu);
+    
+    uint chunkPhysicalLocation;
+
+    // move this to be handled by the compute shader that creates the nodes, when a node gets inserted in the final render list, fetch the location and pass it
+    switch (chunk.Lod) 
+    {
+        case 0: chunkPhysicalLocation = imageLoad(indirectionTexture[0], ivec2(offset)).r; break;
+        case 1: chunkPhysicalLocation = imageLoad(indirectionTexture[1], ivec2(offset)).r; break;
+        case 2: chunkPhysicalLocation = imageLoad(indirectionTexture[2], ivec2(offset)).r; break;
+        case 3: chunkPhysicalLocation = imageLoad(indirectionTexture[3], ivec2(offset)).r; break;
+        case 4: chunkPhysicalLocation = imageLoad(indirectionTexture[4], ivec2(offset)).r; break;
+        case 5: chunkPhysicalLocation = imageLoad(indirectionTexture[5], ivec2(offset)).r; break;
+    }
 
     int chunkSize = terrainInfo.minimumChunkSize << chunk.Lod;
+
     offset.x *= chunkSize;
     offset.y *= chunkSize;
 
@@ -68,30 +83,17 @@ void main()
     int rightLod   = getLod(chunkPosition.x + chunkFarOffset, chunkPosition.y);
     int leftLod    = getLod(chunkPosition.x - 1, chunkPosition.y);
     
-    position.z += (rightLod - (int(position.z) % rightLod)) * float(position.x == chunkSize) * float((int(position.z) % rightLod) != 0);
-    position.z += (leftLod - (int(position.z) % leftLod)) * float(position.x == 0.0) * float((int(position.z) % leftLod) != 0);
-    position.x += (upLod - (int(position.x) % upLod)) * float(position.z == chunkSize) * float((int(position.x) % upLod) != 0);
-    position.x += (downLod - (int(position.x) % downLod)) * float(position.z == 0.0) * float((int(position.x) % downLod) != 0);
+    //position.z += (rightLod - (int(position.z) % rightLod)) * float(position.x == chunkSize) * float((int(position.z) % rightLod) != 0);
+    //position.z += (leftLod - (int(position.z) % leftLod)) * float(position.x == 0.0) * float((int(position.z) % leftLod) != 0);
+    //position.x += (upLod - (int(position.x) % upLod)) * float(position.z == chunkSize) * float((int(position.x) % upLod) != 0);
+    //position.x += (downLod - (int(position.x) % downLod)) * float(position.z == 0.0) * float((int(position.x) % downLod) != 0);
     
     vec2 terrainPhLoc = vec2(position.x, position.z);
         
     position.x += offset.x;
     position.z += offset.y;
 
-    terrainUV = vec2(position.x / terrainInfo.Size.x, position.z / terrainInfo.Size.y);
-    
-    uint chunkPhysicalLocation;
-    
-    // move this to be handled by the compute shader that creates the nodes, when a node gets inserted in the final render list, fetch the location and pass it
-    switch (chunk.Lod) 
-    {
-        case 0: chunkPhysicalLocation = imageLoad(indirectionTexture[0], chunkPosition / int(multiplier)).r; break;
-        case 1: chunkPhysicalLocation = imageLoad(indirectionTexture[1], chunkPosition / int(multiplier)).r; break;
-        case 2: chunkPhysicalLocation = imageLoad(indirectionTexture[2], chunkPosition / int(multiplier)).r; break;
-        case 3: chunkPhysicalLocation = imageLoad(indirectionTexture[3], chunkPosition / int(multiplier)).r; break;
-        case 4: chunkPhysicalLocation = imageLoad(indirectionTexture[4], chunkPosition / int(multiplier)).r; break;
-        case 5: chunkPhysicalLocation = imageLoad(indirectionTexture[5], chunkPosition / int(multiplier)).r; break;
-    }
+    terrainUV = vec2(position.x / terrainInfo.Size, position.z / terrainInfo.Size);
 
     // TODO: fix hardcoded values
     int chunkPhyX = (terrainInfo.minimumChunkSize + 2) * int(chunkPhysicalLocation & 0x0000ffffu);
@@ -115,6 +117,6 @@ void main()
     //position.y = terrainPhLoc.y * terrainInfo.heightMultiplier;
 
     gl_Position = Camera.Projection * Camera.View * position;
-
-    fragPos = position.xyz;
+    
+    fragPos = vec3(1.0, 1.0, 1.0);
 }

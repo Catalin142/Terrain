@@ -35,8 +35,4 @@ public:
 
 	static void SerializeClipmap(const std::shared_ptr<VulkanImage>& texture, const std::string& table, const std::string& data, uint32_t chunkSize,
 		glm::uvec2 worldOffset = { 0u, 0u }, bool purgeContent = true);
-
-	static void Deserialize(const std::shared_ptr<TerrainVirtualMap>& virtualMap);
-	static void Deserialize(const std::shared_ptr<TerrainClipmap>& virtualMap);
-	static void Deserialize(std::unordered_map<size_t, FileChunkProperties>& virtualMap, std::string tab);
 };

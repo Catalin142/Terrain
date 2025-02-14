@@ -44,7 +44,7 @@ void VulkanImage::Create()
 
 	if (m_Specification.UsageFlags & VK_IMAGE_USAGE_STORAGE_BIT)
 	{
-		VkUtils::transitionImageLayout(m_Image, { VK_IMAGE_ASPECT_COLOR_BIT, 0, m_Specification.Mips, 0, 1 }, VK_IMAGE_LAYOUT_UNDEFINED,
+		VkUtils::transitionImageLayout(m_Image, { VK_IMAGE_ASPECT_COLOR_BIT, 0, m_Specification.Mips, 0, m_Specification.LayerCount }, VK_IMAGE_LAYOUT_UNDEFINED,
 			VK_IMAGE_LAYOUT_GENERAL);
 
 		VkCommandBuffer commandBuffer = VkUtils::beginSingleTimeCommand();
@@ -53,7 +53,7 @@ void VulkanImage::Create()
 		imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
 		imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
 		imageMemoryBarrier.image = m_Image;
-		imageMemoryBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, m_Specification.Mips, 0, 1 };
+		imageMemoryBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, m_Specification.Mips, 0, m_Specification.LayerCount };
 		imageMemoryBarrier.srcAccessMask = 0;
 		imageMemoryBarrier.dstAccessMask = 0;
 		imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;

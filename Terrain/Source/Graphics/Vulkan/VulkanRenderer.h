@@ -31,6 +31,9 @@ public:
 	static void preparePipeline(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer,
 		const std::shared_ptr<RenderPass>& renderPass);
 
+	static void preparePipeline(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer,
+		const std::shared_ptr<RenderPass>& renderPass, uint32_t descriptorSetIndex);
+
 	static void dispatchCompute(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer, 
 		const std::shared_ptr<VulkanComputePass>& computePass, glm::ivec3 workgroups, uint32_t pushConstantSize = 0, void* data = nullptr);
 

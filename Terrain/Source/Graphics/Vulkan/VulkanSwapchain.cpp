@@ -347,3 +347,8 @@ void VulkanSwapchain::presentFrame()
 		vkWaitForFences(device, 1, &m_inFlightFences[m_currentFrameIndex], VK_TRUE, UINT64_MAX);
 	}
 }
+
+bool VulkanSwapchain::getCurrentFenceStatus(uint32_t index)
+{
+	return vkGetFenceStatus(VulkanDevice::getVulkanDevice(), m_inFlightFences[index]);
+}

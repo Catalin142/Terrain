@@ -175,3 +175,8 @@ float VulkanRenderCommandBuffer::getTime(const std::string& name)
 	uint32_t startIndex = m_QueryStart[name];
 	return m_QueryResults[startIndex / 2];
 }
+
+bool VulkanRenderCommandBuffer::getCurrentBufferStatus()
+{ 
+	return vkGetFenceStatus(VulkanDevice::getVulkanDevice(), m_inFlightFences[m_QueryFrame]);
+}

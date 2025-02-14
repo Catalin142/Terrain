@@ -15,7 +15,7 @@ struct Node
     int Lod;
 };
 
-layout(binding = 1) readonly buffer NodesUniformBufferSet
+layout(binding = 1) readonly buffer NodesUniformBuffer
 {
     Node node[];
 } Nodes;

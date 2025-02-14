@@ -15,17 +15,13 @@
 
 #include <memory>
 
-struct TerrainChunkIndexBuffer
-{
-	std::shared_ptr<VulkanBuffer> IndexBuffer;
-	uint32_t IndicesCount = 0;
-};
-
 struct QuadTreeTerrainRendererSpecification
 {
-	std::shared_ptr<VulkanFramebuffer> targetFramebuffer;
-	std::shared_ptr<Terrain> Terrain;
+	std::shared_ptr<VulkanFramebuffer> TargetFramebuffer;
+	const std::unique_ptr<TerrainData>& Terrain;
 	VirtualTerrainMapSpecification VirtualMapSpecification;
+
+	QuadTreeTerrainRendererSpecification(const std::unique_ptr<TerrainData>& terrain) : Terrain(terrain) {}
 };
 
 struct QuadTreeRendererMetrics
@@ -33,11 +29,11 @@ struct QuadTreeRendererMetrics
 	inline static const std::string GPU_UPDATE_VIRTUAL_MAP				= "_GpuUpdateVirtualMap";
 	inline static const std::string GPU_UPDATE_STATUS_TEXTURE			= "_GpuUpdateVirtualStatusTexture";
 	inline static const std::string GPU_UPDATE_INDIRECTION_TEXTURE		= "_GpuUpdateVirtualIndirectionTexture";
-	inline static const std::string GPU_GENERATE_QUAD_TREE				= "_GpuGenerateQuadTree";
-	inline static const std::string GPU_GENERATE_LOD_MAP				= "_GpuGenerateLODMap";
-	inline static const std::string GPU_CREATE_INDIRECT_DRAW_COMMAND	= "_GpuGenerateDrawCommand";
+	inline static const std::string GPU_GENERATE_QUAD_TREE				= "_GpuVirtualGenerateQuadTree";
+	inline static const std::string GPU_GENERATE_LOD_MAP				= "_GpuVirtualGenerateLODMap";
+	inline static const std::string GPU_CREATE_INDIRECT_DRAW_COMMAND	= "_GpuVirtualGenerateDrawCommand";
 
-	inline static const std::string CPU_LOAD_NEEDED_NODES				= "_CpuLoadNeededNodes";
+	inline static const std::string CPU_LOAD_NEEDED_NODES				= "_CpuVirtualMapLoadNeededNodes";
 
 	inline static const std::string RENDER_TERRAIN						= "_QuadTreeRenderTerrain";
 };
@@ -48,29 +44,27 @@ public:
 	QuadTreeTerrainRenderer(const QuadTreeTerrainRendererSpecification& spec);
 	~QuadTreeTerrainRenderer() = default;
 
-	void updateVirtualMap(const glm::vec3& camPosition);
+	void refreshVirtualMap(const Camera& camera);
+	void updateVirtualMap();
 
-	void Precompute();
 	void Render(const Camera& camera);
-
-	const std::shared_ptr<VulkanImage> getOutput() { return m_TerrainRenderPass->Pipeline->getTargetFramebuffer()->getImage(0); }
 
 	void setWireframe(bool wireframe);
 
-	void createChunkIndexBuffer(uint8_t lod);
-
+	std::shared_ptr<TerrainVirtualMap> m_VirtualMap;
 private:
 	void createLODMapPipeline();
 	void createRenderPass();
 	void createPipeline();
 	void createIndirectCommandPass();
 
+	void createChunkIndexBuffer(uint8_t lod);
+
 public:
-	std::shared_ptr<VulkanRenderCommandBuffer> commandBuffer;
+	std::shared_ptr<VulkanRenderCommandBuffer> CommandBuffer;
 
 private:
-	std::shared_ptr<Terrain> m_Terrain;
-	std::shared_ptr<TerrainVirtualMap> m_VirtualMap;
+	const std::unique_ptr<TerrainData>& m_Terrain;
 	std::shared_ptr<QuadTreeLOD> m_QuadTreeLOD;
 
 	std::shared_ptr<VulkanFramebuffer> m_TargetFramebuffer;
@@ -89,7 +83,6 @@ private:
 	// The best solution would be to create the draw command on the GPU
 	std::shared_ptr<VulkanComputePass> m_IndirectPass;
 	std::shared_ptr<VulkanBufferSet> m_DrawIndirectCommandsSet;
-
 
 	bool m_InWireframe = false;
 };

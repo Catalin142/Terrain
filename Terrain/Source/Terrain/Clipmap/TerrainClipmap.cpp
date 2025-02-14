@@ -1,87 +1,56 @@
 #include "TerrainClipmap.h"
 
-#include <fstream>
-
 #include "Graphics/Vulkan/VulkanUtils.h"
 #include "Core/Hash.h"
 
-TerrainClipmap::TerrainClipmap(const ClipmapSpecification& spec) : m_Specification(spec)
+#include "Terrain/Terrain.h"
+
+#include <fstream>
+#include <iostream>
+
+TerrainClipmap::TerrainClipmap(const ClipmapTerrainSpecification& spec, const std::unique_ptr<TerrainData>& terrainData) :
+	m_Specification(spec), m_TerrainData(terrainData)
 {
+	TerrainInfo terrainInfo = m_TerrainData->getSpecification().Info;
+	m_RingSize = m_Specification.ClipmapSize / terrainInfo.ChunkSize;
+
 	{
 		VulkanImageSpecification clipmapSpecification{};
-		clipmapSpecification.Width = m_Specification.TextureSize;
-		clipmapSpecification.Height = m_Specification.TextureSize;
+		clipmapSpecification.Width = m_Specification.ClipmapSize + m_RingSize * 2;
+		clipmapSpecification.Height = m_Specification.ClipmapSize + m_RingSize * 2;
 		clipmapSpecification.Format = VK_FORMAT_R16_SFLOAT;
 		clipmapSpecification.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-		clipmapSpecification.LayerCount = m_Specification.LODCount;
-		clipmapSpecification.UsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;;
+		clipmapSpecification.LayerCount = terrainInfo.LODCount;
+		clipmapSpecification.UsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 		clipmapSpecification.MemoryType = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 		m_Map = std::make_shared<VulkanImage>(clipmapSpecification);
 		m_Map->Create();
 	}
 
-	m_Deserializer = std::make_shared<DynamicClipmapDeserializer>(m_Specification);
+	m_Deserializer = std::make_shared<DynamicClipmapDeserializer>(m_Specification, terrainInfo.ChunkSize, m_TerrainData->getSpecification().Filepath.Data);
+
 }
 
-#include <iostream>
-
-void TerrainClipmap::Refresh(VkCommandBuffer commandBuffer, const glm::vec2& cameraPosition)
+void TerrainClipmap::Refresh(const glm::vec2& cameraPosition)
 {
-	glm::ivec2 intCameraPos = cameraPosition;
+	TerrainInfo terrainInfo = m_TerrainData->getSpecification().Info;
 
-	if (m_LastCameraPosition / (int32_t)m_Specification.ChunkSize == intCameraPos / (int32_t)m_Specification.ChunkSize)
+	glm::ivec2 intCameraPos = glm::ivec2(glm::max((int32_t)cameraPosition.x, 0), glm::max((int32_t)cameraPosition.y, 0));
+	glm::ivec2 curPosSnapped = intCameraPos / terrainInfo.ChunkSize * terrainInfo.ChunkSize;
+
+	if (curPosSnapped == m_LastCameraPosition)
 		return;
 
-	std::unordered_set<uint32_t> m_NodesToUnload = m_LoadedNodes;
-	m_LastCameraPosition = cameraPosition;
+	m_LastCameraPosition = curPosSnapped;
+	std::unordered_set<size_t> m_NodesToUnload = m_LoadedNodes;
 
-	prepareForDeserialization(commandBuffer);
-
-	int32_t ringSize = m_Specification.TextureSize / m_Specification.ChunkSize;
-	float fRingSize = ringSize;
-
-	int32_t terrainSize = m_Specification.TerrainSize;
-	float fTerrainSize = (float)terrainSize;
-	
-	glm::vec2 terrainCameraPosition = cameraPosition;
-	for (int32_t lod = 0; lod < m_Specification.LODCount; lod++)
+	for (int32_t lod = 0; lod < terrainInfo.LODCount; lod++)
 	{
-		TerrainChunk tc;
-		tc.Lod = lod;
+		glm::ivec2 xBounds, yBounds;
+		getLODBounds(lod, curPosSnapped, xBounds, yBounds);
 
-		int32_t chunkSize = m_Specification.ChunkSize * (1 << lod);
-
-		glm::ivec2 snapedPosition;
-
-		float fChunkSize = (float)chunkSize;
-		terrainCameraPosition.x = glm::max(terrainCameraPosition.x, fChunkSize * (fRingSize / 2.0f));
-		terrainCameraPosition.y = glm::max(terrainCameraPosition.y, fChunkSize * (fRingSize / 2.0f));
-		terrainCameraPosition.x = glm::min(terrainCameraPosition.x, fTerrainSize - fChunkSize * (fRingSize / 2.0f));
-		terrainCameraPosition.y = glm::min(terrainCameraPosition.y, fTerrainSize - fChunkSize * (fRingSize / 2.0f));
-
-		snapedPosition.x = int32_t(terrainCameraPosition.x) / chunkSize;
-		snapedPosition.y = int32_t(terrainCameraPosition.y) / chunkSize;
-
-		int32_t minY = glm::max(snapedPosition.y - ringSize / 2, 0);
-		int32_t maxY = glm::min(snapedPosition.y + ringSize / 2, terrainSize / chunkSize);
-
-		int32_t minX = glm::max(snapedPosition.x - ringSize / 2, 0);
-		int32_t maxX = glm::min(snapedPosition.x + ringSize / 2, terrainSize / chunkSize);
-
-		if (snapedPosition.x % 2 != 0)
-		{
-			minX -= 1;
-			maxX -= 1;
-		}
-
-		if (snapedPosition.y % 2 != 0)
-		{
-			minY -= 1;
-			maxY -= 1;
-		}
-
-		for (int32_t y = minY; y < maxY; y++)
-			for (int32_t x = minX; x < maxX; x++)
+		for (int32_t y = yBounds.x; y < yBounds.y; y++)
+			for (int32_t x = xBounds.x; x < xBounds.y; x++)
 			{
 				size_t chunkId = getChunkID(x, y, lod);
 
@@ -91,83 +60,43 @@ void TerrainClipmap::Refresh(VkCommandBuffer commandBuffer, const glm::vec2& cam
 				if (m_LoadedNodes.find(chunkId) != m_LoadedNodes.end())
 					continue;
 
+				m_Deserializer->pushLoadChunk(curPosSnapped, m_TerrainData->getChunkProperty(chunkId));
 				m_LoadedNodes.insert(chunkId);
-
-				m_Deserializer->loadChunk(m_ChunkProperties[chunkId]);
-				assert(m_Deserializer->loadedChunks() != MAX_CHUNKS_LOADING_PER_FRAME);
 			}
 	}
-
-	if (m_Deserializer->loadedChunks() != 0)
-	{
-		m_Map->batchCopyBuffer(commandBuffer, *m_Deserializer->getImageData(), m_Deserializer->getRegions());
-		m_Deserializer->Flush();
-	}
-
-	prepareForRendering(commandBuffer);
-
 	for (size_t chunk : m_NodesToUnload)
 		m_LoadedNodes.erase(chunk);
 }
 
 void TerrainClipmap::hardLoad(const glm::vec2& cameraPosition)
 {
-	m_LastCameraPosition = cameraPosition;
+	TerrainInfo terrainInfo = m_TerrainData->getSpecification().Info;
+
+	glm::ivec2 intCameraPos = glm::ivec2(glm::max((int32_t)cameraPosition.x, 0), glm::max((int32_t)cameraPosition.y, 0));
+	glm::ivec2 curPosSnapped = intCameraPos / terrainInfo.ChunkSize * terrainInfo.ChunkSize;
+	
+	if (curPosSnapped == m_LastCameraPosition)
+		return;
+
+	m_LastCameraPosition = curPosSnapped;
+	m_LastValidCameraPosition = curPosSnapped;
 
 	VkCommandBuffer currentCommandBuffer = VkUtils::beginSingleTimeCommand();
 	prepareForDeserialization(currentCommandBuffer);
 
-	int32_t ringSize = m_Specification.TextureSize / m_Specification.ChunkSize;
-	float fRingSize = ringSize;
-
-	int32_t terrainSize = m_Specification.TerrainSize;
-	float fTerrainSize = (float)terrainSize;
-
-	glm::vec2 terrainCameraPosition = cameraPosition;
-	for (int32_t lod = 0; lod < m_Specification.LODCount; lod++)
+	for (int32_t lod = 0; lod < terrainInfo.LODCount; lod++)
 	{
-		TerrainChunk tc;
-		tc.Lod = lod;
+		glm::ivec2 xBounds, yBounds;
+		getLODBounds(lod, curPosSnapped, xBounds, yBounds);
 
-		int32_t chunkSize = m_Specification.ChunkSize * (1 << lod);
-
-		glm::ivec2 snapedPosition;
-
-		float fChunkSize = (float)chunkSize;
-		terrainCameraPosition.x = glm::max(terrainCameraPosition.x, fChunkSize * (fRingSize / 2.0f));
-		terrainCameraPosition.y = glm::max(terrainCameraPosition.y, fChunkSize * (fRingSize / 2.0f));
-		terrainCameraPosition.x = glm::min(terrainCameraPosition.x, fTerrainSize - fChunkSize * (fRingSize / 2.0f));
-		terrainCameraPosition.y = glm::min(terrainCameraPosition.y, fTerrainSize - fChunkSize * (fRingSize / 2.0f));
-
-		snapedPosition.x = int32_t(terrainCameraPosition.x) / chunkSize;
-		snapedPosition.y = int32_t(terrainCameraPosition.y) / chunkSize;
-
-		int32_t minY = glm::max(snapedPosition.y - ringSize / 2, 0);
-		int32_t maxY = glm::min(snapedPosition.y + ringSize / 2, terrainSize / chunkSize);
-
-		int32_t minX = glm::max(snapedPosition.x - ringSize / 2, 0);
-		int32_t maxX = glm::min(snapedPosition.x + ringSize / 2, terrainSize / chunkSize);
-
-		if (snapedPosition.x % 2 != 0)
-		{
-			minX -= 1;
-			maxX -= 1;
-		}
-
-		if (snapedPosition.y % 2 != 0)
-		{
-			minY -= 1;
-			maxY -= 1;
-		}
-
-		for (int32_t y = minY; y < maxY; y++)
-			for (int32_t x = minX; x < maxX; x++)
+		for (int32_t y = yBounds.x; y < yBounds.y; y++)
+			for (int32_t x = xBounds.x; x < xBounds.y; x++)
 			{
 				size_t chunkId = getChunkID(x, y, lod);
 
 				m_LoadedNodes.insert(chunkId);
 
-				m_Deserializer->loadChunk(m_ChunkProperties[chunkId]);
+				m_Deserializer->loadChunkSequential(m_TerrainData->getChunkProperty(chunkId));
 				if (m_Deserializer->loadedChunks() == MAX_CHUNKS_LOADING_PER_FRAME)
 				{
 					m_Map->batchCopyBuffer(currentCommandBuffer, *m_Deserializer->getImageData(), m_Deserializer->getRegions());
@@ -186,15 +115,16 @@ void TerrainClipmap::hardLoad(const glm::vec2& cameraPosition)
 	}
 
 	prepareForRendering(currentCommandBuffer);
-
 	VkUtils::endSingleTimeCommand(currentCommandBuffer);
 }
 
 void TerrainClipmap::prepareForDeserialization(VkCommandBuffer cmdBuffer)
 {
+	TerrainInfo terrainInfo = m_TerrainData->getSpecification().Info;
+
 	VkImageSubresourceRange imgSubresource{};
 	imgSubresource.aspectMask = m_Map->getSpecification().Aspect;
-	imgSubresource.layerCount = m_Specification.LODCount;
+	imgSubresource.layerCount = terrainInfo.LODCount;
 	imgSubresource.levelCount = 1;
 	imgSubresource.baseMipLevel = 0;
 	VkUtils::transitionImageLayout(cmdBuffer, m_Map->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -202,15 +132,58 @@ void TerrainClipmap::prepareForDeserialization(VkCommandBuffer cmdBuffer)
 
 void TerrainClipmap::prepareForRendering(VkCommandBuffer cmdBuffer)
 {
+	TerrainInfo terrainInfo = m_TerrainData->getSpecification().Info;
+
 	VkImageSubresourceRange imgSubresource{};
 	imgSubresource.aspectMask = m_Map->getSpecification().Aspect;
-	imgSubresource.layerCount = m_Specification.LODCount;
+	imgSubresource.layerCount = terrainInfo.LODCount;
 	imgSubresource.levelCount = 1;
 	imgSubresource.baseMipLevel = 0;
 	VkUtils::transitionImageLayout(cmdBuffer, m_Map->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
 }
 
-void TerrainClipmap::addChunkProperty(size_t chunk, const FileChunkProperties& props)
+void TerrainClipmap::blitNodes(VkCommandBuffer cmdBuffer, const std::shared_ptr<VulkanBuffer>& StagingBuffer, const std::vector<VkBufferImageCopy>& regions)
 {
-	m_ChunkProperties[chunk] = props;
+	m_Map->batchCopyBuffer(cmdBuffer, *StagingBuffer, regions);
+}
+
+bool TerrainClipmap::updateClipmaps(VkCommandBuffer cmdBuffer)
+{
+	bool updated = m_Deserializer->Refresh(cmdBuffer, this);
+	m_LastValidCameraPosition = m_Deserializer->getLastValidPosition();
+
+	return updated;
+}
+
+void TerrainClipmap::getLODBounds(int32_t lod, const glm::ivec2& camPositionSnapped, glm::ivec2& xBounds, glm::ivec2& yBounds)
+{
+	TerrainInfo terrainInfo = m_TerrainData->getSpecification().Info;
+
+	int32_t chunkSize = terrainInfo.ChunkSize * (1 << lod);
+
+	glm::ivec2 terrainCameraPosition = camPositionSnapped;
+	terrainCameraPosition.x = glm::max(terrainCameraPosition.x, chunkSize * (m_RingSize / 2));
+	terrainCameraPosition.y = glm::max(terrainCameraPosition.y, chunkSize * (m_RingSize / 2));
+	terrainCameraPosition.x = glm::min(terrainCameraPosition.x, terrainInfo.TerrainSize - chunkSize * (m_RingSize / 2));
+	terrainCameraPosition.y = glm::min(terrainCameraPosition.y, terrainInfo.TerrainSize - chunkSize * (m_RingSize / 2));
+
+	glm::ivec2 snapedPosition = terrainCameraPosition / chunkSize;
+
+	yBounds.x = glm::max(snapedPosition.y - m_RingSize / 2, 0);
+	yBounds.y = glm::min(snapedPosition.y + m_RingSize / 2, terrainInfo.TerrainSize / chunkSize);
+
+	xBounds.x = glm::max(snapedPosition.x - m_RingSize / 2, 0);
+	xBounds.y = glm::min(snapedPosition.x + m_RingSize / 2, terrainInfo.TerrainSize / chunkSize);
+
+	if (snapedPosition.x % 2 != 0)
+	{
+		xBounds.x -= 1;
+		xBounds.y -= 1;
+	}
+
+	if (snapedPosition.y % 2 != 0)
+	{
+		yBounds.x -= 1;
+		yBounds.y -= 1;
+	}
 }

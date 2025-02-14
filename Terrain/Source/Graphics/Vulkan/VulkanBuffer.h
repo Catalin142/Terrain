@@ -36,8 +36,6 @@ public:
 	VulkanBuffer(void* data, const VulkanBufferProperties& props);
 	~VulkanBuffer();
 
-	// if the data is only on the gpu, we can do that only with staging buffer
-	void setDataGPU(VkCommandBuffer cmdBuffer, void* data, uint32_t size);
 	void setDataGPU(void* data, uint32_t size);
 
 	void setDataCPU(VkCommandBuffer cmdBuffer, void* data, uint32_t size);

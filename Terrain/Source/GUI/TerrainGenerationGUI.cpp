@@ -2,7 +2,7 @@
 
 #include <backends/imgui_impl_vulkan.h>
 
-TerrainGenerationGUI::TerrainGenerationGUI(const std::shared_ptr<TerrainGenerator>& generator, const std::shared_ptr<Terrain>& terrain,
+TerrainGenerationGUI::TerrainGenerationGUI(const std::shared_ptr<TerrainGenerator>& generator, const std::unique_ptr<TerrainData>& terrain,
 	uint32_t width, ImVec2 pos) :
 	m_Generator(generator), Width(width), Position(pos), m_Terrain(terrain)
 { 

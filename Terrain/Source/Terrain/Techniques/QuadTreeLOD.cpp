@@ -11,11 +11,8 @@ QuadTreeLOD::QuadTreeLOD(const TerrainSpecification& spec, const std::shared_ptr
 	createResources(virtualMap);
 }
 
-void QuadTreeLOD::Generate(VkCommandBuffer commandBuffer)
+void QuadTreeLOD::Generate(VkCommandBuffer commandBuffer, std::vector<TerrainChunk> firstPass)
 {
-	std::vector<TerrainChunk> firstPass;
-	firstPass.push_back(TerrainChunk{ 0, 3 });
-
 	QuadTreePassMetadata metadata;
 	metadata.ResultArrayIndex = 0;
 	metadata.TMPArray1Index = 0;
@@ -26,7 +23,7 @@ void QuadTreeLOD::Generate(VkCommandBuffer commandBuffer)
 
 	passMetadata->getBuffer(VulkanRenderer::getCurrentFrame())->setDataCPU(&metadata, sizeof(QuadTreePassMetadata));
 
-	for (uint32_t lod = 0; lod < m_TerrainSpecification.Info.LodCount; lod++)
+	for (uint32_t lod = 0; lod < m_TerrainSpecification.Info.LODCount; lod++)
 	{
 		VulkanRenderer::dispatchCompute(commandBuffer, m_ConstructQuadTreePipeline, m_DescriptorSets[lod % 2], { 1, 1, 1 },
 			sizeof(uint32_t), &sizefp);
@@ -66,7 +63,7 @@ void QuadTreeLOD::Generate(VkCommandBuffer commandBuffer)
 	VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, passMetadata->getBuffer(VulkanRenderer::getCurrentFrame()), VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 		VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
-	VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, chunksToRender->getBuffer(VulkanRenderer::getCurrentFrame()), VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+	VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, chunksToRender, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 		VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
 }
 
@@ -94,7 +91,7 @@ void QuadTreeLOD::createResources(const std::shared_ptr<TerrainVirtualMap>& virt
 		resultProperties.Type = BufferType::STORAGE_BUFFER;
 		resultProperties.Usage = BufferMemoryUsage::BUFFER_ONLY_GPU;
 
-		chunksToRender = std::make_shared<VulkanBufferSet>(VulkanRenderer::getFramesInFlight(), resultProperties);
+		chunksToRender = std::make_shared<VulkanBuffer>(resultProperties);
 	}
 	{
 		VulkanBufferProperties passMetadataProperties;

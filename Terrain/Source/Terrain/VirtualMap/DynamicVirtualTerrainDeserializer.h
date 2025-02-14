@@ -1,6 +1,6 @@
 #pragma once
 
-#include "VirtualMapUtils.h"
+#include "VirtualMapData.h"
 #include "Graphics/Vulkan/VulkanBuffer.h"
 #include "Terrain/TerrainChunk.h"
 
@@ -8,18 +8,19 @@
 #include <vector>
 #include <queue>
 #include <unordered_map>
+#include <unordered_set>
 #include <semaphore>
 #include <mutex>
 #include <vulkan/vulkan.h>
 
-#define MAX_CHUNKS_LOADING_PER_FRAME 64
+#define MAX_CHUNKS_LOADING_PER_FRAME 16
 
 class TerrainVirtualMap;
 
 class DynamicVirtualTerrainDeserializer
 {
 public:
-	DynamicVirtualTerrainDeserializer(const VirtualTerrainMapSpecification& spec);
+	DynamicVirtualTerrainDeserializer(const VirtualTerrainMapSpecification& spec, int32_t chunkSize, const std::string& filepath);
 	~DynamicVirtualTerrainDeserializer();
 
 	// The deserializer loads data from the file on a different thread and holds it until i refresh the deserializer
@@ -28,28 +29,30 @@ public:
 
 	void loadChunk(VirtualMapLoadTask task);
 	void pushLoadTask(size_t node, int32_t virtualLocation, const FileChunkProperties& properties);
-
+	
 public:
 	VirtualMapDeserializerLastUpdate LastUpdate;
 
 private:
 	VirtualTerrainMapSpecification m_VirtualMapSpecification;
+	std::string m_ChunksDataFilepath;
+	int32_t m_ChunkSize;
 
 	std::thread m_LoadThread;
 	std::mutex m_DataMutex;
 	std::mutex m_TaskMutex;
-	std::mutex m_SlotsMutex;
+	std::mutex m_BufferMutex;
 
-	// in case we want to load mare than MAX_CHUNKS_LOADING_PER_FRAME, we stop the loading thread and wait for a batch to be sent to the GPU
-	std::counting_semaphore<MAX_CHUNKS_LOADING_PER_FRAME> m_MaxLoadSemaphore{ 0 };
-	std::counting_semaphore<1024> m_LoadThreadSemaphore{ 1 };
+	std::counting_semaphore<1024> m_LoadThreadSemaphore{ 0 };
+	std::condition_variable m_PositionsCV;
 	bool m_ThreadRunning = true;
 
 	std::vector<VkBufferImageCopy> m_RegionsToCopy;
-	std::vector<uint32_t> m_UsedIndices;
 	std::queue<VirtualMapLoadTask> m_LoadTasks;
 
-	std::shared_ptr<VulkanBuffer> m_RawImageData;
+	std::vector<std::shared_ptr<VulkanBuffer>> m_RawImageData;
+	uint32_t m_AvailableBuffer = 0;
+	uint32_t m_MemoryIndex = 0;
 
 	// Cache of file handlers
 	// IDK if it impacts performance if i keep them open all the time
@@ -57,7 +60,6 @@ private:
 	std::unordered_map<std::string, std::ifstream*> m_FileHandlerCache;
 
 	// in memory buffer
-	std::queue<uint32_t> m_AvailableSlots;
 	uint32_t m_TextureDataStride = 0;
 
 	// Compute shader to update the state of the loaded/not loaded texture

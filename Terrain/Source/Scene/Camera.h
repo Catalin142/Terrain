@@ -41,7 +41,7 @@ public:
 private:
 	CameraRenderMatrices m_CameraRenderMatrices;
 
-	glm::vec3 m_Position{ 0.0f, 0.0f, 10.0f };
+	glm::vec3 m_Position{ 0.0f, -10.0f, 0.0f };
 
 	float m_FieldOfView;
 	float m_AspectRatio;

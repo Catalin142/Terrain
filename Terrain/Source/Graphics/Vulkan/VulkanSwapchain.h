@@ -31,6 +31,7 @@ public:
 	VkSemaphore getRenderFinishedSemaphore(uint32_t frameIndex) { return m_Semaphores[frameIndex].renderFinishedSemaphore; }
 
 	VkFence getCurrentFence() const { return m_inFlightFences[m_currentFrameIndex]; }
+	bool getCurrentFenceStatus(uint32_t index);
 	VkFence getFence(uint32_t frameIndex) const { return m_inFlightFences[frameIndex]; }
 
 	VkExtent2D getExtent() { return m_Extent; }

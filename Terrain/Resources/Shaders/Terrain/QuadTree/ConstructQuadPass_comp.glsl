@@ -21,7 +21,7 @@ layout(std430, set = 1, binding = 1) writeonly buffer _TMPArray1Set
 } TMPArray1;
 
 // this holds the nodes we will render
-layout(std430, set = 1, binding = 2) writeonly buffer _FinalResultSet
+layout(std430, set = 1, binding = 2) writeonly buffer _FinalResult
 {
     NodeMetadata nodes[];
 } FinalResult;
@@ -49,8 +49,8 @@ void main()
     NodeMetadata node = TMPArray0.nodes[gl_GlobalInvocationID.x];
     
     ivec2 texel;
-    texel.x = int(node.location & 0x0000FFFF);
-    texel.y = int(node.location & 0xFFFF0000) >> 16;
+    texel.x = int(node.location & 0x0000ffffu);
+    texel.y = int(node.location & 0xffff0000u) >> 16;
 
     uint child0 = 0;
     uint child1 = 0;
@@ -61,7 +61,6 @@ void main()
 
     uint mip = node.mip & 0x0000ffff;
 
-    // each thread in the dispatch will take the same path, the gpu will optimizie this i hope!
     switch (mip) 
     {
         case 0: 

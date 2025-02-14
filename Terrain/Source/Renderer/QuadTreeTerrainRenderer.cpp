@@ -14,7 +14,7 @@
 #define INDIRECT_COMMAND_SHADER "Terrain/QuadTree/CreateDrawCommand_comp.glsl"
 
 QuadTreeTerrainRenderer::QuadTreeTerrainRenderer(const QuadTreeTerrainRendererSpecification& spec)
-	: m_TargetFramebuffer(spec.targetFramebuffer), m_Terrain(spec.Terrain)
+	: m_TargetFramebuffer(spec.TargetFramebuffer), m_Terrain(spec.Terrain)
 {
 	{
 		VulkanBufferProperties terrainInfoProperties;
@@ -33,9 +33,7 @@ QuadTreeTerrainRenderer::QuadTreeTerrainRenderer(const QuadTreeTerrainRendererSp
 		m_DrawIndirectCommandsSet = std::make_shared<VulkanBufferSet>(VulkanRenderer::getFramesInFlight(), indirectProperties);
 	}
 
-	m_VirtualMap = std::make_shared<TerrainVirtualMap>(spec.VirtualMapSpecification);
-
-	VirtualTerrainSerializer::Deserialize(m_VirtualMap);
+	m_VirtualMap = std::make_shared<TerrainVirtualMap>(spec.VirtualMapSpecification, m_Terrain);
 
 	m_QuadTreeLOD = std::make_shared<QuadTreeLOD>(m_Terrain->getSpecification(), m_VirtualMap);
 
@@ -46,61 +44,73 @@ QuadTreeTerrainRenderer::QuadTreeTerrainRenderer(const QuadTreeTerrainRendererSp
 	createChunkIndexBuffer(1);
 }
 
-void QuadTreeTerrainRenderer::updateVirtualMap(const glm::vec3& camPosition)
+void QuadTreeTerrainRenderer::refreshVirtualMap(const Camera& camera)
 {
 	Instrumentor::Get().beginTimer(QuadTreeRendererMetrics::CPU_LOAD_NEEDED_NODES);
+
+	glm::vec3 camPosition = camera.getPosition();
 	m_VirtualMap->pushLoadTasks(glm::vec2(camPosition.x, camPosition.z));
+
 	Instrumentor::Get().endTimer(QuadTreeRendererMetrics::CPU_LOAD_NEEDED_NODES);
 }
 
-void QuadTreeTerrainRenderer::Precompute()
+void QuadTreeTerrainRenderer::updateVirtualMap()
 {
-	VkCommandBuffer vkCommandBuffer = commandBuffer->getCurrentCommandBuffer();
+	VkCommandBuffer vkCommandBuffer = CommandBuffer->getCurrentCommandBuffer();
 
 	// Load nodes and update virtual map
 	{
-		commandBuffer->beginQuery(QuadTreeRendererMetrics::GPU_UPDATE_VIRTUAL_MAP);
+		CommandBuffer->beginQuery(QuadTreeRendererMetrics::GPU_UPDATE_VIRTUAL_MAP);
 
 		m_VirtualMap->updateMap(vkCommandBuffer);
 
 		VulkanComputePipeline::imageMemoryBarrier(vkCommandBuffer, m_VirtualMap->getPhysicalTexture(), VK_ACCESS_MEMORY_WRITE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
 			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 1);
 
-		commandBuffer->endQuery(QuadTreeRendererMetrics::GPU_UPDATE_VIRTUAL_MAP);
+		CommandBuffer->endQuery(QuadTreeRendererMetrics::GPU_UPDATE_VIRTUAL_MAP);
 	}
 
 	{
-		commandBuffer->beginQuery(QuadTreeRendererMetrics::GPU_UPDATE_STATUS_TEXTURE);
+		CommandBuffer->beginQuery(QuadTreeRendererMetrics::GPU_UPDATE_STATUS_TEXTURE);
 		m_VirtualMap->updateStatusTexture(vkCommandBuffer);
-		commandBuffer->endQuery(QuadTreeRendererMetrics::GPU_UPDATE_STATUS_TEXTURE);
+		CommandBuffer->endQuery(QuadTreeRendererMetrics::GPU_UPDATE_STATUS_TEXTURE);
 	}
 
 	{
-		commandBuffer->beginQuery(QuadTreeRendererMetrics::GPU_UPDATE_INDIRECTION_TEXTURE);
+		CommandBuffer->beginQuery(QuadTreeRendererMetrics::GPU_UPDATE_INDIRECTION_TEXTURE);
 		m_VirtualMap->updateIndirectionTexture(vkCommandBuffer);
-		commandBuffer->endQuery(QuadTreeRendererMetrics::GPU_UPDATE_INDIRECTION_TEXTURE);
+		CommandBuffer->endQuery(QuadTreeRendererMetrics::GPU_UPDATE_INDIRECTION_TEXTURE);
 	}
 
 	{
-		commandBuffer->beginQuery(QuadTreeRendererMetrics::GPU_GENERATE_QUAD_TREE);
-		m_QuadTreeLOD->Generate(vkCommandBuffer);
-		commandBuffer->endQuery(QuadTreeRendererMetrics::GPU_GENERATE_QUAD_TREE);
+		CommandBuffer->beginQuery(QuadTreeRendererMetrics::GPU_GENERATE_QUAD_TREE);
+		TerrainInfo terrainInfo = m_Terrain->getInfo();
+		int32_t maxChunkSize = terrainInfo.ChunkSize << (terrainInfo.LODCount - 1);
+		int32_t maxChunkCount = terrainInfo.TerrainSize / maxChunkSize;
+
+		std::vector<TerrainChunk> quadTreeFirstPass;
+		for (int32_t y = 0; y < maxChunkCount; y++)
+			for (int32_t x = 0; x < maxChunkCount; x++)
+				quadTreeFirstPass.push_back(TerrainChunk{ packOffset(x, y), terrainInfo.LODCount - 1 });
+
+		m_QuadTreeLOD->Generate(vkCommandBuffer, quadTreeFirstPass);
+		CommandBuffer->endQuery(QuadTreeRendererMetrics::GPU_GENERATE_QUAD_TREE);
 	}
 	// Generate LodMap
 	{
-		commandBuffer->beginQuery(QuadTreeRendererMetrics::GPU_GENERATE_LOD_MAP);
+		CommandBuffer->beginQuery(QuadTreeRendererMetrics::GPU_GENERATE_LOD_MAP);
 
 		VulkanRenderer::dispatchCompute(vkCommandBuffer, m_LODMapComputePass, { 8, 8, 1 });
 
 		m_LODMapComputePass->Pipeline->imageMemoryBarrier(vkCommandBuffer, m_LODMap, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
 
-		commandBuffer->endQuery(QuadTreeRendererMetrics::GPU_GENERATE_LOD_MAP);
+		CommandBuffer->endQuery(QuadTreeRendererMetrics::GPU_GENERATE_LOD_MAP);
 	}
 
 	// After computing the pass data, create the draw command
 	{
-		commandBuffer->beginQuery(QuadTreeRendererMetrics::GPU_CREATE_INDIRECT_DRAW_COMMAND);
+		CommandBuffer->beginQuery(QuadTreeRendererMetrics::GPU_CREATE_INDIRECT_DRAW_COMMAND);
 
 		uint32_t idxBuffer = m_ChunkIndexBuffer.IndicesCount;
 		VulkanRenderer::dispatchCompute(vkCommandBuffer, m_IndirectPass, { 1, 1, 1 },
@@ -109,34 +119,32 @@ void QuadTreeTerrainRenderer::Precompute()
 		VulkanComputePipeline::bufferMemoryBarrier(vkCommandBuffer, m_DrawIndirectCommandsSet->getBuffer(VulkanRenderer::getCurrentFrame()), VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_MEMORY_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
-		commandBuffer->endQuery(QuadTreeRendererMetrics::GPU_CREATE_INDIRECT_DRAW_COMMAND);
+		CommandBuffer->endQuery(QuadTreeRendererMetrics::GPU_CREATE_INDIRECT_DRAW_COMMAND);
 	}
 }
 
 void QuadTreeTerrainRenderer::Render(const Camera& camera)
 {
-	commandBuffer->beginQuery(QuadTreeRendererMetrics::RENDER_TERRAIN);
+	CommandBuffer->beginQuery(QuadTreeRendererMetrics::RENDER_TERRAIN);
 
 	uint32_t m_CurrentFrame = VulkanRenderer::getCurrentFrame();
 
 	TerrainInfo terrainInfo = m_Terrain->getInfo();
 	m_TerrainInfo->setDataCPU(&terrainInfo, sizeof(TerrainInfo));
 
-	VulkanRenderer::beginRenderPass(commandBuffer, m_TerrainRenderPass);
-	VulkanRenderer::preparePipeline(commandBuffer, m_TerrainRenderPass);
+	VulkanRenderer::beginRenderPass(CommandBuffer, m_TerrainRenderPass);
+	VulkanRenderer::preparePipeline(CommandBuffer, m_TerrainRenderPass);
 
 	CameraRenderMatrices matrices = camera.getRenderMatrices();
-	vkCmdPushConstants(commandBuffer->getCurrentCommandBuffer(), m_TerrainRenderPass->Pipeline->getVkPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0,
+	vkCmdPushConstants(CommandBuffer->getCurrentCommandBuffer(), m_TerrainRenderPass->Pipeline->getVkPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0,
 		sizeof(CameraRenderMatrices), &matrices);
 
-	TerrainChunkIndexBuffer idxBuffer = m_ChunkIndexBuffer;
+	vkCmdBindIndexBuffer(CommandBuffer->getCurrentCommandBuffer(), m_ChunkIndexBuffer.IndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+	vkCmdDrawIndexedIndirect(CommandBuffer->getCurrentCommandBuffer(), m_DrawIndirectCommandsSet->getVkBuffer(VulkanRenderer::getCurrentFrame()), 0, 1, sizeof(VkDrawIndexedIndirectCommand));
 
-	vkCmdBindIndexBuffer(commandBuffer->getCurrentCommandBuffer(), idxBuffer.IndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
-	vkCmdDrawIndexedIndirect(commandBuffer->getCurrentCommandBuffer(), m_DrawIndirectCommandsSet->getVkBuffer(VulkanRenderer::getCurrentFrame()), 0, 1, sizeof(VkDrawIndexedIndirectCommand));
+	VulkanRenderer::endRenderPass(CommandBuffer);
 
-	VulkanRenderer::endRenderPass(commandBuffer);
-
-	commandBuffer->endQuery(QuadTreeRendererMetrics::RENDER_TERRAIN);
+	CommandBuffer->endQuery(QuadTreeRendererMetrics::RENDER_TERRAIN);
 }
 
 void QuadTreeTerrainRenderer::setWireframe(bool wireframe)
@@ -151,7 +159,7 @@ void QuadTreeTerrainRenderer::setWireframe(bool wireframe)
 
 void QuadTreeTerrainRenderer::createChunkIndexBuffer(uint8_t lod)
 {
-	uint32_t vertCount = m_Terrain->getInfo().MinimumChunkSize + 1;
+	uint32_t vertCount = m_Terrain->getInfo().ChunkSize + 1;
 	std::vector<uint32_t> indices = TerrainChunk::generateIndices(lod, vertCount);
 
 	m_ChunkIndexBuffer.IndicesCount = (uint32_t)indices.size();
@@ -172,8 +180,8 @@ void QuadTreeTerrainRenderer::createLODMapPipeline()
 		lodCompute->createDescriptorSetLayouts();
 
 		VulkanImageSpecification LODMapSpecification;
-		LODMapSpecification.Width = uint32_t(m_Terrain->getInfo().TerrainSize.x) / m_Terrain->getInfo().MinimumChunkSize;
-		LODMapSpecification.Height = uint32_t(m_Terrain->getInfo().TerrainSize.x) / m_Terrain->getInfo().MinimumChunkSize;
+		LODMapSpecification.Width = uint32_t(m_Terrain->getInfo().TerrainSize) / m_Terrain->getInfo().ChunkSize;
+		LODMapSpecification.Height = uint32_t(m_Terrain->getInfo().TerrainSize) / m_Terrain->getInfo().ChunkSize;
 		LODMapSpecification.Format = VK_FORMAT_R8_UINT;
 		LODMapSpecification.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
 		LODMapSpecification.UsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;

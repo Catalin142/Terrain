@@ -4,7 +4,8 @@
 #include "Terrain/Generator/TerrainGenerator.h"
 #include "Graphics/Vulkan/VulkanBuffer.h"
 #include "Terrain/TerrainChunk.h"
-#include "VirtualMapUtils.h"
+#include "VirtualMapData.h"
+#include "Terrain/Terrain.h"
 
 #include <cstdint>
 #include <memory>
@@ -20,6 +21,7 @@
 #include <string>
 
 #define INVALID_SLOT -1
+#define INVALID_SLOT -1
 
 class DynamicVirtualTerrainDeserializer;
 
@@ -29,7 +31,7 @@ class DynamicVirtualTerrainDeserializer;
 class TerrainVirtualMap
 {
 public:
-	TerrainVirtualMap(const VirtualTerrainMapSpecification& spec);
+	TerrainVirtualMap(const VirtualTerrainMapSpecification& spec, const std::unique_ptr<TerrainData>& terrainData);
 
 	const VirtualTerrainMapSpecification& getSpecification() {
 		return m_Specification;
@@ -38,7 +40,6 @@ public:
 	void pushLoadTasks(const glm::vec2& camPosition);
 	void createLoadTask(const TerrainChunk& chunks);
 
-	// this is best to keep in a separate command buffer, and start the main command buffer just after this finishes
 	void updateMap(VkCommandBuffer cmdBuffer);
 
 	void blitNodes(VkCommandBuffer cmdBuffer, const std::shared_ptr<VulkanBuffer>& StagingBuffer, const std::vector<VkBufferImageCopy>& regions);
@@ -46,8 +47,6 @@ public:
 	const std::shared_ptr<VulkanImage>& getPhysicalTexture() { return m_PhysicalTexture; }
 	const std::shared_ptr<VulkanImage>& getIndirectionTexture() { return m_IndirectionTexture; }
 	const std::shared_ptr<VulkanImage>& getLoadStatusTexture() { return m_StatusTexture; }
-
-	void addVirtualChunkProperty(size_t chunk, const FileChunkProperties& props);
 
 	void updateIndirectionTexture(VkCommandBuffer cmdBuffer);
 	void updateStatusTexture(VkCommandBuffer cmdBuffer);
@@ -62,15 +61,15 @@ private:
 
 private:
 	std::shared_ptr<VulkanImage> m_PhysicalTexture;
+	const std::unique_ptr<TerrainData>& m_TerrainData;
 
 	VirtualTerrainMapSpecification m_Specification;
-	std::unordered_map<size_t, FileChunkProperties> m_ChunkProperties;
 
 	// I keep a cache of the last Slot a Chunk occupied and the last chunk in a specified slot
 	std::unordered_map<size_t, int32_t> m_LastChunkSlot;
 	std::vector<size_t> m_LastSlotChunk;
 
-	std::unordered_set<size_t> m_ActiveNodes;
+	std::unordered_set<size_t> m_ActiveNodesCPU;
 	std::unordered_set<int32_t> m_AvailableSlots;
 
 	std::unordered_set<size_t> m_NodesToUnload;
@@ -86,6 +85,8 @@ private:
 	std::vector<GPUStatusNode> m_StatusNodes;
 
 	std::shared_ptr<DynamicVirtualTerrainDeserializer> m_Deserializer;
+
+	glm::ivec2 m_LastCameraPosition = { -1, -1 };
 
 	// TODO(if needed): hold a metadata storage buffer and hold the node index in a texture
 };

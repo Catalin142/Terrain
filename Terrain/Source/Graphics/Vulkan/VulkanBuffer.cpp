@@ -114,8 +114,10 @@ VulkanBuffer::~VulkanBuffer()
 	vkFreeMemory(vulkanDevice, m_DeviceMemory, nullptr);
 }
 
-void VulkanBuffer::setDataGPU(VkCommandBuffer cmdBuffer, void* data, uint32_t size)
+void VulkanBuffer::setDataGPU(void* data, uint32_t size)
 {
+	VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
+
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingMemory;
 
@@ -138,13 +140,11 @@ void VulkanBuffer::setDataGPU(VkCommandBuffer cmdBuffer, void* data, uint32_t si
 	copyRegion.dstOffset = 0;
 	copyRegion.size = size;
 	vkCmdCopyBuffer(cmdBuffer, stagingBuffer, m_Buffer, 1, &copyRegion);
-}
 
-void VulkanBuffer::setDataGPU(void* data, uint32_t size)
-{
-	VkCommandBuffer buffer = VkUtils::beginSingleTimeCommand();
-	setDataGPU(buffer, data, size);
-	VkUtils::endSingleTimeCommand(buffer);
+	VkUtils::endSingleTimeCommand(cmdBuffer);
+
+	vkDestroyBuffer(VulkanDevice::getVulkanDevice(), stagingBuffer, nullptr);
+	vkFreeMemory(VulkanDevice::getVulkanDevice(), stagingMemory, nullptr);
 }
 
 void VulkanBuffer::setDataCPU(VkCommandBuffer cmdBuffer, void* data, uint32_t size)

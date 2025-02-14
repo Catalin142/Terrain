@@ -2,23 +2,23 @@
 
 #include <string>
 #include <cstdint>
+#include "glm/glm.hpp"
 
 #include "Terrain/TerrainChunk.h"
 
-struct ClipmapSpecification
+struct ClipmapTerrainSpecification
 {
-	uint32_t ChunkSize;
-	uint32_t TextureSize;
-	uint32_t TerrainSize;
-
-	uint32_t LODCount;
-
-	TerrainFileLocation Filepath;
+	uint32_t ClipmapSize;
 };
 
 struct ClipmapLoadTask
 {
-	uint32_t Offset;
-	uint32_t Lod;
-	size_t FileOffset;
+	size_t CameraHash;
+	FileChunkProperties ChunkProperties;
+};
+
+struct LODMargins
+{
+	glm::ivec2 xMargins;
+	glm::ivec2 yMargins;
 };

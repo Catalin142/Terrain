@@ -11,6 +11,7 @@ TerrainGenerator::TerrainGenerator(uint32_t width, uint32_t height) : m_Width(wi
 		uniformBufferProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
 		m_UniformBuffer = std::make_shared<VulkanBuffer>(uniformBufferProperties);
 	}
+
 	createShaders();
 	createImages();
 	createCompute();
