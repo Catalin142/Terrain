@@ -57,6 +57,7 @@ private:
 	void createRenderPass();
 	void createPipeline();
 	void createIndirectCommandPass();
+	void createNeighboursCommandPass();
 
 	void createChunkIndexBuffer(uint8_t lod);
 
@@ -75,13 +76,16 @@ private:
 	std::shared_ptr<VulkanImage> m_LODMap;
 	std::shared_ptr<VulkanComputePass> m_LODMapComputePass;
 
+	std::shared_ptr<VulkanComputePass> m_NeighboursComputePass;
+
 	std::shared_ptr<VulkanBuffer> m_TerrainInfo;
 
+	std::shared_ptr<VulkanBuffer> m_VertexBuffer;
 	TerrainChunkIndexBuffer m_ChunkIndexBuffer;
 
 	// As we keep all data on the GPU, we can't issue a command directly from the CPU without fetching memory from the GPU.
 	// The best solution would be to create the draw command on the GPU
-	std::shared_ptr<VulkanComputePass> m_IndirectPass;
+	std::shared_ptr<VulkanComputePass> m_IndirectComputePass;
 	std::shared_ptr<VulkanBufferSet> m_DrawIndirectCommandsSet;
 
 	bool m_InWireframe = false;

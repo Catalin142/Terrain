@@ -41,6 +41,16 @@ struct GPUStatusNode
     }
 };
 
+struct GPUQuadTreeTerrainChunk
+{
+    uint32_t Offset;
+    uint32_t Lod = 0;
+    uint32_t ChunkPhysicalLocation = 0;
+
+    // uuuuuuuuddddddddllllllllrrrrrrrr
+    uint32_t NeighboursLod = 0;
+};
+
 struct VirtualTerrainMapSpecification
 {
     uint32_t PhysicalTextureSize = 2048;

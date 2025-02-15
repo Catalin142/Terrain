@@ -1,7 +1,5 @@
 #version 460 core
 
-#extension GL_EXT_debug_printf : enable
-
 layout(location = 0) in ivec2 inPosition;
 
 layout(location = 0) out vec3 fragPos;

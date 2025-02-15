@@ -30,6 +30,11 @@ public:
 	void loadChunk(VirtualMapLoadTask task);
 	void pushLoadTask(size_t node, int32_t virtualLocation, const FileChunkProperties& properties);
 	
+	bool isAvailable() { return m_Available; }
+
+private:
+	VkBufferImageCopy createRegion(const VirtualMapLoadTask& task);
+
 public:
 	VirtualMapDeserializerLastUpdate LastUpdate;
 
@@ -47,6 +52,8 @@ private:
 	std::condition_variable m_PositionsCV;
 	bool m_ThreadRunning = true;
 
+	bool m_Available = true;
+	
 	std::vector<VkBufferImageCopy> m_RegionsToCopy;
 	std::queue<VirtualMapLoadTask> m_LoadTasks;
 

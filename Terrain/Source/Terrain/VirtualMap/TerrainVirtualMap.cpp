@@ -19,8 +19,8 @@
 TerrainVirtualMap::TerrainVirtualMap(const VirtualTerrainMapSpecification& spec, const std::unique_ptr<TerrainData>& terrainData)
     : m_Specification(spec), m_TerrainData(terrainData)
 {
-    TerrainInfo terrainInfo = m_TerrainData->getSpecification().Info;
-    int32_t availableSlots = m_Specification.PhysicalTextureSize / terrainInfo.ChunkSize;
+    m_TerrainInfo = m_TerrainData->getSpecification().Info;
+    int32_t availableSlots = m_Specification.PhysicalTextureSize / m_TerrainInfo.ChunkSize;
 
     {
         VulkanImageSpecification physicalTextureSpecification{};
@@ -46,46 +46,52 @@ TerrainVirtualMap::TerrainVirtualMap(const VirtualTerrainMapSpecification& spec,
     m_StatusNodes.reserve(1024);
     createStatusResources();
 
-    m_Deserializer = std::make_shared<DynamicVirtualTerrainDeserializer>(m_Specification, terrainInfo.ChunkSize, m_TerrainData->getSpecification().Filepath.Data);
+    m_Deserializer = std::make_shared<DynamicVirtualTerrainDeserializer>(m_Specification, m_TerrainInfo.ChunkSize, m_TerrainData->getSpecification().Filepath.Data);
 }
 
 void TerrainVirtualMap::pushLoadTasks(const glm::vec2& camPosition)
 {
-    TerrainInfo terrainInfo = m_TerrainData->getSpecification().Info;
+    glm::ivec2 globalSnapPosition = glm::ivec2(camPosition.x / m_TerrainInfo.ChunkSize, camPosition.y / m_TerrainInfo.ChunkSize);
+
+    if (m_LastCameraPosition != globalSnapPosition)
+    {
+        m_LastCameraPosition = globalSnapPosition;
+        m_PositionsToProcess.push(globalSnapPosition);
+    }
+
+    if (!m_Deserializer->isAvailable() || m_PositionsToProcess.empty())
+        return;
 
     m_IndirectionNodes.clear();
     m_StatusNodes.clear();
 
-    glm::ivec2 globalSnapPosition = glm::ivec2(camPosition.x / terrainInfo.ChunkSize, camPosition.y / terrainInfo.ChunkSize);
-    if (m_LastCameraPosition == globalSnapPosition)
-        return;
-
-    m_LastCameraPosition = globalSnapPosition;
+    globalSnapPosition = m_PositionsToProcess.front();
+    m_PositionsToProcess.pop();
 
     // Search for nodes that need to be loaded/unloaded
     m_NodesToUnload = m_ActiveNodesCPU;
 
-    for (int32_t lod = terrainInfo.LODCount - 1; lod >= 0; lod--)
+    for (int32_t lod = m_TerrainInfo.LODCount - 1; lod >= 0; lod--)
     {
         int32_t ringLODSize = m_Specification.RingSizes[lod] / 2;
         if (ringLODSize <= 0)
             break;
 
-        int32_t chunkSize = terrainInfo.ChunkSize * (1 << lod);
+        int32_t chunkSize = m_TerrainInfo.ChunkSize * (1 << lod);
 
-        glm::ivec2 terrainCameraPosition = globalSnapPosition * terrainInfo.ChunkSize;
+        glm::ivec2 terrainCameraPosition = globalSnapPosition * m_TerrainInfo.ChunkSize;
         terrainCameraPosition.x = glm::max(terrainCameraPosition.x, chunkSize * ringLODSize);
         terrainCameraPosition.y = glm::max(terrainCameraPosition.y, chunkSize * ringLODSize);
-        terrainCameraPosition.x = glm::min(terrainCameraPosition.x, terrainInfo.TerrainSize - chunkSize * ringLODSize);
-        terrainCameraPosition.y = glm::min(terrainCameraPosition.y, terrainInfo.TerrainSize - chunkSize * ringLODSize);
+        terrainCameraPosition.x = glm::min(terrainCameraPosition.x, m_TerrainInfo.TerrainSize - chunkSize * ringLODSize);
+        terrainCameraPosition.y = glm::min(terrainCameraPosition.y, m_TerrainInfo.TerrainSize - chunkSize * ringLODSize);
 
         glm::ivec2 snapedPosition = terrainCameraPosition / chunkSize;
 
         int32_t minY = glm::max(snapedPosition.y - ringLODSize, 0);
-        int32_t maxY = glm::min(snapedPosition.y + ringLODSize, terrainInfo.TerrainSize / chunkSize);
+        int32_t maxY = glm::min(snapedPosition.y + ringLODSize, m_TerrainInfo.TerrainSize / chunkSize);
 
         int32_t minX = glm::max(snapedPosition.x - ringLODSize, 0);
-        int32_t maxX = glm::min(snapedPosition.x + ringLODSize, terrainInfo.TerrainSize / chunkSize);
+        int32_t maxX = glm::min(snapedPosition.x + ringLODSize, m_TerrainInfo.TerrainSize / chunkSize);
 
         for (uint32_t y = minY; y < maxY; y++)
             for (uint32_t x = minX; x < maxX; x++)
@@ -107,8 +113,6 @@ void TerrainVirtualMap::pushLoadTasks(const glm::vec2& camPosition)
 
 void TerrainVirtualMap::createLoadTask(const TerrainChunk& chunk)
 {
-    TerrainInfo terrainInfo = m_TerrainData->getSpecification().Info;
-
     size_t chunkHashValue = getChunkID(chunk.Offset, chunk.Lod);
 
     // Check for nodes to unload from disk
@@ -129,7 +133,7 @@ void TerrainVirtualMap::createLoadTask(const TerrainChunk& chunk)
         {
             m_AvailableSlots.erase(avSlot);
 
-            int32_t slotsPerRow = m_Specification.PhysicalTextureSize / terrainInfo.ChunkSize;
+            int32_t slotsPerRow = m_Specification.PhysicalTextureSize / m_TerrainInfo.ChunkSize;
             int32_t x = avSlot / slotsPerRow;
             int32_t y = avSlot % slotsPerRow;
 
@@ -185,7 +189,7 @@ void TerrainVirtualMap::updateIndirectionTexture(VkCommandBuffer cmdBuffer)
             sizeof(GPUVirtualMapProperties), &size);
 
         VulkanComputePipeline::imageMemoryBarrier(cmdBuffer, m_IndirectionTexture, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 6);
+            VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 6);
     }
 }
 
@@ -246,8 +250,6 @@ void TerrainVirtualMap::prepareForRendering(VkCommandBuffer cmdBuffer)
 
 void TerrainVirtualMap::createIndirectionResources()
 {
-    TerrainInfo terrainInfo = m_TerrainData->getSpecification().Info;
-
     {
         VulkanBufferProperties indirectionBufferProperties;
         indirectionBufferProperties.Size = 1024 * (uint32_t)sizeof(GPUIndirectionNode);
@@ -258,7 +260,7 @@ void TerrainVirtualMap::createIndirectionResources()
     }
 
     {
-        uint32_t storeSize = terrainInfo.TerrainSize / terrainInfo.ChunkSize;
+        uint32_t storeSize = m_TerrainInfo.TerrainSize / m_TerrainInfo.ChunkSize;
         storeSize = glm::max(storeSize, uint32_t(1 << MAX_LOD));
 
         VulkanImageSpecification indirectionTextureSpecification{};
@@ -298,8 +300,6 @@ void TerrainVirtualMap::createIndirectionResources()
 
 void TerrainVirtualMap::createStatusResources()
 {
-    TerrainInfo terrainInfo = m_TerrainData->getSpecification().Info;
-
     {
         VulkanBufferProperties statusBufferProperties;
         statusBufferProperties.Size = 1024 * (uint32_t)sizeof(GPUStatusNode);
@@ -310,7 +310,7 @@ void TerrainVirtualMap::createStatusResources()
     }
 
     {
-        uint32_t storeSize = terrainInfo.TerrainSize / terrainInfo.ChunkSize;
+        uint32_t storeSize = m_TerrainInfo.TerrainSize / m_TerrainInfo.ChunkSize;
         storeSize = glm::max(storeSize, uint32_t(1 << MAX_LOD));
 
         VulkanImageSpecification statusTextureSpecification{};

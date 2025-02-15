@@ -21,7 +21,7 @@ void QuadTreeLOD::Generate(VkCommandBuffer commandBuffer, std::vector<TerrainChu
 	m_TempA->getBuffer(VulkanRenderer::getCurrentFrame())->setDataCPU(firstPass.data(), firstPass.size() * sizeof(TerrainChunk));
 	uint32_t sizefp = firstPass.size();
 
-	passMetadata->getBuffer(VulkanRenderer::getCurrentFrame())->setDataCPU(&metadata, sizeof(QuadTreePassMetadata));
+	PassMetadata->getBuffer(VulkanRenderer::getCurrentFrame())->setDataCPU(&metadata, sizeof(QuadTreePassMetadata));
 
 	for (uint32_t lod = 0; lod < m_TerrainSpecification.Info.LODCount; lod++)
 	{
@@ -43,7 +43,7 @@ void QuadTreeLOD::Generate(VkCommandBuffer commandBuffer, std::vector<TerrainChu
 		);
 
 		uint32_t indexSSBO = 0;
-		vkCmdUpdateBuffer(commandBuffer, passMetadata->getVkBuffer(VulkanRenderer::getCurrentFrame()), 0, sizeof(uint32_t), &indexSSBO);
+		vkCmdUpdateBuffer(commandBuffer, PassMetadata->getVkBuffer(VulkanRenderer::getCurrentFrame()), 0, sizeof(uint32_t), &indexSSBO);
 
 		VkMemoryBarrier barrier2 = {};
 		barrier2.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
@@ -60,11 +60,14 @@ void QuadTreeLOD::Generate(VkCommandBuffer commandBuffer, std::vector<TerrainChu
 		);
 	}
 
-	VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, passMetadata->getBuffer(VulkanRenderer::getCurrentFrame()), VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+	VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, PassMetadata->getBuffer(VulkanRenderer::getCurrentFrame()), VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 		VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
-	VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, chunksToRender, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+	VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, ChunksToRender, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 		VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+
+	VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, ChunksToRender, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 }
 
 void QuadTreeLOD::createResources(const std::shared_ptr<TerrainVirtualMap>& virtualMap)
@@ -87,11 +90,11 @@ void QuadTreeLOD::createResources(const std::shared_ptr<TerrainVirtualMap>& virt
 	}
 	{
 		VulkanBufferProperties resultProperties;
-		resultProperties.Size = 1024 * (uint32_t)sizeof(TerrainChunk);
+		resultProperties.Size = 1024 * (uint32_t)sizeof(GPUQuadTreeTerrainChunk);
 		resultProperties.Type = BufferType::STORAGE_BUFFER;
 		resultProperties.Usage = BufferMemoryUsage::BUFFER_ONLY_GPU;
 
-		chunksToRender = std::make_shared<VulkanBuffer>(resultProperties);
+		ChunksToRender = std::make_shared<VulkanBuffer>(resultProperties);
 	}
 	{
 		VulkanBufferProperties passMetadataProperties;
@@ -99,7 +102,7 @@ void QuadTreeLOD::createResources(const std::shared_ptr<TerrainVirtualMap>& virt
 		passMetadataProperties.Type = BufferType::STORAGE_BUFFER | BufferType::TRANSFER_DST_BUFFER;
 		passMetadataProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
 
-		passMetadata = std::make_shared<VulkanBufferSet>(VulkanRenderer::getFramesInFlight(), passMetadataProperties);
+		PassMetadata = std::make_shared<VulkanBufferSet>(VulkanRenderer::getFramesInFlight(), passMetadataProperties);
 	}
 
 	// create shader
@@ -116,22 +119,24 @@ void QuadTreeLOD::createResources(const std::shared_ptr<TerrainVirtualMap>& virt
 		for (uint32_t i = 0; i < MAX_LOD; i++)
 		{
 			m_DescriptorSets[0]->bindInput(0, 0, i, virtualMap->getLoadStatusTexture(), (uint32_t)i);
+			m_DescriptorSets[0]->bindInput(0, 1, i, virtualMap->getIndirectionTexture(), (uint32_t)i);
 		}
 		m_DescriptorSets[0]->bindInput(1, 0, 0, m_TempA);
 		m_DescriptorSets[0]->bindInput(1, 1, 0, m_TempB);
-		m_DescriptorSets[0]->bindInput(1, 2, 0, chunksToRender);
-		m_DescriptorSets[0]->bindInput(2, 0, 0, passMetadata);
+		m_DescriptorSets[0]->bindInput(1, 2, 0, ChunksToRender);
+		m_DescriptorSets[0]->bindInput(2, 0, 0, PassMetadata);
 		m_DescriptorSets[0]->Create();
 
 		m_DescriptorSets[1] = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader(CONSTRUCT_QUAD_COMPUTE));
 		for (uint32_t i = 0; i < MAX_LOD; i++)
 		{
 			m_DescriptorSets[1]->bindInput(0, 0, i, virtualMap->getLoadStatusTexture(), (uint32_t)i);
+			m_DescriptorSets[1]->bindInput(0, 1, i, virtualMap->getIndirectionTexture(), (uint32_t)i);
 		}
 		m_DescriptorSets[1]->bindInput(1, 0, 0, m_TempB);
 		m_DescriptorSets[1]->bindInput(1, 1, 0, m_TempA);
-		m_DescriptorSets[1]->bindInput(1, 2, 0, chunksToRender);
-		m_DescriptorSets[1]->bindInput(2, 0, 0, passMetadata);
+		m_DescriptorSets[1]->bindInput(1, 2, 0, ChunksToRender);
+		m_DescriptorSets[1]->bindInput(2, 0, 0, PassMetadata);
 		m_DescriptorSets[1]->Create();
 
 		m_ConstructQuadTreePipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader(CONSTRUCT_QUAD_COMPUTE),

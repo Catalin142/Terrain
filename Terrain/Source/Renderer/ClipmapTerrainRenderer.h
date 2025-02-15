@@ -68,7 +68,6 @@ private:
 	std::shared_ptr<VulkanBuffer> m_TerrainInfoBuffer;
 
 	std::shared_ptr<VulkanBuffer> m_VertexBuffer;
-
 	TerrainChunkIndexBuffer m_ChunkIndexBuffer;
 	uint32_t m_ChunksToRender = 0;
 

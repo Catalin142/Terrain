@@ -244,7 +244,7 @@ void VulkanApp::onUpdate()
 	if (camVelocity != glm::vec3(0.0f, 0.0f, 0.0f))
 	{
 		if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_SPACE))
-			cam.Move(glm::normalize(camVelocity) * 100.0f);
+			cam.Move(glm::normalize(camVelocity) * 5.0f);
 		else
 			cam.Move(glm::normalize(camVelocity) * 0.10f);
 	}
@@ -328,7 +328,7 @@ void VulkanApp::onUpdate()
 
 			ImGui::Begin("VirtualHeightMapDebug");
 			static float maxTime = 0;
-			maxTime = glm::max(Instrumentor::Get().getTime("RRRRR"), maxTime);
+			maxTime = glm::max(Instrumentor::Get().getTime(QuadTreeRendererMetrics::CPU_LOAD_NEEDED_NODES), maxTime);
 			ImGui::Text(std::to_string(maxTime).c_str());
 
 			

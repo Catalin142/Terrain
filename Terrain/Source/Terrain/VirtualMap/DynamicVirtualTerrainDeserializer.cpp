@@ -75,6 +75,7 @@ void DynamicVirtualTerrainDeserializer::pushLoadTask(size_t node, int32_t virtua
     {
         std::lock_guard<std::mutex> lock(m_TaskMutex);
         m_LoadTasks.push(VirtualMapLoadTask{node, virtualSlot, properties});
+        m_Available = false;
     }
     m_LoadThreadSemaphore.release();
 }
@@ -95,26 +96,11 @@ void DynamicVirtualTerrainDeserializer::loadChunk(VirtualMapLoadTask task)
         char* charData = (char*)m_RawImageData[m_AvailableBuffer]->getMappedData();
         m_FileHandlerCache[m_ChunksDataFilepath]->read(&charData[m_MemoryIndex * m_TextureDataStride], m_TextureDataStride);
 
-        int32_t iChunkSize = m_ChunkSize + m_VirtualMapSpecification.ChunkPadding;
-
-        VkBufferImageCopy region{};
-        region.bufferOffset = m_MemoryIndex * m_TextureDataStride;
-        region.bufferRowLength = 0;
-        region.bufferImageHeight = 0;
-
-        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        region.imageSubresource.mipLevel = 0;
-        region.imageSubresource.baseArrayLayer = 0;
-        region.imageSubresource.layerCount = 1;
-
         int32_t slotsPerRow = m_VirtualMapSpecification.PhysicalTextureSize / m_ChunkSize;
         int32_t x = task.VirtualSlot / slotsPerRow;
         int32_t y = task.VirtualSlot % slotsPerRow;
-        
-        region.imageOffset = { x * iChunkSize, y * iChunkSize, 0 };
-        region.imageExtent = { (uint32_t)iChunkSize, (uint32_t)iChunkSize, 1 };
 
-        m_RegionsToCopy.push_back(region);
+        m_RegionsToCopy.push_back(createRegion(task));
         m_IndirectionNodes.push_back(GPUIndirectionNode{ task.Properties.Position, packOffset(x, y), task.Properties.Mip });
         m_StatusNodes.push_back(GPUStatusNode(task.Properties.Position, task.Properties.Mip, 1));
 
@@ -154,5 +140,35 @@ void DynamicVirtualTerrainDeserializer::Refresh(VkCommandBuffer cmdBuffer, Terra
         m_PositionsCV.notify_all();
     }
 
+    {
+        std::lock_guard<std::mutex> lock(m_TaskMutex);
+        if (m_LoadTasks.size() == 0)
+            m_Available = true;
+    }
+
     Instrumentor::Get().endTimer("Refresh Deserializer");
+}
+
+VkBufferImageCopy DynamicVirtualTerrainDeserializer::createRegion(const VirtualMapLoadTask& task)
+{
+    int32_t iChunkSize = m_ChunkSize + m_VirtualMapSpecification.ChunkPadding;
+
+    VkBufferImageCopy region{};
+    region.bufferOffset = m_MemoryIndex * m_TextureDataStride;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+
+    int32_t slotsPerRow = m_VirtualMapSpecification.PhysicalTextureSize / m_ChunkSize;
+    int32_t x = task.VirtualSlot / slotsPerRow;
+    int32_t y = task.VirtualSlot % slotsPerRow;
+
+    region.imageOffset = { x * iChunkSize, y * iChunkSize, 0 };
+    region.imageExtent = { (uint32_t)iChunkSize, (uint32_t)iChunkSize, 1 };
+
+    return region;
 }

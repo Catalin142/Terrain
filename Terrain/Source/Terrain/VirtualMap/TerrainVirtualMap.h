@@ -62,6 +62,9 @@ private:
 private:
 	std::shared_ptr<VulkanImage> m_PhysicalTexture;
 	const std::unique_ptr<TerrainData>& m_TerrainData;
+	TerrainInfo m_TerrainInfo;
+
+	std::queue<glm::ivec2> m_PositionsToProcess;
 
 	VirtualTerrainMapSpecification m_Specification;
 

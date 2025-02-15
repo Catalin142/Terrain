@@ -31,8 +31,8 @@ private:
 	void createResources(const std::shared_ptr<TerrainVirtualMap>& virtualMap);
 
 public:
-	std::shared_ptr<VulkanBuffer> chunksToRender;
-	std::shared_ptr<VulkanBufferSet> passMetadata;
+	std::shared_ptr<VulkanBuffer> ChunksToRender;
+	std::shared_ptr<VulkanBufferSet> PassMetadata;
 
 private:
 	TerrainSpecification m_TerrainSpecification;
