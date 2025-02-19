@@ -46,7 +46,6 @@ private:
 	std::thread m_LoadThread;
 	std::mutex m_DataMutex;
 	std::mutex m_TaskMutex;
-	std::mutex m_BufferMutex;
 
 	std::counting_semaphore<1024> m_LoadThreadSemaphore{ 0 };
 	std::condition_variable m_PositionsCV;

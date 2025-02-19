@@ -3,6 +3,8 @@
 #include "VulkanDevice.h"
 #include "VulkanUtils.h"
 
+#include "Core/VulkanMemoryTracker.h"
+
 #include <iostream>
 #include <cassert>
 
@@ -10,6 +12,7 @@ static uint32_t getFormatSizeInBytes(VkFormat format) {
 	switch (format)
 	{
 	case VK_FORMAT_R32_SFLOAT: return 4;
+	case VK_FORMAT_R16_SFLOAT: return 2;
 	}
 }
 
@@ -217,6 +220,8 @@ void VulkanImage::generateMips(VkFilter filter)
 
 		if (mipWidth > 1)	 mipWidth /= 2;
 		if (mipHeight > 1)	 mipHeight /= 2;
+
+		TRACK_VK_MEMORY(mipWidth * mipHeight * getFormatSizeInBytes(m_Specification.Format) * m_Specification.LayerCount);
 	}
 
 	barrier.subresourceRange.baseMipLevel = m_Specification.Mips - 1;
@@ -256,6 +261,9 @@ void VulkanImage::createImage()
 		std::cerr << "failed to create texture image!\n";
 		assert(false);
 	}
+
+
+	TRACK_VK_MEMORY(m_Specification.Height * m_Specification.Width * getFormatSizeInBytes(m_Specification.Format) * m_Specification.LayerCount);
 
 	VkMemoryRequirements memRequirements{};
 	vkGetImageMemoryRequirements(device, m_Image, &memRequirements);

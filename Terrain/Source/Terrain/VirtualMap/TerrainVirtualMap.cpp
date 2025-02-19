@@ -26,7 +26,7 @@ TerrainVirtualMap::TerrainVirtualMap(const VirtualTerrainMapSpecification& spec,
         VulkanImageSpecification physicalTextureSpecification{};
         physicalTextureSpecification.Width = m_Specification.PhysicalTextureSize + availableSlots * 2; // Each slots takes 2 pixels padding
         physicalTextureSpecification.Height = m_Specification.PhysicalTextureSize + availableSlots * 2;
-        physicalTextureSpecification.Format = m_Specification.Format;
+        physicalTextureSpecification.Format = VK_FORMAT_R16_SFLOAT;
         physicalTextureSpecification.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
         physicalTextureSpecification.UsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
         physicalTextureSpecification.MemoryType = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
@@ -49,9 +49,10 @@ TerrainVirtualMap::TerrainVirtualMap(const VirtualTerrainMapSpecification& spec,
     m_Deserializer = std::make_shared<DynamicVirtualTerrainDeserializer>(m_Specification, m_TerrainInfo.ChunkSize, m_TerrainData->getSpecification().Filepath.Data);
 }
 
-void TerrainVirtualMap::pushLoadTasks(const glm::vec2& camPosition)
+uint32_t TerrainVirtualMap::pushLoadTasks(const glm::vec2& camPosition)
 {
-    glm::ivec2 globalSnapPosition = glm::ivec2(camPosition.x / m_TerrainInfo.ChunkSize, camPosition.y / m_TerrainInfo.ChunkSize);
+    glm::ivec2 intCameraPos = glm::ivec2(glm::max((int32_t)camPosition.x, 0), glm::max((int32_t)camPosition.y, 0));
+    glm::ivec2 globalSnapPosition = glm::ivec2(intCameraPos.x / m_TerrainInfo.ChunkSize, intCameraPos.y / m_TerrainInfo.ChunkSize);
 
     if (m_LastCameraPosition != globalSnapPosition)
     {
@@ -60,13 +61,15 @@ void TerrainVirtualMap::pushLoadTasks(const glm::vec2& camPosition)
     }
 
     if (!m_Deserializer->isAvailable() || m_PositionsToProcess.empty())
-        return;
+        return 0;
 
     m_IndirectionNodes.clear();
     m_StatusNodes.clear();
 
     globalSnapPosition = m_PositionsToProcess.front();
     m_PositionsToProcess.pop();
+
+    uint32_t chunksRequested = 0;
 
     // Search for nodes that need to be loaded/unloaded
     m_NodesToUnload = m_ActiveNodesCPU;
@@ -95,7 +98,10 @@ void TerrainVirtualMap::pushLoadTasks(const glm::vec2& camPosition)
 
         for (uint32_t y = minY; y < maxY; y++)
             for (uint32_t x = minX; x < maxX; x++)
+            {
                 createLoadTask(TerrainChunk{ packOffset(x, y), uint32_t(lod) });
+                chunksRequested++;
+            }
     }
 
     // unload nodes
@@ -109,6 +115,8 @@ void TerrainVirtualMap::pushLoadTasks(const glm::vec2& camPosition)
 
         m_StatusNodes.push_back(GPUStatusNode(props.Position, props.Mip, 0));
     }
+
+    return chunksRequested;
 }
 
 void TerrainVirtualMap::createLoadTask(const TerrainChunk& chunk)
@@ -129,7 +137,7 @@ void TerrainVirtualMap::createLoadTask(const TerrainChunk& chunk)
             avSlot = m_LastChunkSlot.at(chunkHashValue);
 
         // check if the node may be already in the map but unloaded, if so, just remeber id
-        if (avSlot != INVALID_SLOT && m_LastSlotChunk.at(avSlot) == chunkHashValue)
+        if (avSlot != INVALID_SLOT && m_LastSlotChunk[avSlot] == chunkHashValue)
         {
             m_AvailableSlots.erase(avSlot);
 
@@ -156,9 +164,12 @@ void TerrainVirtualMap::createLoadTask(const TerrainChunk& chunk)
     }
 }
 
-void TerrainVirtualMap::updateMap(VkCommandBuffer cmdBuffer)
+uint32_t TerrainVirtualMap::updateMap(VkCommandBuffer cmdBuffer)
 {
     m_Deserializer->Refresh(cmdBuffer, this);
+
+    // number of loaded chunks
+    return m_Deserializer->LastUpdate.IndirectionNodes.size();
 }
 
 void TerrainVirtualMap::blitNodes(VkCommandBuffer cmdBuffer, const std::shared_ptr<VulkanBuffer>& StagingBuffer, const std::vector<VkBufferImageCopy>& regions)
@@ -191,6 +202,8 @@ void TerrainVirtualMap::updateIndirectionTexture(VkCommandBuffer cmdBuffer)
         VulkanComputePipeline::imageMemoryBarrier(cmdBuffer, m_IndirectionTexture, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 6);
     }
+
+    m_IndirectionNodes.clear();
 }
 
 void TerrainVirtualMap::updateStatusTexture(VkCommandBuffer cmdBuffer)
@@ -225,6 +238,8 @@ void TerrainVirtualMap::updateStatusTexture(VkCommandBuffer cmdBuffer)
         VulkanComputePipeline::imageMemoryBarrier(cmdBuffer, m_StatusTexture, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 6);
     }
+
+    m_StatusNodes.clear();
 }
 
 void TerrainVirtualMap::prepareForDeserialization(VkCommandBuffer cmdBuffer)
@@ -285,15 +300,14 @@ void TerrainVirtualMap::createIndirectionResources()
 
     // create pass
     {
-        m_UpdateIndirectionComputePass = std::make_shared<VulkanComputePass>();
-        m_UpdateIndirectionComputePass->DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader(INDIRECTION_COMPUTE_SHADER));
+        m_UpdateIndirectionComputePass.DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader(INDIRECTION_COMPUTE_SHADER));
 
         for (uint32_t i = 0; i < MAX_LOD; i++)
-            m_UpdateIndirectionComputePass->DescriptorSet->bindInput(0, 0, i, m_IndirectionTexture, (uint32_t)i);
+            m_UpdateIndirectionComputePass.DescriptorSet->bindInput(0, 0, i, m_IndirectionTexture, (uint32_t)i);
 
-        m_UpdateIndirectionComputePass->DescriptorSet->bindInput(1, 0, 0, m_IndirectionNodesStorage);
-        m_UpdateIndirectionComputePass->DescriptorSet->Create();
-        m_UpdateIndirectionComputePass->Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader(INDIRECTION_COMPUTE_SHADER),
+        m_UpdateIndirectionComputePass.DescriptorSet->bindInput(1, 0, 0, m_IndirectionNodesStorage);
+        m_UpdateIndirectionComputePass.DescriptorSet->Create();
+        m_UpdateIndirectionComputePass.Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader(INDIRECTION_COMPUTE_SHADER),
             uint32_t(sizeof(uint32_t) * 4));
     }
 }
@@ -335,15 +349,14 @@ void TerrainVirtualMap::createStatusResources()
 
     // create pass
     {
-        m_UpdateStatusComputePass = std::make_shared<VulkanComputePass>();
-        m_UpdateStatusComputePass->DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader(STATUS_COMPUTE_SHADER));
+        m_UpdateStatusComputePass.DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader(STATUS_COMPUTE_SHADER));
 
         for (uint32_t i = 0; i < MAX_LOD; i++)
-            m_UpdateStatusComputePass->DescriptorSet->bindInput(0, 0, i, m_StatusTexture, (uint32_t)i);
+            m_UpdateStatusComputePass.DescriptorSet->bindInput(0, 0, i, m_StatusTexture, (uint32_t)i);
 
-        m_UpdateStatusComputePass->DescriptorSet->bindInput(1, 0, 0, m_StatusNodesStorage);
-        m_UpdateStatusComputePass->DescriptorSet->Create();
-        m_UpdateStatusComputePass->Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader(STATUS_COMPUTE_SHADER),
+        m_UpdateStatusComputePass.DescriptorSet->bindInput(1, 0, 0, m_StatusNodesStorage);
+        m_UpdateStatusComputePass.DescriptorSet->Create();
+        m_UpdateStatusComputePass.Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader(STATUS_COMPUTE_SHADER),
             uint32_t(sizeof(uint32_t) * 4));
     }
 }

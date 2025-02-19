@@ -25,12 +25,20 @@ struct ClipmapTerrainRendererSpecification
 
 struct ClipmapRendererMetrics
 {
+	inline static const std::string NAME						= "ClipmapRendererMetrics";
+
 	inline static const std::string GPU_UPDATE_CLIPMAP			= "_GpuUpdateClipmapMap";
 
 	inline static const std::string CPU_CREATE_CHUNK_BUFFER		= "_CpuClipmapCreateChunkBuffer";
 	inline static const std::string CPU_LOAD_NEEDED_NODES		= "_CpuClipmapLoadNeededNodes";
 
 	inline static const std::string RENDER_TERRAIN				= "_ClipmapRenderTerrain";
+
+	inline static uint32_t CHUNKS_LOADED_LAST_UPDATE			= 0;
+	inline static uint32_t MAX_VERTICES_RENDERED				= 0;
+	inline static uint32_t MAX_INDICES_RENDERED					= 0;
+
+	inline static uint32_t MEMORY_USED							= 0;
 };
 
 class ClipmapTerrainRenderer
@@ -46,7 +54,8 @@ public:
 
 	void setWireframe(bool wireframe);
 
-	std::shared_ptr<TerrainClipmap> m_Clipmap;
+	const std::shared_ptr<TerrainClipmap>& getClipmap() { return m_Clipmap; }
+
 private:
 	void createRenderPass();
 	void createPipeline();
@@ -58,11 +67,12 @@ public:
 
 private:
 	const std::unique_ptr<TerrainData>& m_Terrain;
+	std::shared_ptr<TerrainClipmap> m_Clipmap;
 	std::shared_ptr<ClipmapLOD> m_ClipmapLOD;
 
 	std::shared_ptr<VulkanFramebuffer> m_TargetFramebuffer;
 
-	std::shared_ptr<RenderPass> m_TerrainRenderPass;
+	RenderPass m_TerrainRenderPass;
 	std::shared_ptr<VulkanPipeline> m_TerrainPipeline;
 
 	std::shared_ptr<VulkanBuffer> m_TerrainInfoBuffer;

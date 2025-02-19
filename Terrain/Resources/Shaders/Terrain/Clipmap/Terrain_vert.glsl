@@ -78,9 +78,9 @@ void main()
     offset *= chunkSize;
     position += offset;
     
-    float height = (-imageLoad(heightMap, terrainLoadLayer).r) * terrainInfo.heightMultiplier;
+    float height = (-imageLoad(heightMap, terrainLoadLayer).r);
 
-    gl_Position = Camera.Projection * Camera.View * vec4(float(position.x), height, float(position.y), 1.0);
-
-    fragPos = vec3(1.0, 1.0, 1.0);
+    gl_Position = Camera.Projection * Camera.View * vec4(float(position.x), height * terrainInfo.heightMultiplier, float(position.y), 1.0);
+    
+    fragPos = vec3(0.0, abs(height), 0.0);
 }

@@ -26,16 +26,26 @@ struct QuadTreeTerrainRendererSpecification
 
 struct QuadTreeRendererMetrics
 {
+	inline static const std::string NAME								= "QuadTreeRendererMetrics";
+
 	inline static const std::string GPU_UPDATE_VIRTUAL_MAP				= "_GpuUpdateVirtualMap";
 	inline static const std::string GPU_UPDATE_STATUS_TEXTURE			= "_GpuUpdateVirtualStatusTexture";
 	inline static const std::string GPU_UPDATE_INDIRECTION_TEXTURE		= "_GpuUpdateVirtualIndirectionTexture";
 	inline static const std::string GPU_GENERATE_QUAD_TREE				= "_GpuVirtualGenerateQuadTree";
 	inline static const std::string GPU_GENERATE_LOD_MAP				= "_GpuVirtualGenerateLODMap";
+	inline static const std::string GPU_SET_NEIGHTBOURS					= "_GpuSetNeightbours";
 	inline static const std::string GPU_CREATE_INDIRECT_DRAW_COMMAND	= "_GpuVirtualGenerateDrawCommand";
 
 	inline static const std::string CPU_LOAD_NEEDED_NODES				= "_CpuVirtualMapLoadNeededNodes";
 
 	inline static const std::string RENDER_TERRAIN						= "_QuadTreeRenderTerrain";
+
+	inline static uint32_t CHUNKS_LOADED_LAST_UPDATE					= 0;
+	inline static uint32_t CHUNKS_LOADED_LAST_FRAME						= 0;
+	inline static uint32_t MAX_VERTICES_RENDERED						= 0;
+	inline static uint32_t MAX_INDICES_RENDERED							= 0;
+
+	inline static uint32_t MEMORY_USED									= 0;
 };
 
 class QuadTreeTerrainRenderer
@@ -51,7 +61,8 @@ public:
 
 	void setWireframe(bool wireframe);
 
-	std::shared_ptr<TerrainVirtualMap> m_VirtualMap;
+	const std::shared_ptr<VulkanImage>& getPhysicalTexture() { return m_VirtualMap->getPhysicalTexture(); }
+
 private:
 	void createLODMapPipeline();
 	void createRenderPass();
@@ -66,17 +77,18 @@ public:
 
 private:
 	const std::unique_ptr<TerrainData>& m_Terrain;
+	std::shared_ptr<TerrainVirtualMap> m_VirtualMap;
 	std::shared_ptr<QuadTreeLOD> m_QuadTreeLOD;
 
 	std::shared_ptr<VulkanFramebuffer> m_TargetFramebuffer;
 
-	std::shared_ptr<RenderPass> m_TerrainRenderPass;
+	RenderPass m_TerrainRenderPass;
 	std::shared_ptr<VulkanPipeline> m_TerrainPipeline;
 
 	std::shared_ptr<VulkanImage> m_LODMap;
-	std::shared_ptr<VulkanComputePass> m_LODMapComputePass;
+	VulkanComputePass m_LODMapComputePass;
 
-	std::shared_ptr<VulkanComputePass> m_NeighboursComputePass;
+	VulkanComputePass m_NeighboursComputePass;
 
 	std::shared_ptr<VulkanBuffer> m_TerrainInfo;
 
@@ -85,8 +97,10 @@ private:
 
 	// As we keep all data on the GPU, we can't issue a command directly from the CPU without fetching memory from the GPU.
 	// The best solution would be to create the draw command on the GPU
-	std::shared_ptr<VulkanComputePass> m_IndirectComputePass;
+	VulkanComputePass m_IndirectComputePass;
 	std::shared_ptr<VulkanBufferSet> m_DrawIndirectCommandsSet;
 
 	bool m_InWireframe = false;
+	uint32_t m_BufferUsed = 0;
+	uint32_t m_AvailableBuffer = 0;
 };

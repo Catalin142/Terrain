@@ -37,10 +37,10 @@ public:
 		return m_Specification;
 	}
 
-	void pushLoadTasks(const glm::vec2& camPosition);
+	uint32_t pushLoadTasks(const glm::vec2& camPosition);
 	void createLoadTask(const TerrainChunk& chunks);
 
-	void updateMap(VkCommandBuffer cmdBuffer);
+	uint32_t updateMap(VkCommandBuffer cmdBuffer);
 
 	void blitNodes(VkCommandBuffer cmdBuffer, const std::shared_ptr<VulkanBuffer>& StagingBuffer, const std::vector<VkBufferImageCopy>& regions);
 
@@ -78,18 +78,16 @@ private:
 	std::unordered_set<size_t> m_NodesToUnload;
 
 	std::shared_ptr<VulkanImage> m_IndirectionTexture;
-	std::shared_ptr<VulkanComputePass> m_UpdateIndirectionComputePass;
+	VulkanComputePass m_UpdateIndirectionComputePass;
 	std::shared_ptr<VulkanBufferSet> m_IndirectionNodesStorage;
 	std::vector<GPUIndirectionNode> m_IndirectionNodes;
 
 	std::shared_ptr<VulkanImage> m_StatusTexture;
-	std::shared_ptr<VulkanComputePass> m_UpdateStatusComputePass;
+	VulkanComputePass m_UpdateStatusComputePass;
 	std::shared_ptr<VulkanBufferSet> m_StatusNodesStorage;
 	std::vector<GPUStatusNode> m_StatusNodes;
 
 	std::shared_ptr<DynamicVirtualTerrainDeserializer> m_Deserializer;
 
 	glm::ivec2 m_LastCameraPosition = { -1, -1 };
-
-	// TODO(if needed): hold a metadata storage buffer and hold the node index in a texture
 };

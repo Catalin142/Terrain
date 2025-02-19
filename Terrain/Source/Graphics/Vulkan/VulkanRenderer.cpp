@@ -2,8 +2,6 @@
 
 #include "VulkanDevice.h"
 
-std::shared_ptr<VulkanSwapchain> VulkanRenderer::m_Swapchain = nullptr;
-
 void VulkanRenderer::Initialize(const std::shared_ptr<VulkanSwapchain> swapchain)
 {
 	m_Swapchain = swapchain;
@@ -44,14 +42,11 @@ uint32_t VulkanRenderer::getCurrentFrame()
 	return m_Swapchain->getCurrentFrame();
 }
 
-void VulkanRenderer::beginRenderPass(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer, 
-	const std::shared_ptr<RenderPass>& renderPass)
+void VulkanRenderer::beginRenderPass(VkCommandBuffer commandBuffer, const RenderPass& renderPass)
 {
-	VkCommandBuffer VulkanCommandBuffer = commandBuffer->getCurrentCommandBuffer();
-
 	VkExtent2D extent = { m_Swapchain->getWidth(), m_Swapchain->getHeight() };
 
-	std::shared_ptr<VulkanFramebuffer> framebuffer = renderPass->Pipeline->getTargetFramebuffer();
+	std::shared_ptr<VulkanFramebuffer> framebuffer = renderPass.Pipeline->getTargetFramebuffer();
 
 	VkRenderPassBeginInfo renderPassInfo{};
 	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -77,20 +72,16 @@ void VulkanRenderer::beginRenderPass(const std::shared_ptr<VulkanRenderCommandBu
 	renderPassInfo.clearValueCount = (uint32_t)clearValues.size();
 	renderPassInfo.pClearValues = clearValues.data();
 
-	vkCmdBeginRenderPass(VulkanCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+	vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 }
 
-void VulkanRenderer::endRenderPass(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer)
+void VulkanRenderer::endRenderPass(VkCommandBuffer commandBuffer)
 {
-	VkCommandBuffer vulkanCommandBuffer = commandBuffer->getCurrentCommandBuffer();
-	vkCmdEndRenderPass(vulkanCommandBuffer);
+	vkCmdEndRenderPass(commandBuffer);
 }
 
-void VulkanRenderer::beginSwapchainRenderPass(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer, 
-	const std::shared_ptr<RenderPass>& renderPass)
+void VulkanRenderer::beginSwapchainRenderPass(VkCommandBuffer commandBuffer, const RenderPass& renderPass)
 {
-	VkCommandBuffer VulkanCommandBuffer = commandBuffer->getCurrentCommandBuffer();
-
 	VkExtent2D extent = { m_Swapchain->getWidth(), m_Swapchain->getHeight() };
 
 	VkRenderPassBeginInfo renderPassInfo{};
@@ -107,18 +98,16 @@ void VulkanRenderer::beginSwapchainRenderPass(const std::shared_ptr<VulkanRender
 	renderPassInfo.pClearValues = &clearValue;
 	renderPassInfo.clearValueCount = 1;
 
-	vkCmdBeginRenderPass(VulkanCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+	vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 }
 
-void VulkanRenderer::preparePipeline(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer, const std::shared_ptr<RenderPass>& renderPass)
+void VulkanRenderer::preparePipeline(VkCommandBuffer commandBuffer, const RenderPass& renderPass)
 {
 	preparePipeline(commandBuffer, renderPass, m_Swapchain->getCurrentFrame());
 }
 
-void VulkanRenderer::preparePipeline(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer, const std::shared_ptr<RenderPass>& renderPass, uint32_t descriptorSetIndex)
+void VulkanRenderer::preparePipeline(VkCommandBuffer commandBuffer, const RenderPass& renderPass, uint32_t descriptorSetIndex)
 {
-	VkCommandBuffer VulkanCommandBuffer = commandBuffer->getCurrentCommandBuffer();
-
 	VkExtent2D extent = { m_Swapchain->getWidth(), m_Swapchain->getHeight() };
 
 	VkViewport viewport{};
@@ -128,70 +117,35 @@ void VulkanRenderer::preparePipeline(const std::shared_ptr<VulkanRenderCommandBu
 	viewport.height = float(extent.height);
 	viewport.minDepth = 0.0f;
 	viewport.maxDepth = 1.0f;
-	vkCmdSetViewport(VulkanCommandBuffer, 0, 1, &viewport);
+	vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
-	float lineWidth = renderPass->Pipeline->getSpecification().lineWidth;
+	float lineWidth = renderPass.Pipeline->getSpecification().lineWidth;
 
-	if (renderPass->Pipeline->getSpecification().lineWidth != 1.0f)
-		vkCmdSetLineWidth(VulkanCommandBuffer, renderPass->Pipeline->getSpecification().lineWidth);
+	if (renderPass.Pipeline->getSpecification().lineWidth != 1.0f)
+		vkCmdSetLineWidth(commandBuffer, renderPass.Pipeline->getSpecification().lineWidth);
 
 	VkRect2D scissor{};
 	scissor.offset = { 0, 0 };
 	scissor.extent = extent;
-	vkCmdSetScissor(VulkanCommandBuffer, 0, 1, &scissor);
-	vkCmdBindPipeline(VulkanCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderPass->Pipeline->getVkPipeline());
+	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderPass.Pipeline->getVkPipeline());
 
-	if (renderPass->DescriptorSet != nullptr)
-		vkCmdBindDescriptorSets(VulkanCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderPass->Pipeline->getVkPipelineLayout(),
-			0, renderPass->DescriptorSet->getNumberOfSets(),
-			renderPass->DescriptorSet->getDescriptorSet(descriptorSetIndex).data(), 0, nullptr);
+	if (renderPass.DescriptorSet != nullptr)
+		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderPass.Pipeline->getVkPipelineLayout(),
+			0, renderPass.DescriptorSet->getNumberOfSets(),
+			renderPass.DescriptorSet->getDescriptorSet(descriptorSetIndex).data(), 0, nullptr);
 }
 
-static std::mutex queueMutex;
-
-void VulkanRenderer::dispatchCompute(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer, const std::shared_ptr<VulkanComputePass>& computePass, glm::ivec3 workgroups,
-	uint32_t pushConstantSize, void* data)
+void VulkanRenderer::dispatchCompute(VkCommandBuffer commandBuffer, const VulkanComputePass& computePass, uint32_t descriptorSetUsed, glm::ivec3 workgroups, uint32_t pushConstantSize, void* data)
 {
-	dispatchCompute(commandBuffer->getCurrentCommandBuffer(), computePass, workgroups, pushConstantSize, data);
-}
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePass.Pipeline->getVkPipeline());
 
-void VulkanRenderer::dispatchCompute(VkCommandBuffer cmd, const std::shared_ptr<VulkanComputePass>& computePass, glm::ivec3 workgroups, uint32_t pushConstantSize, void* data)
-{
-	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, computePass->Pipeline->getVkPipeline());
-
-	if (computePass->DescriptorSet != nullptr)
-		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, computePass->Pipeline->getVkPipelineLayout(),
-			0, computePass->DescriptorSet->getNumberOfSets(),
-			computePass->DescriptorSet->getDescriptorSet(VulkanRenderer::getCurrentFrame()).data(), 0, nullptr);
+	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePass.Pipeline->getVkPipelineLayout(),
+		0, computePass.DescriptorSet->getNumberOfSets(),
+		computePass.DescriptorSet->getDescriptorSet(descriptorSetUsed).data(), 0, nullptr);
 
 	if (pushConstantSize != 0)
-		vkCmdPushConstants(cmd, computePass->Pipeline->getVkPipelineLayout(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
-			pushConstantSize, data);
-
-	vkCmdDispatch(cmd, workgroups.x, workgroups.y, workgroups.z);
-
-	VkSubmitInfo submitInfo{};
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-	{
-		std::lock_guard<std::mutex> lock(queueMutex);
-		if (vkQueueSubmit(VulkanDevice::getVulkanContext()->getComputeQueue(), 1, &submitInfo, nullptr) != VK_SUCCESS)
-			assert(false);
-	}
-}
-
-void VulkanRenderer::dispatchCompute(VkCommandBuffer commandBuffer, 
-	const std::shared_ptr<VulkanComputePipeline>& computePipeline, const std::shared_ptr<VulkanDescriptorSet>& descriptorSet, 
-	glm::ivec3 workgroups, uint32_t pushConstantSize, void* data)
-{
-	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline->getVkPipeline());
-
-	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline->getVkPipelineLayout(),
-		0, descriptorSet->getNumberOfSets(),
-		descriptorSet->getDescriptorSet(VulkanRenderer::getCurrentFrame()).data(), 0, nullptr);
-
-	if (pushConstantSize != 0)
-		vkCmdPushConstants(commandBuffer, computePipeline->getVkPipelineLayout(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
+		vkCmdPushConstants(commandBuffer, computePass.Pipeline->getVkPipelineLayout(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
 			pushConstantSize, data);
 
 	vkCmdDispatch(commandBuffer, workgroups.x, workgroups.y, workgroups.z);
@@ -199,10 +153,13 @@ void VulkanRenderer::dispatchCompute(VkCommandBuffer commandBuffer,
 	VkSubmitInfo submitInfo{};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-	{
-		std::lock_guard<std::mutex> lock(queueMutex);
-		if (vkQueueSubmit(VulkanDevice::getVulkanContext()->getComputeQueue(), 1, &submitInfo, nullptr) != VK_SUCCESS)
-			assert(false);
-	}
+	if (vkQueueSubmit(VulkanDevice::getVulkanContext()->getComputeQueue(), 1, &submitInfo, nullptr) != VK_SUCCESS)
+		assert(false);
 }
+
+void VulkanRenderer::dispatchCompute(VkCommandBuffer commandBuffer, const VulkanComputePass& computePass, glm::ivec3 workgroups, uint32_t pushConstantSize, void* data)
+{
+	dispatchCompute(commandBuffer, computePass, VulkanRenderer::getCurrentFrame(), workgroups, pushConstantSize, data);
+}
+
 

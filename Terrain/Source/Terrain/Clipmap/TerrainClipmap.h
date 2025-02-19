@@ -16,7 +16,7 @@ public:
 	TerrainClipmap(const ClipmapTerrainSpecification& spec, const std::unique_ptr<TerrainData>& terrainData);
 	~TerrainClipmap() {}
 
-	void Refresh(const glm::vec2& cameraPosition);
+	void pushLoadTasks(const glm::vec2& cameraPosition);
 
 	// Loads all the nodes using a separate commandbuffer
 	void hardLoad(const glm::vec2& cameraPosition);
@@ -30,8 +30,8 @@ public:
 
 	void blitNodes(VkCommandBuffer cmdBuffer, const std::shared_ptr<VulkanBuffer>& StagingBuffer, const std::vector<VkBufferImageCopy>& regions);
 	
-	// returns true if the last valid position was updated, false otherwise
-	bool updateClipmaps(VkCommandBuffer cmdBuffer);
+	// returns not 0 if the last valid position was updated, 0 otherwise
+	uint32_t updateClipmaps(VkCommandBuffer cmdBuffer);
 
 private:
 	void getLODBounds(int32_t lod, const glm::ivec2& camPositionSnapped, glm::ivec2& xBounds, glm::ivec2& yBounds);
@@ -44,6 +44,7 @@ private:
 	std::shared_ptr<DynamicClipmapDeserializer> m_Deserializer;
 
 	std::unordered_set<size_t> m_LoadedNodes;
+	std::queue<glm::ivec2> m_PositionsToProcess;
 	
 	glm::ivec2 m_LastCameraPosition = { -1000, -1000 };
 	glm::ivec2 m_LastValidCameraPosition;

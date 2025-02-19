@@ -7,11 +7,12 @@
 
 #include <Graphics/Vulkan/VulkanDevice.h>
 
+#define CHUNK_PADDING 2
 
 DynamicVirtualTerrainDeserializer::DynamicVirtualTerrainDeserializer(const VirtualTerrainMapSpecification& spec, int32_t chunkSize, const std::string& filepath) 
     : m_VirtualMapSpecification(spec), m_ChunkSize(chunkSize), m_ChunksDataFilepath(filepath)
 {
-    uint32_t chunkSizeWithPadding = m_ChunkSize + m_VirtualMapSpecification.ChunkPadding;
+    uint32_t chunkSizeWithPadding = m_ChunkSize + CHUNK_PADDING;
     m_TextureDataStride = chunkSizeWithPadding * chunkSizeWithPadding * SIZE_OF_FLOAT16;
 
     {
@@ -80,6 +81,8 @@ void DynamicVirtualTerrainDeserializer::pushLoadTask(size_t node, int32_t virtua
     m_LoadThreadSemaphore.release();
 }
 
+static char* buffer = new char[130 * 130 * 2];
+
 void DynamicVirtualTerrainDeserializer::loadChunk(VirtualMapLoadTask task)
 {
     if (m_FileHandlerCache.find(m_ChunksDataFilepath) == m_FileHandlerCache.end())
@@ -88,13 +91,14 @@ void DynamicVirtualTerrainDeserializer::loadChunk(VirtualMapLoadTask task)
     if (!m_FileHandlerCache[m_ChunksDataFilepath]->is_open())
         throw(false);
 
+    m_FileHandlerCache[m_ChunksDataFilepath]->seekg(task.Properties.inFileOffset, std::ios::beg);
+    m_FileHandlerCache[m_ChunksDataFilepath]->read(buffer, m_TextureDataStride);
+
     {
         std::lock_guard<std::mutex> lock(m_DataMutex);
 
-        m_FileHandlerCache[m_ChunksDataFilepath]->seekg(task.Properties.inFileOffset, std::ios::beg);
-
         char* charData = (char*)m_RawImageData[m_AvailableBuffer]->getMappedData();
-        m_FileHandlerCache[m_ChunksDataFilepath]->read(&charData[m_MemoryIndex * m_TextureDataStride], m_TextureDataStride);
+        std::memcpy(&charData[m_MemoryIndex * m_TextureDataStride], buffer, m_TextureDataStride);
 
         int32_t slotsPerRow = m_VirtualMapSpecification.PhysicalTextureSize / m_ChunkSize;
         int32_t x = task.VirtualSlot / slotsPerRow;
@@ -113,6 +117,9 @@ void DynamicVirtualTerrainDeserializer::Refresh(VkCommandBuffer cmdBuffer, Terra
     LastUpdate.IndirectionNodes.clear();
     LastUpdate.StatusNodes.clear();
 
+    uint32_t currentBuffer = 0;
+    std::vector<VkBufferImageCopy> regions;
+
     {
         std::lock_guard<std::mutex> lock(m_DataMutex);
 
@@ -122,15 +129,10 @@ void DynamicVirtualTerrainDeserializer::Refresh(VkCommandBuffer cmdBuffer, Terra
         LastUpdate.IndirectionNodes = m_IndirectionNodes;
         LastUpdate.StatusNodes = m_StatusNodes;
 
-        Instrumentor::Get().beginTimer("Refresh Deserializer");
-
-        virtualMap->prepareForDeserialization(cmdBuffer);
-        virtualMap->blitNodes(cmdBuffer, m_RawImageData[m_AvailableBuffer], m_RegionsToCopy);
-        virtualMap->prepareForRendering(cmdBuffer);
-
-
-        m_AvailableBuffer++;
+        currentBuffer = m_AvailableBuffer++;
         m_AvailableBuffer %= (VulkanRenderer::getFramesInFlight() + 1);
+
+        regions = m_RegionsToCopy;
 
         m_RegionsToCopy.clear();
         m_IndirectionNodes.clear();
@@ -140,18 +142,20 @@ void DynamicVirtualTerrainDeserializer::Refresh(VkCommandBuffer cmdBuffer, Terra
         m_PositionsCV.notify_all();
     }
 
+    virtualMap->prepareForDeserialization(cmdBuffer);
+    virtualMap->blitNodes(cmdBuffer, m_RawImageData[currentBuffer], regions);
+    virtualMap->prepareForRendering(cmdBuffer);
+
     {
         std::lock_guard<std::mutex> lock(m_TaskMutex);
         if (m_LoadTasks.size() == 0)
             m_Available = true;
     }
-
-    Instrumentor::Get().endTimer("Refresh Deserializer");
 }
 
 VkBufferImageCopy DynamicVirtualTerrainDeserializer::createRegion(const VirtualMapLoadTask& task)
 {
-    int32_t iChunkSize = m_ChunkSize + m_VirtualMapSpecification.ChunkPadding;
+    int32_t iChunkSize = m_ChunkSize + CHUNK_PADDING;
 
     VkBufferImageCopy region{};
     region.bufferOffset = m_MemoryIndex * m_TextureDataStride;

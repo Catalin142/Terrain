@@ -1,5 +1,4 @@
 #version 460 core
-#extension GL_EXT_debug_printf : enable
 
 layout(location = 0) in ivec2 inPosition;
 
@@ -69,10 +68,6 @@ void main()
     offset *= chunkSize;
     position += offset;
 
-    if (gl_VertexIndex == 0)
-        debugPrintfEXT("%i: %u %u %u %u", gl_InstanceIndex, upLod, downLod, leftLod, rightLod);
-
-    // TODO: fix hardcoded values
     ivec2 chunkPhysicalLocation;
     chunkPhysicalLocation.x = (terrainInfo.minimumChunkSize + 2) * int(chunk.ChunkPhysicalLocation & 0x0000ffffu);
     chunkPhysicalLocation.y = (terrainInfo.minimumChunkSize + 2) * int((chunk.ChunkPhysicalLocation >> 16) & 0x0000ffffu);
@@ -91,10 +86,10 @@ void main()
 
     gl_Position = Camera.Projection * Camera.View * vec4(float(position.x), height * terrainInfo.heightMultiplier, float(position.y), 1.0);
     
-    fragPos = vec3(1.0);
-    if (height > 0.0)
-        fragPos = vec3(0.0, 0.0, abs(height));
-    else
-        fragPos = vec3(0.0, abs(height), 0.0);
+    //fragPos = vec3(1.0);
+    //if (height > 0.0)
+    //    fragPos = vec3(0.0, 0.0, abs(height));
+    //else
+    fragPos = vec3(0.0, abs(height), 0.0);
 
 }

@@ -5,12 +5,12 @@
 #include "Terrain/Clipmap/TerrainClipmap.h"
 #include "Terrain/Terrain.h"
 
-#include "Core/DCompressor.h"
+#define CHUNK_PADDING 2
 
 DynamicClipmapDeserializer::DynamicClipmapDeserializer(const ClipmapTerrainSpecification& spec, int32_t chunkSize, const std::string& filepath)
     : m_Specification(spec), m_ChunkSize(chunkSize), m_ChunksDataFilepath(filepath)
 {
-    int32_t chunkSizePadding = m_ChunkSize + 2;
+    int32_t chunkSizePadding = m_ChunkSize + CHUNK_PADDING;
     m_TextureDataStride = chunkSizePadding * chunkSizePadding * SIZE_OF_FLOAT16;
 
     {
@@ -19,7 +19,7 @@ DynamicClipmapDeserializer::DynamicClipmapDeserializer(const ClipmapTerrainSpeci
         RawDataProperties.Type = BufferType::TRANSFER_SRC_BUFFER | BufferType::TRANSFER_DST_BUFFER;
         RawDataProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
 
-        for (uint32_t frame = 0; frame < VulkanRenderer::getFramesInFlight(); frame++)
+        for (uint32_t frame = 0; frame < VulkanRenderer::getFramesInFlight() + 1; frame++)
         {
             m_RawImageData.push_back(std::make_shared<VulkanBuffer>(RawDataProperties));
             m_RawImageData.back()->Map();
@@ -31,24 +31,14 @@ DynamicClipmapDeserializer::DynamicClipmapDeserializer(const ClipmapTerrainSpeci
     m_LoadThread = std::thread([&]() -> void {
         while (m_ThreadRunning)
         {
-            // block thead if no positions are queued
-            {
-                std::unique_lock lock(m_DataMutex);
-                m_PositionsCV.wait(lock, [this] { return m_PositionsToProcess.size() != 0 || !m_ThreadRunning; });
-            }
+            m_LoadThreadSemaphore.acquire();
 
             ClipmapLoadTask task;
 
             {
                 std::lock_guard lock(m_DataMutex);
 
-                if (m_PositionsToProcess.empty())
-                    continue;
-
-                glm::ivec2 camPos = m_PositionsToProcess.front();
-                size_t camHash = hash((uint32_t)camPos.x, (uint32_t)camPos.y);
-
-                if (m_LoadTasks.empty() || m_LoadTasks.front().CameraHash != camHash)
+                if (m_LoadTasks.empty())
                     continue;
 
                 task = m_LoadTasks.front();
@@ -67,7 +57,7 @@ DynamicClipmapDeserializer::DynamicClipmapDeserializer(const ClipmapTerrainSpeci
 DynamicClipmapDeserializer::~DynamicClipmapDeserializer()
 {
     m_ThreadRunning = false;
-    m_PositionsCV.notify_all();
+    m_LoadThreadSemaphore.release();
     m_LoadThread.join();
 
     delete m_FileHandle;
@@ -79,15 +69,13 @@ void DynamicClipmapDeserializer::pushLoadChunk(const glm::ivec2& camPos, const F
 
     {
         std::lock_guard lock(m_DataMutex);
-        if (m_PositionsToProcess.empty() || m_PositionsToProcess.back() != camPos)
-        {
-            m_PositionsToProcess.push(camPos);
-        
-            // notify that we have positions to process
-            m_PositionsCV.notify_all();
-        }
         m_LoadTasks.push(ClipmapLoadTask{ camHash, task });
     }
+
+    m_CurrentPosition = camPos;
+
+    m_Available = false;
+    m_LoadThreadSemaphore.release();
 }
 
 void DynamicClipmapDeserializer::loadChunk(const FileChunkProperties& task)
@@ -116,6 +104,7 @@ void DynamicClipmapDeserializer::loadChunk(const FileChunkProperties& task)
 
 void DynamicClipmapDeserializer::loadChunkSequential(const FileChunkProperties& task)
 {
+    m_Available = false;
     if (m_FileHandle == nullptr)
         m_FileHandle = new std::ifstream(m_ChunksDataFilepath, std::ios::binary);
 
@@ -135,25 +124,22 @@ void DynamicClipmapDeserializer::Flush()
 {
     m_RegionsToCopy.clear();
     m_MemoryIndex = 0;
+    m_Available = true;
 }
 
-bool DynamicClipmapDeserializer::Refresh(VkCommandBuffer cmdBuffer, TerrainClipmap* clipmap)
+uint32_t DynamicClipmapDeserializer::Refresh(VkCommandBuffer cmdBuffer, TerrainClipmap* clipmap)
 {
-    glm::ivec2 camPos;
-    size_t camHash;
-
     {
         std::lock_guard lock(m_DataMutex);
+        if (!m_LoadTasks.empty())
+            return 0;
 
-        if (m_PositionsToProcess.empty())
-            return false;
-
-        camPos = m_PositionsToProcess.front();
-        camHash = hash((uint32_t)camPos.x, (uint32_t)camPos.y);
-
-        if (!m_LoadTasks.empty() && m_LoadTasks.front().CameraHash == camHash)
-            return false;
     }
+
+    if (m_RegionsToCopy.size() == 0)
+        return 0;
+
+    uint32_t regionsCopied = m_RegionsToCopy.size();
 
     clipmap->prepareForDeserialization(cmdBuffer);
     clipmap->blitNodes(cmdBuffer, m_RawImageData[m_AvailableBuffer], m_RegionsToCopy);
@@ -168,13 +154,13 @@ bool DynamicClipmapDeserializer::Refresh(VkCommandBuffer cmdBuffer, TerrainClipm
         std::lock_guard lock(m_DataMutex);
 
         m_AvailableBuffer++;
-        m_AvailableBuffer %= VulkanRenderer::getFramesInFlight();
-
-        m_PositionsToProcess.pop();
+        m_AvailableBuffer %= (VulkanRenderer::getFramesInFlight() + 1);
     }
 
-    m_LastValidPosition = camPos;
-    return true;
+    m_Available = true;
+    m_LastPositionProcessed = m_CurrentPosition;
+
+    return regionsCopied;
 }
 
 VkBufferImageCopy DynamicClipmapDeserializer::createRegion(const FileChunkProperties& task)
@@ -197,8 +183,7 @@ VkBufferImageCopy DynamicClipmapDeserializer::createRegion(const FileChunkProper
     x %= chunksPerRow;
     y %= chunksPerRow;
 
-
-    int32_t chunkSizePadding = m_ChunkSize + 2;
+    int32_t chunkSizePadding = m_ChunkSize + CHUNK_PADDING;
     region.imageOffset = { int32_t(x * chunkSizePadding), int32_t(y * chunkSizePadding), 0 };
     region.imageExtent = { uint32_t(chunkSizePadding), uint32_t(chunkSizePadding), 1 };
 

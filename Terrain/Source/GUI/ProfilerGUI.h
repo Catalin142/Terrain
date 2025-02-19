@@ -7,19 +7,17 @@
 #include <vector>
 #include <memory>
 
-// refactor this and post
 class ProfilerGUI
 {
-	friend class ProfilerManager;
-
 public:
-	ProfilerGUI(const std::string& name, uint32_t sampleCount = 100);
+	ProfilerGUI(const std::string& name = "", uint32_t sampleCount = 100);
 	~ProfilerGUI() = default;
 	
+	void Flush(const std::string& name);
+
 	void pushValue(const std::string& name, float value, uint32_t color = 0xff0000ff);
 	void nextFrame();
 
-private:
 	void Render(ImVec2 size);
 
 private:
@@ -52,7 +50,7 @@ public:
 public:
 	ImVec2 Position;
 	float Width;
-	float Height = 150.0f;
+	float Height = 110.0f;
 
 private:
 	std::unordered_map<std::string, std::shared_ptr<ProfilerGUI>> m_Profilers;

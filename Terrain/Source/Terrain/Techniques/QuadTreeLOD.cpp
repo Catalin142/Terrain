@@ -11,22 +11,25 @@ QuadTreeLOD::QuadTreeLOD(const TerrainSpecification& spec, const std::shared_ptr
 	createResources(virtualMap);
 }
 
-void QuadTreeLOD::Generate(VkCommandBuffer commandBuffer, std::vector<TerrainChunk> firstPass)
+void QuadTreeLOD::Generate(VkCommandBuffer commandBuffer, std::vector<TerrainChunk> firstPass, uint32_t bufferIndex)
 {
 	QuadTreePassMetadata metadata;
 	metadata.ResultArrayIndex = 0;
 	metadata.TMPArray1Index = 0;
 	metadata.DataLoaded = firstPass.size();
 
-	m_TempA->getBuffer(VulkanRenderer::getCurrentFrame())->setDataCPU(firstPass.data(), firstPass.size() * sizeof(TerrainChunk));
+	m_TempA->getBuffer(bufferIndex)->setDataCPU(firstPass.data(), firstPass.size() * sizeof(TerrainChunk));
 	uint32_t sizefp = firstPass.size();
 
-	PassMetadata->getBuffer(VulkanRenderer::getCurrentFrame())->setDataCPU(&metadata, sizeof(QuadTreePassMetadata));
+	PassMetadata->getBuffer(bufferIndex)->setDataCPU(&metadata, sizeof(QuadTreePassMetadata));
+
+	VulkanComputePass computePass;
+	computePass.Pipeline = m_ConstructQuadTreePipeline;
 
 	for (uint32_t lod = 0; lod < m_TerrainSpecification.Info.LODCount; lod++)
 	{
-		VulkanRenderer::dispatchCompute(commandBuffer, m_ConstructQuadTreePipeline, m_DescriptorSets[lod % 2], { 1, 1, 1 },
-			sizeof(uint32_t), &sizefp);
+		computePass.DescriptorSet = m_DescriptorSets[lod % 2];
+		VulkanRenderer::dispatchCompute(commandBuffer, computePass, bufferIndex, { 1, 1, 1 }, sizeof(uint32_t), &sizefp);
 
 		VkMemoryBarrier barrier1 = {};
 		barrier1.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
@@ -43,7 +46,7 @@ void QuadTreeLOD::Generate(VkCommandBuffer commandBuffer, std::vector<TerrainChu
 		);
 
 		uint32_t indexSSBO = 0;
-		vkCmdUpdateBuffer(commandBuffer, PassMetadata->getVkBuffer(VulkanRenderer::getCurrentFrame()), 0, sizeof(uint32_t), &indexSSBO);
+		vkCmdUpdateBuffer(commandBuffer, PassMetadata->getVkBuffer(bufferIndex), 0, sizeof(uint32_t), &indexSSBO);
 
 		VkMemoryBarrier barrier2 = {};
 		barrier2.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
@@ -60,7 +63,7 @@ void QuadTreeLOD::Generate(VkCommandBuffer commandBuffer, std::vector<TerrainChu
 		);
 	}
 
-	VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, PassMetadata->getBuffer(VulkanRenderer::getCurrentFrame()), VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+	VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, PassMetadata->getBuffer(bufferIndex), VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 		VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
 	VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, ChunksToRender, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,

@@ -9,8 +9,30 @@
 ProfilerGUI::ProfilerGUI(const std::string& name, uint32_t sampleCount) : m_SampleCount(sampleCount), m_Name(name)
 { }
 
+void ProfilerGUI::Flush(const std::string& name)
+{
+	m_Name = name;
+
+	m_ProfilerValues.clear();
+	m_ProfilerAverage.clear();
+	m_ProfilerColors.clear();
+}
+
 void ProfilerGUI::pushValue(const std::string& name, float value, uint32_t color)
 {
+	if (value < 0.001)
+	{
+		if (m_ProfilerValues.find(name) != m_ProfilerValues.end())
+		{
+			int32_t lastValue = m_End - 1;
+			if (lastValue < 0)
+				lastValue = m_SampleCount - 1;
+			value = m_ProfilerValues[name][lastValue];
+		}
+		else
+			value = 0.001;
+	}
+
 	m_MaxValue = std::max(m_MaxValue, value);
 	if (m_ProfilerValues.find(name) == m_ProfilerValues.end())
 	{
@@ -125,14 +147,13 @@ std::shared_ptr<ProfilerGUI> ProfilerManager::operator[](const std::string& name
 void ProfilerManager::Render()
 {
 	ImGui::SetNextWindowPos(Position);
-	ImGui::SetNextWindowSizeConstraints(ImVec2(Width, -1.0f), ImVec2(Width, FLT_MAX));
-	ImGui::Begin(("Vulkan Profilers " + VulkanDevice::getVulkanContext()->GPUName).c_str(), 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize);
+	ImGui::SetNextWindowSizeConstraints(ImVec2(Width, Height * m_Profilers.size() + 50), ImVec2(Width, Height * m_Profilers.size() + 50));
+	ImGui::Begin(("Renderer Metrics: " + VulkanDevice::getVulkanContext()->GPUName).c_str());
 
 	for (auto& [name, profiler] : m_Profilers)
 	{
 		profiler->nextFrame();
-		if (ImGui::CollapsingHeader(name.c_str()))
-			profiler->Render({ Width, Height });
+		profiler->Render({ Width, Height });
 	}
 	ImGui::End();
 }

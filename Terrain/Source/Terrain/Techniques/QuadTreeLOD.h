@@ -25,7 +25,7 @@ public:
 	QuadTreeLOD(const TerrainSpecification& spec, const std::shared_ptr<TerrainVirtualMap>& virtualMap);
 	~QuadTreeLOD() = default;
 
-	void Generate(VkCommandBuffer commandBuffer, std::vector<TerrainChunk> firstPass);
+	void Generate(VkCommandBuffer commandBuffer, std::vector<TerrainChunk> firstPass, uint32_t bufferIndex);
 
 private:
 	void createResources(const std::shared_ptr<TerrainVirtualMap>& virtualMap);

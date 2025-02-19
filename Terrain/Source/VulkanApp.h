@@ -21,9 +21,12 @@
 #include "Scene/Camera.h"
 #include "GUI/TerrainGenerationGUI.h"
 
-#include <thread>
 #include "Terrain/VirtualMap/TerrainVirtualMap.h"
 #include "Renderer/ClipmapTerrainRenderer.h"
+
+#include "Terrain/LODManager.h"
+
+#include "GUI/LODManagerGUI.h"
 
 #define MAX_FRAMES_IN_FLIGHT 2
 
@@ -52,7 +55,7 @@ private:
 
 private:
 	std::shared_ptr<VulkanRenderCommandBuffer> CommandBuffer;
-	std::shared_ptr<RenderPass> m_FinalPass;
+	RenderPass m_FinalPass;
 
 	std::shared_ptr<VulkanFramebuffer> m_Output;
 
@@ -66,18 +69,6 @@ private:
 
 	Camera cam{45.0f, 1600.0f / 900.0f, 0.1f, 5000.0f};
 
-	std::shared_ptr<RenderPass> m_TerrainRenderPass;
-	std::shared_ptr<VulkanPipeline> m_TerrainPipeline;
-
-	VkDescriptorSet m_HeightMapDescriptor;/*
-	VkDescriptorSet m_HeightMapDescriptor1;
-	VkDescriptorSet m_HeightMapDescriptor2;
-	VkDescriptorSet m_HeightMapDescriptor3;*/
-	std::shared_ptr<VulkanImageView> imageView;/*
-	std::shared_ptr<VulkanImageView> imageView1;
-	std::shared_ptr<VulkanImageView> imageView2;
-	std::shared_ptr<VulkanImageView> imageView3;*/
-
-	//std::shared_ptr<ClipmapTerrainRenderer> m_ClipmapRenderer;
-	std::shared_ptr<QuadTreeTerrainRenderer> m_QuadTreeRenderer;
+	std::unique_ptr<LODManager> m_LODManager;
+	std::shared_ptr<LODManagerGUI> m_ManagerGUI;
 };

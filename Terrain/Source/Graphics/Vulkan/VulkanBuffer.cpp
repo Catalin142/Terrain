@@ -4,6 +4,8 @@
 #include "VulkanUtils.h"
 #include "VulkanRenderer.h"
 
+#include "Core/VulkanMemoryTracker.h"
+
 #include <memory>
 #include <cassert>
 
@@ -98,11 +100,15 @@ VulkanBuffer::VulkanBuffer(const VulkanBufferProperties& props) : m_Properties(p
 	bufferInfo.usage = getUsage();
 	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
+	TRACK_VK_MEMORY(m_Properties.Size);
+
 	createBuffer(bufferInfo, m_Buffer, m_DeviceMemory, getMemoryUsage());
 }
 
 VulkanBuffer::VulkanBuffer(void* data, const VulkanBufferProperties& props) : VulkanBuffer(props)
 {
+	TRACK_VK_MEMORY(m_Properties.Size);
+
 	setData(data, m_Properties.Size);
 }
 

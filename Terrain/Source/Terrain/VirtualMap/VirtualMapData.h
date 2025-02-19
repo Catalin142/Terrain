@@ -54,9 +54,6 @@ struct GPUQuadTreeTerrainChunk
 struct VirtualTerrainMapSpecification
 {
     uint32_t PhysicalTextureSize = 2048;
-    VkFormat Format;
-    uint32_t ChunkPadding = 2;
-
     std::array<uint32_t, MAX_LOD> RingSizes;
 };
 

@@ -127,92 +127,11 @@ void VulkanApp::onCreate()
 		TerrainGUI = std::make_shared<TerrainGenerationGUI>(m_TerrainGenerator, m_Terrain, 300, ImVec2(1290.0f, 10.0f));
 	}
 
-	//VirtualTerrainSerializer::Init();
-
 	createFinalPass();
 
-	/*ClipmapTerrainRendererSpecification clipmapRendererSpecification(m_Terrain);
-	clipmapRendererSpecification.TargetFramebuffer = m_Output;
-	clipmapRendererSpecification.CameraStartingPosition = cam.getPosition();
+	m_LODManager = std::make_unique<LODManager>(m_Terrain, m_Output, cam);
+	m_ManagerGUI = std::make_shared<LODManagerGUI>(m_LODManager);
 
-	ClipmapTerrainSpecification clipmapSpecification;
-	clipmapSpecification.ClipmapSize = 1024;
-
-	clipmapRendererSpecification.ClipmapSpecification = clipmapSpecification;
-
-	m_ClipmapRenderer = std::make_shared<ClipmapTerrainRenderer>(clipmapRendererSpecification);*/
-
-	QuadTreeTerrainRendererSpecification quadTreeSpecification(m_Terrain);
-	quadTreeSpecification.TargetFramebuffer = m_Output;
-
-	VirtualTerrainMapSpecification vmSpecification;
-	vmSpecification.ChunkPadding = 2;
-	vmSpecification.PhysicalTextureSize = 1024 * 2;
-	vmSpecification.Format = VK_FORMAT_R16_SFLOAT;
-	vmSpecification.RingSizes = std::array<uint32_t, MAX_LOD>{8, 8, 8, 0, 0};
-	quadTreeSpecification.VirtualMapSpecification = vmSpecification;
-
-	m_QuadTreeRenderer = std::make_shared<QuadTreeTerrainRenderer>(quadTreeSpecification);
-
-	//{
-	//	{
-	//		ImageViewSpecification imvSpec;
-	//		imvSpec.Image = m_ClipmapRenderer->m_Clipmap->getMap()->getVkImage();
-	//		imvSpec.Aspect = m_ClipmapRenderer->m_Clipmap->getMap()->getSpecification().Aspect;
-	//		imvSpec.Format = m_ClipmapRenderer->m_Clipmap->getMap()->getSpecification().Format;
-	//		imvSpec.Layer = 0;
-	//		imvSpec.Mip = 0;
-
-	//		imageView = std::make_shared<VulkanImageView>(imvSpec);
-
-			m_HeightMapDescriptor = ImGui_ImplVulkan_AddTexture(m_Sampler->Get(),
-				m_QuadTreeRenderer->m_VirtualMap->getPhysicalTexture()->getVkImageView(), VK_IMAGE_LAYOUT_GENERAL);
-	//	}
-
-	//	{
-	//		ImageViewSpecification imvSpec;
-	//		imvSpec.Image = m_ClipmapRenderer->m_Clipmap->getMap()->getVkImage();
-	//		imvSpec.Aspect = m_ClipmapRenderer->m_Clipmap->getMap()->getSpecification().Aspect;
-	//		imvSpec.Format = m_ClipmapRenderer->m_Clipmap->getMap()->getSpecification().Format;
-	//		imvSpec.Layer = 1;
-	//		imvSpec.Mip = 0;
-
-	//		imageView1 = std::make_shared<VulkanImageView>(imvSpec);
-
-	//		m_HeightMapDescriptor1 = ImGui_ImplVulkan_AddTexture(m_Sampler->Get(),
-	//			imageView1->getImageView(), VK_IMAGE_LAYOUT_GENERAL);
-	//	}
-
-	//	{
-	//		ImageViewSpecification imvSpec;
-	//		imvSpec.Image = m_ClipmapRenderer->m_Clipmap->getMap()->getVkImage();
-	//		imvSpec.Aspect = m_ClipmapRenderer->m_Clipmap->getMap()->getSpecification().Aspect;
-	//		imvSpec.Format = m_ClipmapRenderer->m_Clipmap->getMap()->getSpecification().Format;
-	//		imvSpec.Layer = 2;
-	//		imvSpec.Mip = 0;
-
-	//		imageView2 = std::make_shared<VulkanImageView>(imvSpec);
-
-	//		m_HeightMapDescriptor2 = ImGui_ImplVulkan_AddTexture(m_Sampler->Get(),
-	//			imageView2->getImageView(), VK_IMAGE_LAYOUT_GENERAL);
-	//	}
-	//}
-		//{
-		//	ImageViewSpecification imvSpec;
-		//	imvSpec.Image = m_Clipmap->getMap()->getVkImage();
-		//	imvSpec.Aspect = m_Clipmap->getMap()->getSpecification().Aspect;
-		//	imvSpec.Format = m_Clipmap->getMap()->getSpecification().Format;
-		//	imvSpec.Layer = 3;
-		//	imvSpec.Mip = 0;
-
-		//	imageView3 = std::make_shared<VulkanImageView>(imvSpec);
-
-		//	m_HeightMapDescriptor3 = ImGui_ImplVulkan_AddTexture(m_Sampler->Get(),
-		//		imageView3->getImageView(), VK_IMAGE_LAYOUT_GENERAL);
-		//}
-
-		/*glm::vec2 camPosss = { cam.getPosition().x, cam.getPosition().z };
-		m_Clipmap->hardLoad(camPosss);*/
 }
 
 void VulkanApp::onUpdate()
@@ -251,15 +170,18 @@ void VulkanApp::onUpdate()
 
 	if (rotation != glm::vec2(0.0f, 0.0f))
 		cam.Rotate(rotation);
+
 	cam.updateMatrices();
 
-	m_QuadTreeRenderer->refreshVirtualMap(cam);
+	//m_QuadTreeRenderer->refreshVirtualMap(cam);
 
-	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_1))
+	/*if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_1))
 		m_QuadTreeRenderer->setWireframe(true);
 
 	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_2))
-		m_QuadTreeRenderer->setWireframe(false);
+		m_QuadTreeRenderer->setWireframe(false);*/
+
+	m_LODManager->preprocessTerrain();
 
 	uint32_t m_CurrentFrame = VulkanRenderer::getCurrentFrame();
 
@@ -271,79 +193,41 @@ void VulkanApp::onUpdate()
 		if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_3))
 			m_TerrainGenerator->runHydraulicErosion(CommandBuffer);
 
-		m_QuadTreeRenderer->CommandBuffer = CommandBuffer;
-		m_QuadTreeRenderer->updateVirtualMap();
-
-		// Geometry pass
-		{
-			//CommandBuffer->beginQuery("GeometryPass");
-			m_QuadTreeRenderer->Render(cam);
-			//CommandBuffer->endQuery("GeometryPass");
-		}
+		m_LODManager->renderTerrain(CommandBuffer);
 
 		// Present, fullscreen quad
 		{
 			CommandBuffer->beginQuery("PresentPass");
 
-			VulkanRenderer::beginSwapchainRenderPass(CommandBuffer, m_FinalPass);
-			VulkanRenderer::preparePipeline(CommandBuffer, m_FinalPass);
+			VulkanRenderer::beginSwapchainRenderPass(commandBuffer, m_FinalPass);
+			VulkanRenderer::preparePipeline(commandBuffer, m_FinalPass);
 
 			vkCmdDraw(commandBuffer, 6, 1, 0, 0);
 
 			CommandBuffer->beginQuery("Imgui");
 			beginImGuiFrame();
 
-			static ProfilerManager manager({ 10.0f, 10.0f }, 640.0f);
+			static ProfilerManager manager({480.0f, 10.0f }, 560.0f);
 			{
 				manager.addProfiler("GPUProfiler", 100);
 				manager["GPUProfiler"]->pushValue("TotalGPU", CommandBuffer->getCommandBufferTime(), 0xffff00ff);
-				manager["GPUProfiler"]->pushValue("GeometryPass", CommandBuffer->getTime("GeometryPass"), 0xffffffff);
 				manager["GPUProfiler"]->pushValue("PresentPass", CommandBuffer->getTime("PresentPass"), 0xff0000ff);
-				manager["GPUProfiler"]->pushValue(QuadTreeRendererMetrics::RENDER_TERRAIN, CommandBuffer->getTime(QuadTreeRendererMetrics::RENDER_TERRAIN), 0xff0000ff);
 				manager["GPUProfiler"]->pushValue("Imgui", CommandBuffer->getTime("Imgui"), 0xff00ffff);
-			}
-			{
-				manager.addProfiler("CPUProfiler", 100);
-				manager["CPUProfiler"]->pushValue("Total Time", Instrumentor::Get().getTime("_TotalTime"), 0xffffffff);
-				manager["CPUProfiler"]->pushValue("Update", Instrumentor::Get().getTime("_Update"), 0xffff00ff);
-			}
-
-			{
-				manager.addProfiler("Terrain", 100);
-				manager["Terrain"]->pushValue(QuadTreeRendererMetrics::CPU_LOAD_NEEDED_NODES, Instrumentor::Get().getTime(QuadTreeRendererMetrics::CPU_LOAD_NEEDED_NODES), 0xffffffff);
-				manager["Terrain"]->pushValue(QuadTreeRendererMetrics::GPU_UPDATE_VIRTUAL_MAP, CommandBuffer->getTime(QuadTreeRendererMetrics::GPU_UPDATE_VIRTUAL_MAP), 0xffffff00);
-				manager["Terrain"]->pushValue(QuadTreeRendererMetrics::GPU_UPDATE_STATUS_TEXTURE, CommandBuffer->getTime(QuadTreeRendererMetrics::GPU_UPDATE_STATUS_TEXTURE), 0xffff00ff);
-				manager["Terrain"]->pushValue(QuadTreeRendererMetrics::GPU_UPDATE_INDIRECTION_TEXTURE, CommandBuffer->getTime(QuadTreeRendererMetrics::GPU_UPDATE_INDIRECTION_TEXTURE), 0xff00ffff);
-				manager["Terrain"]->pushValue(QuadTreeRendererMetrics::GPU_GENERATE_QUAD_TREE, CommandBuffer->getTime(QuadTreeRendererMetrics::GPU_GENERATE_QUAD_TREE), 0xffff0000);
-				manager["Terrain"]->pushValue(QuadTreeRendererMetrics::GPU_GENERATE_LOD_MAP, CommandBuffer->getTime(QuadTreeRendererMetrics::GPU_GENERATE_LOD_MAP), 0xff0000ff);
-				manager["Terrain"]->pushValue(QuadTreeRendererMetrics::GPU_CREATE_INDIRECT_DRAW_COMMAND, CommandBuffer->getTime(QuadTreeRendererMetrics::GPU_CREATE_INDIRECT_DRAW_COMMAND), 0xff00ff00);
-			
 			}
 
 			manager.Render();
 
 			TerrainGUI->Render();
 
+			m_ManagerGUI->CommandBuffer = CommandBuffer;
+			m_ManagerGUI->Render();
+
 			m_Terrain->setHeightMultiplier(100.0f);
-
-			ImGui::Begin("VirtualHeightMapDebug");
-			static float maxTime = 0;
-			maxTime = glm::max(Instrumentor::Get().getTime(QuadTreeRendererMetrics::CPU_LOAD_NEEDED_NODES), maxTime);
-			ImGui::Text(std::to_string(maxTime).c_str());
-
-			
-			ImGui::Image(m_HeightMapDescriptor,  ImVec2{ 512, 512 });/*
-			ImGui::SameLine();
-			ImGui::Image(m_HeightMapDescriptor1, ImVec2{ 256, 256 });
-			ImGui::Image(m_HeightMapDescriptor2, ImVec2{ 256, 256 });*/
-			////ImGui::SameLine();
-			////ImGui::Image(m_HeightMapDescriptor3, ImVec2{ 256, 256 });
-			ImGui::End();
 
 			endImGuiFrame();
 			CommandBuffer->endQuery("Imgui");
 
-			VulkanRenderer::endRenderPass(CommandBuffer);
+			VulkanRenderer::endRenderPass(commandBuffer);
 			CommandBuffer->endQuery("PresentPass");
 		}
 
@@ -356,10 +240,6 @@ void VulkanApp::onUpdate()
 	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_O))
 		VirtualTerrainSerializer::Serialize(m_TerrainGenerator->getHeightMap(), "2kmterrain.tb",
 			"2kmterrain.tc", 128);
-	//if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_P))
-	//{
-	//	VirtualTerrainSerializer::Deserialize(VirtualMap, VirtualTextureType::HEIGHT);
-	//}
 }
 
 void VulkanApp::onResize()
@@ -368,15 +248,13 @@ void VulkanApp::onResize()
 
 	m_Output->Resize(getWidth(), getHeight());
 
-	//m_TerrainRenderer->setTargetFramebuffer(m_Output);
-
 	{
 		std::shared_ptr<VulkanDescriptorSet> DescriptorSet;
 		DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("FinalShader"));
 		DescriptorSet->bindInput(0, 0, 0, m_Sampler);
 		DescriptorSet->bindInput(0, 1, 0, m_Output->getImage(0));
 		DescriptorSet->Create();
-		m_FinalPass->DescriptorSet = DescriptorSet;
+		m_FinalPass.DescriptorSet = DescriptorSet;
 	}
 }
 
@@ -388,21 +266,10 @@ void VulkanApp::onDestroy()
 void VulkanApp::postFrame()
 {
 	CommandBuffer->queryResults();
-	//if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_U))
-	//{
-	//	thread = new std::thread([&]() {
-	//		ShaderManager::getShader("_NormalCompute")->getShaderStage(ShaderStage::COMPUTE)->Recompile();
-	//		vkDeviceWaitIdle(VulkanDevice::getVulkanDevice());
-	//		m_TerrainGenerator->m_NormalComputePass->Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader("_NormalCompute"));
-	//		});
-	//	//thread->join();
-	//	presed = true;
-	//}
 }
 
 void VulkanApp::createFinalPass()
 {
-	m_FinalPass = std::make_shared<RenderPass>();
 	{
 		std::shared_ptr<VulkanShader>& mainShader = ShaderManager::createShader("FinalShader");
 		mainShader->addShaderStage(ShaderStage::VERTEX, "FullscreenPass_vert.glsl");
@@ -415,13 +282,13 @@ void VulkanApp::createFinalPass()
 		DescriptorSet->bindInput(0, 0, 0, m_Sampler);
 		DescriptorSet->bindInput(0, 1, 0, m_Output->getImage(0));
 		DescriptorSet->Create();
-		m_FinalPass->DescriptorSet = DescriptorSet;
+		m_FinalPass.DescriptorSet = DescriptorSet;
 	}
 	{
 		PipelineSpecification spec{};
 		spec.Framebuffer = nullptr;
 		spec.Shader = ShaderManager::getShader("FinalShader");
 		spec.vertexBufferLayout = VulkanVertexBufferLayout{};
-		m_FinalPass->Pipeline = std::make_shared<VulkanPipeline>(spec);
+		m_FinalPass.Pipeline = std::make_shared<VulkanPipeline>(spec);
 	}
 }

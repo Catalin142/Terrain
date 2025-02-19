@@ -1,5 +1,5 @@
 #version 450
-#extension GL_EXT_debug_printf : enable
+
 layout (set = 0, binding = 0, r8ui) uniform readonly uimage2D LODMap;
 
 struct GPUQuadTreeRenderChunk
@@ -42,7 +42,7 @@ void main()
     
     GPUQuadTreeRenderChunk chunk = FinalResult.nodes[gl_GlobalInvocationID.x];
 
-    int chunkFarOffset = int(chunk.Lod) + 1;
+    int chunkFarOffset = 1 << int(chunk.Lod);
 
     ivec2 offset;
     offset.x = int(chunk.Offset & 0x0000ffffu);
@@ -58,8 +58,6 @@ void main()
     uint downLod    = imageLoad(LODMap, clamp(ivec2(offset.x, offset.y - 1), marginBottomDown, marginUpRight)).r;
     uint leftLod    = imageLoad(LODMap, clamp(ivec2(offset.x - 1, offset.y), marginBottomDown, marginUpRight)).r;
     uint rightLod   = imageLoad(LODMap, clamp(ivec2(offset.x + chunkFarOffset, offset.y), marginBottomDown, marginUpRight)).r;
-
-    debugPrintfEXT("%u %u %u %u", upLod, downLod, leftLod, rightLod);
 
     FinalResult.nodes[gl_GlobalInvocationID.x].NeighboursLod = 
         ((upLod      & 0x0000000fu) << 24) | 

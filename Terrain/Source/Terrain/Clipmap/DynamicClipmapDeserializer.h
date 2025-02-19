@@ -33,13 +33,14 @@ public:
 	void loadChunkSequential(const FileChunkProperties& task);
 	void Flush();
 
-	uint32_t loadedChunks() { return m_MemoryIndex; }
+	uint32_t loadedChunksInBuffer() { return m_MemoryIndex; }
 	const std::shared_ptr<VulkanBuffer>& getImageData() { return m_RawImageData[0]; }
 	const std::vector<VkBufferImageCopy>& getRegions() { return m_RegionsToCopy; }
 
-	bool Refresh(VkCommandBuffer cmdBuffer, TerrainClipmap* clipmap);
+	uint32_t Refresh(VkCommandBuffer cmdBuffer, TerrainClipmap* clipmap);
 
-	const glm::ivec2& getLastValidPosition() { return m_LastValidPosition; }
+	bool isAvailable() { return m_Available; }
+	const glm::ivec2& getLastPosition() { return m_LastPositionProcessed; }
 
 private:
 	VkBufferImageCopy createRegion(const FileChunkProperties& task);
@@ -49,26 +50,26 @@ private:
 	std::string m_ChunksDataFilepath;
 	int32_t m_ChunkSize; 
 
+	std::counting_semaphore<1024> m_LoadThreadSemaphore{ 0 };
 	std::thread m_LoadThread;
-
-	std::condition_variable m_PositionsCV;
 
 	std::mutex m_DataMutex;
 	std::mutex m_CopyDataMutex;
 
 	bool m_ThreadRunning = true;
+	bool m_Available = true;
 
 	uint32_t m_MemoryIndex = 0;
 	uint32_t m_AvailableBuffer = 0;
 	uint32_t m_TextureDataStride;
 	
 	std::queue<ClipmapLoadTask> m_LoadTasks;
-	std::queue<glm::ivec2> m_PositionsToProcess;
 	
 	std::vector<VkBufferImageCopy> m_RegionsToCopy;
 	std::vector<std::shared_ptr<VulkanBuffer>> m_RawImageData;
 
-	glm::ivec2 m_LastValidPosition;
+	glm::ivec2 m_LastPositionProcessed;
+	glm::ivec2 m_CurrentPosition;
 
 	std::ifstream* m_FileHandle = nullptr;
 };

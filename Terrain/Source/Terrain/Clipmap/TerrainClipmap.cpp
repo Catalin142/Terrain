@@ -31,17 +31,25 @@ TerrainClipmap::TerrainClipmap(const ClipmapTerrainSpecification& spec, const st
 
 }
 
-void TerrainClipmap::Refresh(const glm::vec2& cameraPosition)
+void TerrainClipmap::pushLoadTasks(const glm::vec2& cameraPosition)
 {
 	TerrainInfo terrainInfo = m_TerrainData->getSpecification().Info;
 
 	glm::ivec2 intCameraPos = glm::ivec2(glm::max((int32_t)cameraPosition.x, 0), glm::max((int32_t)cameraPosition.y, 0));
 	glm::ivec2 curPosSnapped = intCameraPos / terrainInfo.ChunkSize * terrainInfo.ChunkSize;
 
-	if (curPosSnapped == m_LastCameraPosition)
+	if (m_LastCameraPosition != curPosSnapped)
+	{
+		m_LastCameraPosition = curPosSnapped;
+		m_PositionsToProcess.push(curPosSnapped);
+	}
+
+	if (!m_Deserializer->isAvailable() || m_PositionsToProcess.empty())
 		return;
 
-	m_LastCameraPosition = curPosSnapped;
+	curPosSnapped = m_PositionsToProcess.front();
+	m_PositionsToProcess.pop();
+
 	std::unordered_set<size_t> m_NodesToUnload = m_LoadedNodes;
 
 	for (int32_t lod = 0; lod < terrainInfo.LODCount; lod++)
@@ -97,7 +105,7 @@ void TerrainClipmap::hardLoad(const glm::vec2& cameraPosition)
 				m_LoadedNodes.insert(chunkId);
 
 				m_Deserializer->loadChunkSequential(m_TerrainData->getChunkProperty(chunkId));
-				if (m_Deserializer->loadedChunks() == MAX_CHUNKS_LOADING_PER_FRAME)
+				if (m_Deserializer->loadedChunksInBuffer() == MAX_CHUNKS_LOADING_PER_FRAME)
 				{
 					m_Map->batchCopyBuffer(currentCommandBuffer, *m_Deserializer->getImageData(), m_Deserializer->getRegions());
 					m_Deserializer->Flush();
@@ -108,7 +116,7 @@ void TerrainClipmap::hardLoad(const glm::vec2& cameraPosition)
 			}
 	}
 
-	if (m_Deserializer->loadedChunks() != 0)
+	if (m_Deserializer->loadedChunksInBuffer() != 0)
 	{
 		m_Map->batchCopyBuffer(currentCommandBuffer, *m_Deserializer->getImageData(), m_Deserializer->getRegions());
 		m_Deserializer->Flush();
@@ -147,10 +155,10 @@ void TerrainClipmap::blitNodes(VkCommandBuffer cmdBuffer, const std::shared_ptr<
 	m_Map->batchCopyBuffer(cmdBuffer, *StagingBuffer, regions);
 }
 
-bool TerrainClipmap::updateClipmaps(VkCommandBuffer cmdBuffer)
+uint32_t TerrainClipmap::updateClipmaps(VkCommandBuffer cmdBuffer)
 {
-	bool updated = m_Deserializer->Refresh(cmdBuffer, this);
-	m_LastValidCameraPosition = m_Deserializer->getLastValidPosition();
+	uint32_t updated = m_Deserializer->Refresh(cmdBuffer, this);
+	m_LastValidCameraPosition = m_Deserializer->getLastPosition();
 
 	return updated;
 }

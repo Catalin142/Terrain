@@ -65,10 +65,10 @@ private:
 private:
 	uint32_t m_Width = 0, m_Height = 0;
 
-	std::shared_ptr<VulkanComputePass> m_NoiseGenerationPass;
-	std::shared_ptr<VulkanComputePass> m_CompositionPass;
-	std::shared_ptr<VulkanComputePass> m_NormalComputePass;
-	std::shared_ptr<VulkanComputePass> m_HydraulicErosionPass;
+	VulkanComputePass m_NoiseGenerationPass;
+	VulkanComputePass m_CompositionPass;
+	VulkanComputePass m_NormalComputePass;
+	VulkanComputePass m_HydraulicErosionPass;
 
 	std::shared_ptr<VulkanImage> m_Noise;
 	std::shared_ptr<VulkanImage> m_Normals;
