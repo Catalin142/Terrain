@@ -11,6 +11,7 @@ enum class PrimitiveTopology
 	POINTS,
 	LINES,
 	TRIANGLES,
+	PATCHES,
 };
 
 static VkPrimitiveTopology getVulkanTopology(PrimitiveTopology topology);
@@ -48,6 +49,7 @@ struct PipelineSpecification
 	bool Culling = false;
 	bool Wireframe = false;
 	float lineWidth = 1.0f;
+	uint32_t tessellationControlPoints = 0;
 };
 
 class VulkanPipeline

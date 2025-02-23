@@ -292,6 +292,7 @@ void VulkanDevice::createLogicalDevice(const InstanceProperties& instanceProps)
 	deviceFeatures.sampleRateShading			  = VK_TRUE;
 	deviceFeatures.fillModeNonSolid				  = VK_TRUE;
 	deviceFeatures.geometryShader				  = VK_TRUE;
+	deviceFeatures.tessellationShader			  = VK_TRUE;
 	deviceFeatures.wideLines					  = VK_TRUE;
 
 	VkDeviceCreateInfo deviceCreateInfo{};

@@ -53,6 +53,8 @@ public:
 private:
 	void createFinalPass();
 
+	void createtess();
+
 private:
 	std::shared_ptr<VulkanRenderCommandBuffer> CommandBuffer;
 	RenderPass m_FinalPass;
@@ -69,6 +71,10 @@ private:
 
 	Camera cam{45.0f, 1600.0f / 900.0f, 0.1f, 5000.0f};
 
-	std::unique_ptr<LODManager> m_LODManager;
-	std::shared_ptr<LODManagerGUI> m_ManagerGUI;
+	RenderPass m_TerrainRenderPass;
+	std::shared_ptr<VulkanPipeline> m_TerrainPipeline;
+
+	std::shared_ptr<VulkanBuffer> m_VertexBuffer;
+	uint32_t vCount;
+
 };

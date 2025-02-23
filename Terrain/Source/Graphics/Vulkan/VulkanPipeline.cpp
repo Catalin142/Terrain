@@ -12,6 +12,7 @@ VkPrimitiveTopology getVulkanTopology(PrimitiveTopology topology)
 	case PrimitiveTopology::POINTS:		return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
 	case PrimitiveTopology::LINES:		return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
 	case PrimitiveTopology::TRIANGLES:	return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	case PrimitiveTopology::PATCHES:	return VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
 	default: assert(false);
 	}
 
@@ -188,6 +189,11 @@ void VulkanPipeline::Recreate()
 	depthStencil.depthBoundsTestEnable = VK_FALSE;
 	depthStencil.stencilTestEnable = VK_FALSE;
 
+	// tessellation
+	VkPipelineTessellationStateCreateInfo tessellationInfo{};
+	tessellationInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO;
+	tessellationInfo.patchControlPoints = m_Specification.tessellationControlPoints;
+
 	// layout create info
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -210,11 +216,12 @@ void VulkanPipeline::Recreate()
 	if (vkCreatePipelineLayout(VulkanDevice::getVulkanDevice(), &pipelineLayoutInfo, nullptr, &m_PipelineLayout) != VK_SUCCESS)
 		assert(false);
 
-	ShaderStage stages[] = { ShaderStage::VERTEX, ShaderStage::GEOMETRY, ShaderStage::FRAGMENT };
+	ShaderStage stages[] = { ShaderStage::VERTEX, ShaderStage::TESSELLATION_CONTROL, 
+		ShaderStage::GEOMETRY, ShaderStage::TESSELLATION_EVALUATION, ShaderStage::FRAGMENT };
 
 	std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
 
-	for (uint32_t i = 0; i < 3; i++)
+	for (uint32_t i = 0; i < 5; i++)
 		if (m_Specification.Shader->hasStage(stages[i]))
 			shaderStages.push_back(m_Specification.Shader->getStageCreateInfo(stages[i]));
 
@@ -226,6 +233,7 @@ void VulkanPipeline::Recreate()
 	pipelineInfo.pInputAssemblyState = &inputAssembly;
 	pipelineInfo.pViewportState = &viewportState;
 	pipelineInfo.pRasterizationState = &rasterizer;
+	pipelineInfo.pTessellationState = &tessellationInfo;
 	pipelineInfo.pMultisampleState = &multisampling;
 	pipelineInfo.pDepthStencilState = &depthStencil;
 	pipelineInfo.pColorBlendState = &colorBlending;

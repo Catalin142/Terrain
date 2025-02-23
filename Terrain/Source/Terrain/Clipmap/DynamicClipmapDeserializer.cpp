@@ -5,7 +5,7 @@
 #include "Terrain/Clipmap/TerrainClipmap.h"
 #include "Terrain/Terrain.h"
 
-#define CHUNK_PADDING 2
+#define CHUNK_PADDING 0
 
 DynamicClipmapDeserializer::DynamicClipmapDeserializer(const ClipmapTerrainSpecification& spec, int32_t chunkSize, const std::string& filepath)
     : m_Specification(spec), m_ChunkSize(chunkSize), m_ChunksDataFilepath(filepath)

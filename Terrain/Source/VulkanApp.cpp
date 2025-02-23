@@ -129,9 +129,7 @@ void VulkanApp::onCreate()
 
 	createFinalPass();
 
-	m_LODManager = std::make_unique<LODManager>(m_Terrain, m_Output, cam);
-	m_ManagerGUI = std::make_shared<LODManagerGUI>(m_LODManager);
-
+	createtess();
 }
 
 void VulkanApp::onUpdate()
@@ -173,16 +171,6 @@ void VulkanApp::onUpdate()
 
 	cam.updateMatrices();
 
-	//m_QuadTreeRenderer->refreshVirtualMap(cam);
-
-	/*if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_1))
-		m_QuadTreeRenderer->setWireframe(true);
-
-	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_2))
-		m_QuadTreeRenderer->setWireframe(false);*/
-
-	m_LODManager->preprocessTerrain();
-
 	uint32_t m_CurrentFrame = VulkanRenderer::getCurrentFrame();
 
 	{
@@ -193,7 +181,22 @@ void VulkanApp::onUpdate()
 		if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_3))
 			m_TerrainGenerator->runHydraulicErosion(CommandBuffer);
 
-		m_LODManager->renderTerrain(CommandBuffer);
+		{
+			VulkanRenderer::beginRenderPass(commandBuffer, m_TerrainRenderPass);
+			VulkanRenderer::preparePipeline(commandBuffer, m_TerrainRenderPass);
+
+			CameraRenderMatrices matrices = cam.getRenderMatrices();
+			vkCmdPushConstants(commandBuffer, m_TerrainRenderPass.Pipeline->getVkPipelineLayout(), VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, 0,
+				sizeof(CameraRenderMatrices), &matrices);
+
+			VkBuffer vertexBuffers[] = { m_VertexBuffer->getBuffer() };
+			VkDeviceSize offsets[] = { 0 };
+			vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
+			vkCmdDraw(commandBuffer, 4, 256, 0, 0);
+
+			VulkanRenderer::endRenderPass(commandBuffer);
+		}
 
 		// Present, fullscreen quad
 		{
@@ -218,9 +221,6 @@ void VulkanApp::onUpdate()
 			manager.Render();
 
 			TerrainGUI->Render();
-
-			m_ManagerGUI->CommandBuffer = CommandBuffer;
-			m_ManagerGUI->Render();
 
 			m_Terrain->setHeightMultiplier(100.0f);
 
@@ -291,4 +291,54 @@ void VulkanApp::createFinalPass()
 		spec.vertexBufferLayout = VulkanVertexBufferLayout{};
 		m_FinalPass.Pipeline = std::make_shared<VulkanPipeline>(spec);
 	}
+}
+
+void VulkanApp::createtess()
+{
+	{
+		std::shared_ptr<VulkanShader>& mainShader = ShaderManager::createShader("CLipamptess");
+		mainShader->addShaderStage(ShaderStage::VERTEX, "Terrain/ClipmapTessellation/Terrain_vert.glsl");
+		mainShader->addShaderStage(ShaderStage::TESSELLATION_CONTROL, "Terrain/ClipmapTessellation/Terrain_tesc.glsl");
+		mainShader->addShaderStage(ShaderStage::TESSELLATION_EVALUATION, "Terrain/ClipmapTessellation/Terrain_tese.glsl");
+		mainShader->addShaderStage(ShaderStage::FRAGMENT, "Terrain/Terrain_frag.glsl");
+		mainShader->createDescriptorSetLayouts();
+	}
+	{
+		std::shared_ptr<VulkanDescriptorSet> DescriptorSet;
+		//DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader("CLipamptess"));
+		//DescriptorSet->Create();
+		//m_TerrainRenderPass.DescriptorSet = DescriptorSet;
+	}
+
+	PipelineSpecification spec{};
+	spec.Framebuffer = m_Output;
+	spec.depthTest = true;
+	spec.depthWrite = true;
+	spec.Wireframe = true;
+	spec.Culling = true;
+	spec.Shader = ShaderManager::getShader("CLipamptess");
+	spec.vertexBufferLayout = VulkanVertexBufferLayout{ VertexType::INT_2 };
+	spec.depthCompareFunction = DepthCompare::LESS;
+	spec.Topology = PrimitiveTopology::PATCHES;
+	spec.tessellationControlPoints = 4;
+
+	spec.pushConstants.push_back({ sizeof(CameraRenderMatrices), VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT });
+
+	m_TerrainPipeline = std::make_shared<VulkanPipeline>(spec);
+
+	m_TerrainRenderPass.Pipeline = m_TerrainPipeline;
+
+	std::vector<glm::ivec2> vertices;
+
+	vertices.push_back({ 0, 0 });
+	vertices.push_back({ 0, 100 });
+	vertices.push_back({ 100, 100 });
+	vertices.push_back({ 100, 0 });
+
+	VulkanBufferProperties vertexBufferProperties;
+	vertexBufferProperties.Size = (uint32_t)(sizeof(glm::ivec2) * (uint32_t)vertices.size());
+	vertexBufferProperties.Type = BufferType::VERTEX_BUFFER | BufferType::TRANSFER_DST_BUFFER;
+	vertexBufferProperties.Usage = BufferMemoryUsage::BUFFER_ONLY_GPU;
+
+	m_VertexBuffer = std::make_shared<VulkanBuffer>(vertices.data(), vertexBufferProperties);
 }

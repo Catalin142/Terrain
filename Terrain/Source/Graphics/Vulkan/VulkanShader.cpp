@@ -23,11 +23,13 @@ static VkShaderStageFlagBits getStage(const ShaderStage& stage)
 {
 	switch (stage)
 	{
-	case ShaderStage::VERTEX:    return VK_SHADER_STAGE_VERTEX_BIT;
-	case ShaderStage::FRAGMENT:  return VK_SHADER_STAGE_FRAGMENT_BIT; break;
-	case ShaderStage::COMPUTE:   return VK_SHADER_STAGE_COMPUTE_BIT; break;
-	case ShaderStage::GEOMETRY:  return VK_SHADER_STAGE_GEOMETRY_BIT; break;
-	case ShaderStage::NONE:     assert(false); break;
+	case ShaderStage::VERTEX:						return VK_SHADER_STAGE_VERTEX_BIT;
+	case ShaderStage::GEOMETRY:						return VK_SHADER_STAGE_GEOMETRY_BIT;
+	case ShaderStage::TESSELLATION_CONTROL:			return VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+	case ShaderStage::TESSELLATION_EVALUATION:		return VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+	case ShaderStage::FRAGMENT:						return VK_SHADER_STAGE_FRAGMENT_BIT; 
+	case ShaderStage::COMPUTE:						return VK_SHADER_STAGE_COMPUTE_BIT; 
+	case ShaderStage::NONE:							assert(false); break;
 	default:
 		return VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM;
 	}
@@ -301,6 +303,10 @@ shaderc_shader_kind getShadercKind(ShaderStage stage)
 	{
 	case ShaderStage::VERTEX:
 		return shaderc_glsl_vertex_shader;
+	case ShaderStage::TESSELLATION_CONTROL:
+		return shaderc_glsl_tess_control_shader;
+	case ShaderStage::TESSELLATION_EVALUATION:
+		return shaderc_glsl_tess_evaluation_shader;
 	case ShaderStage::FRAGMENT:
 		return shaderc_glsl_fragment_shader;
 	case ShaderStage::COMPUTE:
