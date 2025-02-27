@@ -93,7 +93,7 @@ layout(local_size_x = 1024, local_size_y = 1) in;
 void main()
 {
 	//vec2 dopletPosition = p.pos[gl_LocalInvocationID.x];
-	vec2 dopletPosition = vec2(random((gl_GlobalInvocationID.x + 1) * seed.x), random((gl_GlobalInvocationID.x + 1) * seed.y)) * 1024.0;
+	vec2 dopletPosition = vec2(random((gl_GlobalInvocationID.x + 1) * seed.x), random((gl_GlobalInvocationID.x + 1) * seed.y)) * (1024.0 * 4.0);
 
 	vec2 velocity = vec2(0.0);
 

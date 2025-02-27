@@ -77,4 +77,14 @@ private:
 	std::shared_ptr<VulkanBuffer> m_VertexBuffer;
 	uint32_t vCount;
 
+	std::shared_ptr<TerrainClipmap> m_TerrainClipmap;
+
+	std::vector<VkDescriptorSet> m_MapDescriptors;
+	std::vector<std::shared_ptr<VulkanImageView>> m_MapViews;
+
+	VulkanComputePass verticalErrorPass;
+	std::shared_ptr<VulkanImage> m_VerticalErrorMap;
+	std::shared_ptr<ClipmapLOD> m_ClipmapLOD;
+
+	std::shared_ptr<VulkanBuffer> threshold;
 };

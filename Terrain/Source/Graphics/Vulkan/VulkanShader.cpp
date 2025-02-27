@@ -349,6 +349,7 @@ std::vector<uint32_t> VulkanShaderCompiler::compileVulkanShader(ShaderStage stag
 	std::string sourceCode = readFile(filepath);
 
 	if (optimize) options.SetOptimizationLevel(shaderc_optimization_level_performance);
+	options.SetGenerateDebugInfo();
 
 	size_t begString = filepath.find_last_of('/');
 	std::string shaderName = filepath.substr(begString + 1);

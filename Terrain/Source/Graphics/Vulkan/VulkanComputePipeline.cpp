@@ -70,7 +70,7 @@ void VulkanComputePipeline::bufferMemoryBarrier(VkCommandBuffer cmdBuffer, const
 
 // TODO: update to take image and mips, you see how
 void VulkanComputePipeline::imageMemoryBarrier(VkCommandBuffer cmdBuffer, const std::shared_ptr<VulkanImage>& image, 
-	VkAccessFlagBits from, VkPipelineStageFlags fromStage, VkAccessFlagBits to, VkPipelineStageFlags toStage, uint32_t mips, uint32_t mip)
+	VkAccessFlagBits from, VkPipelineStageFlags fromStage, VkAccessFlagBits to, VkPipelineStageFlags toStage, uint32_t mips, uint32_t layers)
 {
 	VkImageMemoryBarrier imageMemoryBarrier = {};
 	imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -79,7 +79,7 @@ void VulkanComputePipeline::imageMemoryBarrier(VkCommandBuffer cmdBuffer, const 
 	imageMemoryBarrier.image = image->getVkImage();
 	imageMemoryBarrier.subresourceRange.aspectMask = image->getSpecification().Aspect;
 	imageMemoryBarrier.subresourceRange.baseArrayLayer = 0;
-	imageMemoryBarrier.subresourceRange.layerCount = 1;
+	imageMemoryBarrier.subresourceRange.layerCount = layers;
 	imageMemoryBarrier.subresourceRange.levelCount = mips;
 	imageMemoryBarrier.subresourceRange.baseMipLevel = 0;
 	imageMemoryBarrier.srcAccessMask = from;

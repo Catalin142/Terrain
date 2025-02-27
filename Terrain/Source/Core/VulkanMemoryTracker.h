@@ -44,6 +44,6 @@ private:
 
 #if DEBUG == 1
 #define TRACK_VK_MEMORY(var) SimpleVulkanMemoryTracker::Get()->Track(var);
-#elif
+#else
 #define TRACK_VK_MEMORY(var)
 #endif

@@ -1,23 +1,16 @@
 #version 450
 
 layout (binding = 0, r16f) uniform readonly image2D heightMap;
-layout (binding = 1, rgba8) uniform writeonly image2D normalMap;
-
-int size = imageSize(normalMap).x;
+layout (binding = 1, rgba8_snorm) uniform writeonly image2D normalMap;
 
 float getHeight(ivec2 position)
 {
-	position.x = clamp(position.x, 0, size - 1);
-	position.y = clamp(position.y, 0, size - 1);
-
 	return 100.0 * imageLoad(heightMap, position).r;
 }
 
 layout(local_size_x = 8, local_size_y = 8) in;
 void main()
 {
-	int size = imageSize(normalMap).x;
-
 	ivec2 texel = ivec2(gl_GlobalInvocationID.xy);
 
 	float height = imageLoad(heightMap, texel).r;

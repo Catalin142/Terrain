@@ -13,7 +13,7 @@
 
 namespace VulkanShaderCompiler
 {
-	static std::vector<uint32_t> compileVulkanShader(ShaderStage stage, const std::string& filepath, bool optimize = false);
+	static std::vector<uint32_t> compileVulkanShader(ShaderStage stage, const std::string& filepath, bool optimize = true);
 	static std::vector<ShaderInput> Reflect(ShaderStage stage, const std::vector<uint32_t>& shaderBytecode);
 }
 
