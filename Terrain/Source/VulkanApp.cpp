@@ -133,7 +133,7 @@ void VulkanApp::onCreate()
 	clipmapSpec.ClipmapSize = 1024;
 
 	m_TerrainClipmap = std::make_shared<TerrainClipmap>(clipmapSpec, m_Terrain);
-	glm::vec2 camPos = { cam.getPosition().x, cam.getPosition().z };
+	glm::vec2 camPos = { cam.getPosition().x, cam.getPosition().z};
 	m_TerrainClipmap->hardLoad(camPos);
 
 	const std::shared_ptr<VulkanImage> clipmap = m_TerrainClipmap->getMap();
@@ -427,7 +427,7 @@ void VulkanApp::createtess()
 	spec.Framebuffer = m_Output;
 	spec.depthTest = true;
 	spec.depthWrite = true;
-	spec.Wireframe = true;
+	spec.Wireframe = false;
 	spec.Culling = true;
 	spec.Shader = ShaderManager::getShader("CLipamptess");
 	spec.vertexBufferLayout = VulkanVertexBufferLayout{ VertexType::INT_2 };

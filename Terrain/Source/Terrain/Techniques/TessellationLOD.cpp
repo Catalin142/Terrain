@@ -1,12 +1,8 @@
-#include "ClipmapLOD.h"
+#include "TessellationLOD.h"
 
 #include "Graphics/Vulkan/VulkanRenderer.h"
-#include "Terrain/Clipmap/ClipmapData.h"
 
-#include <memory>
-
-ClipmapLOD::ClipmapLOD(const TerrainSpecification& spec, const std::shared_ptr<TerrainClipmap>& clipmap)
-	: m_TerrainSpecification(spec)
+TessellationLOD::TessellationLOD(const TerrainSpecification& spec, const std::shared_ptr<TerrainClipmap>& clipmap)
 {
 	ClipmapTerrainSpecification clipmapSpec = clipmap->getSpecification();
 	m_RingSize = clipmapSpec.ClipmapSize / spec.Info.ChunkSize;
@@ -30,8 +26,9 @@ ClipmapLOD::ClipmapLOD(const TerrainSpecification& spec, const std::shared_ptr<T
 	}
 }
 
-uint32_t ClipmapLOD::Generate(const glm::ivec2& cameraPosition)
+uint32_t TessellationLOD::Generate(const glm::ivec2& cameraPosition)
 {
+
 	std::vector<TerrainChunk> chunks;
 	std::vector<LODMargins> margins;
 

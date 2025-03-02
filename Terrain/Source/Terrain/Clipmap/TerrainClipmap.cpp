@@ -135,7 +135,7 @@ void TerrainClipmap::prepareForDeserialization(VkCommandBuffer cmdBuffer)
 	imgSubresource.layerCount = terrainInfo.LODCount;
 	imgSubresource.levelCount = 1;
 	imgSubresource.baseMipLevel = 0;
-	VkUtils::transitionImageLayout(cmdBuffer, m_Map->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	VkUtils::transitionImageLayout(cmdBuffer, m_Map->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 }
 
 void TerrainClipmap::prepareForRendering(VkCommandBuffer cmdBuffer)
@@ -147,8 +147,7 @@ void TerrainClipmap::prepareForRendering(VkCommandBuffer cmdBuffer)
 	imgSubresource.layerCount = terrainInfo.LODCount;
 	imgSubresource.levelCount = 1;
 	imgSubresource.baseMipLevel = 0;
-	VkUtils::transitionImageLayout(cmdBuffer, m_Map->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TESSELLATION_EVALUATION_SHADER_BIT);
+	VkUtils::transitionImageLayout(cmdBuffer, m_Map->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
 }
 
 void TerrainClipmap::blitNodes(VkCommandBuffer cmdBuffer, const std::shared_ptr<VulkanBuffer>& StagingBuffer, const std::vector<VkBufferImageCopy>& regions)
@@ -159,7 +158,8 @@ void TerrainClipmap::blitNodes(VkCommandBuffer cmdBuffer, const std::shared_ptr<
 uint32_t TerrainClipmap::updateClipmaps(VkCommandBuffer cmdBuffer)
 {
 	uint32_t updated = m_Deserializer->Refresh(cmdBuffer, this);
-	m_LastValidCameraPosition = m_Deserializer->getLastPosition();
+	if (updated)
+		m_LastValidCameraPosition = m_Deserializer->getLastPosition();
 
 	return updated;
 }

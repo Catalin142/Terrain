@@ -82,7 +82,47 @@ void main(void)
 		gl_TessLevelOuter[1] = max(centerLod, leftLod);
 		gl_TessLevelOuter[2] = max(centerLod, upLod);
 		gl_TessLevelOuter[3] = max(centerLod, rightLod);
+
+		int multiplier = (1 << in_Lod[gl_InvocationID]);
+
+		if (in_ChunkOffset[gl_InvocationID].x == Margins[in_Lod[gl_InvocationID]].xMargins.x && in_ControlPointPosition[gl_InvocationID].x == 0)
+			gl_TessLevelOuter[1] = 2 << in_Lod[gl_InvocationID];
+			
+		if (in_ChunkOffset[gl_InvocationID].x == Margins[in_Lod[gl_InvocationID]].xMargins.y - 1 && in_ControlPointPosition[gl_InvocationID].x == 7)
+			gl_TessLevelOuter[3] = 2 << in_Lod[gl_InvocationID];
+
+		if (in_ChunkOffset[gl_InvocationID].y == Margins[in_Lod[gl_InvocationID]].yMargins.x && in_ControlPointPosition[gl_InvocationID].y == 0)
+			gl_TessLevelOuter[0] = 2 << in_Lod[gl_InvocationID];
+			
+		if (in_ChunkOffset[gl_InvocationID].y == Margins[in_Lod[gl_InvocationID]].yMargins.y - 1 && in_ControlPointPosition[gl_InvocationID].y == 7)
+			gl_TessLevelOuter[2] = 2 << in_Lod[gl_InvocationID];
+
+		if (in_Lod[gl_InvocationID] != 0)
+		{
+		
+		int marginminY = Margins[in_Lod[gl_InvocationID] - 1].yMargins.x / 2;
+		int marginmaxY = Margins[in_Lod[gl_InvocationID] - 1].yMargins.y / 2;
+		int marginminX = Margins[in_Lod[gl_InvocationID] - 1].xMargins.x / 2;
+		int marginmaxX = Margins[in_Lod[gl_InvocationID] - 1].xMargins.y / 2;
+
+		if (in_ChunkOffset[gl_InvocationID].x == marginminX - 1 && in_ChunkOffset[gl_InvocationID].y >= marginminY && in_ChunkOffset[gl_InvocationID].y < marginmaxY
+			&& in_ControlPointPosition[gl_InvocationID].x == 7)
+			gl_TessLevelOuter[3] = 2 << in_Lod[gl_InvocationID];
+			
+		if (in_ChunkOffset[gl_InvocationID].x == marginmaxX && in_ChunkOffset[gl_InvocationID].y >= marginminY && in_ChunkOffset[gl_InvocationID].y < marginmaxY
+			&& in_ControlPointPosition[gl_InvocationID].x == 0)
+			gl_TessLevelOuter[1] = 2 << in_Lod[gl_InvocationID];
+
+		if (in_ChunkOffset[gl_InvocationID].y == marginminY - 1 && in_ChunkOffset[gl_InvocationID].x >= marginminX && in_ChunkOffset[gl_InvocationID].x < marginmaxX
+			&& in_ControlPointPosition[gl_InvocationID].y == 7)
+			gl_TessLevelOuter[2] = 2 << in_Lod[gl_InvocationID];
+			
+		if (in_ChunkOffset[gl_InvocationID].y == marginmaxY && in_ChunkOffset[gl_InvocationID].x >= marginminX && in_ChunkOffset[gl_InvocationID].x < marginmaxX
+			&& in_ControlPointPosition[gl_InvocationID].y == 0)
+			gl_TessLevelOuter[0] = 2 << in_Lod[gl_InvocationID];
+		}
+			
     }
-	
     gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;
+	
 }
