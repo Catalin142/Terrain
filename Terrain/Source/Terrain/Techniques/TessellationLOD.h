@@ -15,7 +15,6 @@ public:
 	TessellationLOD(const TerrainSpecification& spec, const std::shared_ptr<TerrainClipmap>& clipmap);
 	~TessellationLOD() = default;
 
-	// returns count of chunks to render
 	uint32_t Generate(const glm::ivec2& cameraPosition);
 	uint32_t getMostRecentIndex() { return m_CurrentlyUsedBuffer; }
 
@@ -29,6 +28,4 @@ private:
 
 	uint32_t m_CurrentlyUsedBuffer = 0;
 	uint32_t m_NextBuffer = 0;
-};
-
 };

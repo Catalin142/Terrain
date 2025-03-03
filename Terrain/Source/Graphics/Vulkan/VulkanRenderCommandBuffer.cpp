@@ -4,7 +4,7 @@
 #include "VulkanSwapChain.h"
 #include "VulkanRenderer.h"
 
-#define MAX_NUMBER_OF_QUERIES 64
+#define MAX_NUMBER_OF_QUERIES 128
 
 VulkanRenderCommandBuffer::VulkanRenderCommandBuffer(uint32_t count)
 {

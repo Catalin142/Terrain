@@ -9,6 +9,7 @@ LODManagerGUI::LODManagerGUI(const std::unique_ptr<LODManager>& manager) : m_LOD
 
 	m_TechniqueMap["Clipmap"]  = LODTechnique::CLIPMAP;
 	m_TechniqueMap["QuadTree"] = LODTechnique::QUADTREE;
+	m_TechniqueMap["Tessellation"] = LODTechnique::TESSELLATION;
 
 	switch (m_LODManager->getCurrentTechnique())
 	{
@@ -20,6 +21,11 @@ LODManagerGUI::LODManagerGUI(const std::unique_ptr<LODManager>& manager) : m_LOD
 	case LODTechnique::QUADTREE:
 		m_CurrentTechnique = "QuadTree";
 		createQuadTreeGUI();
+		break;
+
+	case LODTechnique::TESSELLATION:
+		m_CurrentTechnique = "Tessellation";
+		createTessellationGUI();
 		break;
 	}
 
@@ -68,8 +74,15 @@ void LODManagerGUI::Render()
 		case LODTechnique::QUADTREE:
 			createQuadTreeGUI();
 			break;
+
+		case LODTechnique::TESSELLATION:
+			createTessellationGUI();
+			break;
 		}
 	}
+
+	if (ImGui::Checkbox("Wireframe", &m_Wireframe))
+		m_LODManager->setWireframe(m_Wireframe);
 
 	switch (m_LODManager->getCurrentTechnique())
 	{
@@ -79,6 +92,10 @@ void LODManagerGUI::Render()
 
 	case LODTechnique::QUADTREE:
 		renderQuadTreeGUI();
+		break;
+
+	case LODTechnique::TESSELLATION:
+		renderTessellationGUI();
 		break;
 	}
 
@@ -115,6 +132,19 @@ void LODManagerGUI::pushProfilerValues()
 		m_GPUProfiler.nextFrame();
 
 		m_RenderProfiler.pushValue("Render Terrain", CommandBuffer->getTime(QuadTreeRendererMetrics::RENDER_TERRAIN), 0xff00ff00);
+		m_RenderProfiler.nextFrame();
+		break;
+
+	case LODTechnique::TESSELLATION:
+		m_CPUProfiler.pushValue("Push tasks", Instrumentor::Get().getTime(TessellationRendererMetrics::CPU_LOAD_NEEDED_NODES), 0xffff00ff);
+		m_CPUProfiler.pushValue("Chunk buffer", Instrumentor::Get().getTime(TessellationRendererMetrics::CPU_CREATE_CHUNK_BUFFER), 0xffff0000);
+		m_CPUProfiler.nextFrame();
+
+		m_GPUProfiler.pushValue("Update clipmap", CommandBuffer->getTime(TessellationRendererMetrics::GPU_UPDATE_CLIPMAP), 0xffffff00);
+		m_GPUProfiler.pushValue("Vertical error map", CommandBuffer->getTime(TessellationRendererMetrics::GPU_CREATE_VERTICAL_ERROR_MAP), 0xffffff00);
+		m_GPUProfiler.nextFrame();
+
+		m_RenderProfiler.pushValue("Render terrain", CommandBuffer->getTime(TessellationRendererMetrics::RENDER_TERRAIN), 0xff00ff00);
 		m_RenderProfiler.nextFrame();
 		break;
 	}
@@ -260,4 +290,102 @@ void LODManagerGUI::renderQuadTreeGUI()
 	ImGui::Text(std::string("Physical texture: " + std::to_string(m_LODManager->VirtualMapSpecification.PhysicalTextureSize) + "px").c_str());
 	ImGui::Spacing();
 	ImGui::Image(m_MapDescriptors[0], ImVec2{ 256, 256 });
+}
+
+void LODManagerGUI::createTessellationGUI()
+{
+	{
+		const std::shared_ptr<VulkanImage> clipmap = m_LODManager->TessellationRenderer->getClipmap()->getMap();
+
+		m_MapViews.clear();
+		m_MapDescriptors.clear();
+
+		for (uint32_t lod = 0; lod < m_LODManager->getTerrainInfo().LODCount; lod++)
+		{
+			ImageViewSpecification imvSpec;
+			imvSpec.Image = clipmap->getVkImage();
+			imvSpec.Aspect = clipmap->getSpecification().Aspect;
+			imvSpec.Format = clipmap->getSpecification().Format;
+			imvSpec.Layer = lod;
+			imvSpec.Mip = 0;
+
+			m_MapViews.push_back(std::make_shared<VulkanImageView>(imvSpec));
+
+			m_MapDescriptors.push_back(ImGui_ImplVulkan_AddTexture(m_Sampler->Get(),
+				m_MapViews.back()->getImageView(), VK_IMAGE_LAYOUT_GENERAL));
+		}
+	}
+
+	{
+		const std::shared_ptr<VulkanImage> verticalError = m_LODManager->TessellationRenderer->getVerticalErrorMap();
+
+		for (uint32_t lod = 0; lod < m_LODManager->getTerrainInfo().LODCount; lod++)
+		{
+			ImageViewSpecification imvSpec;
+			imvSpec.Image = verticalError->getVkImage();
+			imvSpec.Aspect = verticalError->getSpecification().Aspect;
+			imvSpec.Format = verticalError->getSpecification().Format;
+			imvSpec.Layer = lod;
+			imvSpec.Mip = 0;
+
+			m_MapViews.push_back(std::make_shared<VulkanImageView>(imvSpec));
+
+			m_MapDescriptors.push_back(ImGui_ImplVulkan_AddTexture(m_Sampler->Get(),
+				m_MapViews.back()->getImageView(), VK_IMAGE_LAYOUT_GENERAL));
+		}
+	}
+}
+
+void LODManagerGUI::renderTessellationGUI()
+{
+	ImGui::Spacing();
+
+	ImGui::Text("CPU Profiler");
+	ImGui::BeginChild("CPU Profiler", { 560, 100 });
+	m_CPUProfiler.Render({ 560, 100 });
+	ImGui::EndChild();
+
+	ImGui::Separator();
+
+	ImGui::Text("GPU Profiler");
+	ImGui::BeginChild("GPU Profiler", { 560, 100 });
+	m_GPUProfiler.Render({ 560, 100 });
+	ImGui::EndChild();
+
+	ImGui::Separator();
+
+	ImGui::Text("Render Profiler");
+	ImGui::BeginChild("Render Profiler", { 560, 100 });
+	m_RenderProfiler.Render({ 560, 100 });
+	ImGui::EndChild();
+
+	ImGui::Separator();
+
+	ImGui::Text("Metrics");
+	ImGui::Spacing();
+	std::string lastLoaded = "Loaded last frame: " + std::to_string(TessellationRendererMetrics::CHUNKS_LOADED_LAST_UPDATE);
+	ImGui::Text(lastLoaded.c_str());
+
+	std::string vertices = "Vertices: " + std::to_string(TessellationRendererMetrics::MAX_VERTICES_RENDERED);
+	std::string indices = "Indices: " + std::to_string(TessellationRendererMetrics::MAX_INDICES_RENDERED);
+	std::string memory = "Memory: " + std::to_string((float)TessellationRendererMetrics::MEMORY_USED / 1048576.0f) + "MB";
+
+	ImGui::Text(vertices.c_str());
+	ImGui::Text(indices.c_str());
+	ImGui::Text(memory.c_str());
+
+	ImGui::Separator();
+
+	uint32_t lodCount = m_LODManager->getTerrainInfo().LODCount;
+	uint32_t clipmapResolution = m_LODManager->ClipmapSpecification.ClipmapSize;
+
+	ImGui::Text(std::string("Maps: " + std::to_string(lodCount) + " * " + std::to_string(clipmapResolution) + "px").c_str());
+	ImGui::Spacing();
+	for (uint32_t lod = 0; lod < m_MapDescriptors.size(); lod++)
+	{
+		ImGui::Image(m_MapDescriptors[lod], ImVec2{ 128, 128 });
+
+		if ((lod + 1) % 3 != 0)
+			ImGui::SameLine();
+	}
 }

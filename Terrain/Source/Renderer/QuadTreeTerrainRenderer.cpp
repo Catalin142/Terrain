@@ -205,9 +205,10 @@ void QuadTreeTerrainRenderer::Render(const Camera& camera)
 
 void QuadTreeTerrainRenderer::setWireframe(bool wireframe)
 {
-	vkDeviceWaitIdle(VulkanDevice::getVulkanDevice());
 	if (m_InWireframe != wireframe)
 	{
+		vkDeviceWaitIdle(VulkanDevice::getVulkanDevice());
+
 		m_InWireframe = wireframe;
 		createPipeline();
 	}

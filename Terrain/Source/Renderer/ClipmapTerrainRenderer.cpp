@@ -79,8 +79,6 @@ void ClipmapTerrainRenderer::Render(const Camera& camera)
 {
 	CommandBuffer->beginQuery(ClipmapRendererMetrics::RENDER_TERRAIN);
 
-	uint32_t m_CurrentFrame = VulkanRenderer::getCurrentFrame();
-
 	TerrainInfo terrainInfo = m_Terrain->getInfo();
 	m_TerrainInfoBuffer->setDataCPU(&terrainInfo, sizeof(TerrainInfo));
 
@@ -108,9 +106,10 @@ void ClipmapTerrainRenderer::Render(const Camera& camera)
 
 void ClipmapTerrainRenderer::setWireframe(bool wireframe)
 {
-	vkDeviceWaitIdle(VulkanDevice::getVulkanDevice());
 	if (m_InWireframe != wireframe)
 	{
+		vkDeviceWaitIdle(VulkanDevice::getVulkanDevice());
+
 		m_InWireframe = wireframe;
 		createPipeline();
 	}

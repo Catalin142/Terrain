@@ -14,6 +14,14 @@ layout(location = 2) in ivec2 in_ChunkOffset[];
 
 layout (set = 2, binding = 0, r16f) uniform readonly image2DArray heightMap;
 
+layout(set = 2, binding = 1) uniform TerrainInfoUniformBuffer
+{
+    int Size;
+    float heightMultiplier;
+    int minimumChunkSize;
+    uint LODCount;
+} terrainInfo;
+
 layout(quads, equal_spacing, cw) in;
 
 void main()
@@ -23,25 +31,23 @@ void main()
 	vec4 position = mix(pos1, pos2, gl_TessCoord.y);
 
     int multiplier = 1 << in_Lod[0];
-    int chunkSize = 128 << in_Lod[0];
-
-    ivec2 wrappedOffset = (in_ChunkOffset[0] % 8) * 130;
+    int chunkSize = terrainInfo.minimumChunkSize << in_Lod[0];
+	
+    int paddedSize = terrainInfo.minimumChunkSize + 2;
+    ivec2 wrappedOffset = (in_ChunkOffset[0] % 8) * paddedSize;
 
 	ivec2 controlPointOffset = in_ControlPointPosition[0] * 16;
     ivec3 terrainLoadLayer = ivec3(wrappedOffset + position.xz + controlPointOffset, in_Lod[0]);
 
     float height = (-imageLoad(heightMap, terrainLoadLayer).r);
-	position.y = height * 100.0;
+	position.y = height * terrainInfo.heightMultiplier;
 	
 	position.xz *= multiplier;
 	position.xz += controlPointOffset * multiplier;
-	position.x += (in_ChunkOffset[0].x * (128 << in_Lod[0]));
-	position.z += (in_ChunkOffset[0].y * (128 << in_Lod[0]));
+	position.x += (in_ChunkOffset[0].x * (terrainInfo.minimumChunkSize << in_Lod[0]));
+	position.z += (in_ChunkOffset[0].y * (terrainInfo.minimumChunkSize << in_Lod[0]));
 
 	gl_Position = Camera.Projection * Camera.View * position;
 
-	if (position.x == 0)
-		fragPos = vec3(1.0, 0.0, 0.0);
-	else
-		fragPos = vec3(1.0, abs(height), 0.0);
+	fragPos = vec3(0.0, abs(height), 0.0);
 }

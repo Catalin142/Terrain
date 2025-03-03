@@ -297,14 +297,15 @@ void VulkanDevice::createLogicalDevice(const InstanceProperties& instanceProps)
 
 	VkPhysicalDeviceShaderAtomicFloatFeaturesEXT atomicFloatFeatures{};
 	atomicFloatFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_FEATURES_EXT;
-	atomicFloatFeatures.shaderSharedFloat32Atomics = VK_TRUE;
+	atomicFloatFeatures.shaderSharedFloat32Atomics		= VK_TRUE;
+	atomicFloatFeatures.shaderSharedFloat32AtomicAdd	= VK_TRUE;
 
-	VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT atomicFloat2Features{};
+	/*VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT atomicFloat2Features{};
 	
 	atomicFloat2Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_2_FEATURES_EXT;
 	atomicFloat2Features.shaderSharedFloat32AtomicMinMax = VK_TRUE;
 
-	atomicFloatFeatures.pNext = &atomicFloat2Features;
+	atomicFloatFeatures.pNext = &atomicFloat2Features;*/
 
 	VkDeviceCreateInfo deviceCreateInfo{};
 	deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -314,12 +315,11 @@ void VulkanDevice::createLogicalDevice(const InstanceProperties& instanceProps)
 	deviceCreateInfo.queueCreateInfoCount = (uint32_t)queueCreateInfos.size();
 	// gpu features
 	deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
-	deviceCreateInfo.pNext = &atomicFloatFeatures;
+	//deviceCreateInfo.pNext = &atomicFloatFeatures;
 
 	deviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(instanceProps.requestedExtensions.size());
 	deviceCreateInfo.ppEnabledExtensionNames = instanceProps.requestedExtensions.data();
 
-	// in versinile mai noi valorile astea sunt ignoarate de vulkan, e good practice sa le setezi pt backwards compatibility
 	deviceCreateInfo.enabledLayerCount = static_cast<uint32_t>(instanceProps.requestedLayers.size());
 	deviceCreateInfo.ppEnabledLayerNames = instanceProps.requestedLayers.data();
 

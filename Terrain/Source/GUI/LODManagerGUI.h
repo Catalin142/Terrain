@@ -22,6 +22,9 @@ private:
 	void createQuadTreeGUI();
 	void renderQuadTreeGUI();
 
+	void createTessellationGUI();
+	void renderTessellationGUI();
+
 public:
 	std::shared_ptr<VulkanRenderCommandBuffer> CommandBuffer;
 	
@@ -41,4 +44,6 @@ private:
 	std::vector<VkDescriptorSet> m_MapDescriptors;
 	std::vector<std::shared_ptr<VulkanImageView>> m_MapViews;
 	std::shared_ptr<VulkanSampler> m_Sampler;
+
+	bool m_Wireframe = false;
 };

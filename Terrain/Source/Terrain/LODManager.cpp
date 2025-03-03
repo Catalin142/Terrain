@@ -19,6 +19,10 @@ void LODManager::refreshTechnique()
 	case LODTechnique::QUADTREE:
 		createQuadTreeRenderer();
 		break;
+
+	case LODTechnique::TESSELLATION:
+		createTessellationRenderer();
+		break;
 	}
 }
 
@@ -27,11 +31,18 @@ void LODManager::preprocessTerrain()
 	switch (m_CurrentTechnique)
 	{
 	case LODTechnique::CLIPMAP:
+		ClipmapRenderer->setWireframe(m_Wireframe);
 		ClipmapRenderer->refreshClipmaps(m_Camera);
 		break;
 
 	case LODTechnique::QUADTREE:
+		QuadTreeRenderer->setWireframe(m_Wireframe);
 		QuadTreeRenderer->refreshVirtualMap(m_Camera);
+		break;
+
+	case LODTechnique::TESSELLATION:
+		TessellationRenderer->setWireframe(m_Wireframe);
+		TessellationRenderer->refreshClipmaps(m_Camera);
 		break;
 	}
 }
@@ -53,6 +64,13 @@ void LODManager::renderTerrain(const std::shared_ptr<VulkanRenderCommandBuffer>&
 		QuadTreeRenderer->updateVirtualMap();
 		QuadTreeRenderer->Render(m_Camera);
 		break;
+
+	case LODTechnique::TESSELLATION:
+		TessellationRenderer->CommandBuffer = cmdBuffer;
+
+		TessellationRenderer->updateClipmaps();
+		TessellationRenderer->Render(m_Camera);
+		break;
 	}
 }
 
@@ -65,6 +83,11 @@ void LODManager::setTechnique(LODTechnique technique)
 
 	m_CurrentTechnique = technique;
 	refreshTechnique();
+}
+
+void LODManager::setWireframe(bool wireframe)
+{
+	m_Wireframe = wireframe;
 }
 
 void LODManager::createClipmapRenderer()
@@ -84,5 +107,15 @@ void LODManager::createQuadTreeRenderer()
 	quadtreeRendererSpecification.VirtualMapSpecification = VirtualMapSpecification;
 
 	QuadTreeRenderer = std::make_shared<QuadTreeTerrainRenderer>(quadtreeRendererSpecification);
+}
+
+void LODManager::createTessellationRenderer()
+{
+	TessellationTerrainRendererSpecification tessellationRendererSpecification(m_Terrain);
+	tessellationRendererSpecification.TargetFramebuffer = m_TargetFramebuffer;
+	tessellationRendererSpecification.CameraStartingPosition = m_Camera.getPosition();
+	tessellationRendererSpecification.ClipmapSpecification = ClipmapSpecification;
+
+	TessellationRenderer = std::make_shared<TessellationTerrainRenderer>(tessellationRendererSpecification);
 }
 

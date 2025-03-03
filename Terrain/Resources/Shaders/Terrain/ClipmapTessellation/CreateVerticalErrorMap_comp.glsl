@@ -1,16 +1,10 @@
 #version 460
 #extension GL_EXT_shader_atomic_float  : enable
-#extension GL_EXT_shader_atomic_float2 : enable
 
 layout (set = 0, binding = 0, r16f) uniform readonly image2DArray heightMap;
 layout (set = 0, binding = 1, rgba16f) uniform writeonly image2DArray verticalErrorMap;
 
 precision highp float;
-
-layout(push_constant) uniform MapLOD
-{
-	uint LOD;
-};
 
 struct LODMargins
 {
@@ -33,7 +27,9 @@ void main()
 	memoryBarrierShared();
 	barrier();
 
-	ivec2 texelChunk = ivec2(gl_GlobalInvocationID.z % 64, gl_GlobalInvocationID.z / 64);
+	uint LOD = gl_GlobalInvocationID.z;
+
+	ivec2 texelChunk = ivec2(gl_GlobalInvocationID.x / 16, gl_GlobalInvocationID.y / 16);
 	ivec2 chunkOffset = texelChunk / 8;
 	chunkOffset *= 130;
 	chunkOffset += 1;
@@ -131,9 +127,9 @@ void main()
 		verticalError.z = abs(pixelHeight - mix(xBMix, xTMix, distY));
 	}
 	
-	atomicMax(maxVerticalError.x, verticalError.x);
-	atomicMax(maxVerticalError.y, verticalError.y);
-	atomicMax(maxVerticalError.z, verticalError.z);
+	atomicAdd(maxVerticalError.x, verticalError.x);
+	atomicAdd(maxVerticalError.y, verticalError.y);
+	atomicAdd(maxVerticalError.z, verticalError.z);
 	maxVerticalError.w = 1.0;
 	
 	memoryBarrierShared();

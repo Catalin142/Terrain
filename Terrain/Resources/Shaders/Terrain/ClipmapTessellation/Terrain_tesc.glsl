@@ -5,6 +5,7 @@ layout (vertices = 4) out;
 layout(location = 0) in ivec2 in_ControlPointPosition[];
 layout(location = 2) in uint in_Lod[];
 layout(location = 3) in ivec2 in_ChunkOffset[];
+layout(location = 4) in uint in_StitchDirection[];
 
 layout(location = 0) out ivec2 out_ControlPointPosition[];
 layout(location = 1) out uint out_Lod[];
@@ -51,7 +52,10 @@ void main(void)
 
 		ivec2 wrappedOffset = in_ChunkOffset[gl_InvocationID] % 8;
 
-		ivec3 chunkPos = ivec3(wrappedOffset * 8 + in_ControlPointPosition[gl_InvocationID], in_Lod[gl_InvocationID]);
+		ivec2 cpPosition = in_ControlPointPosition[gl_InvocationID];
+		uint lod = in_Lod[gl_InvocationID];
+
+		ivec3 chunkPos = ivec3(wrappedOffset * 8 + cpPosition, lod);
 
 		vec4 verticalError = imageLoad(verticalErrorMap, chunkPos);
 		float centerLod = getLod(verticalError);
@@ -83,46 +87,23 @@ void main(void)
 		gl_TessLevelOuter[2] = max(centerLod, upLod);
 		gl_TessLevelOuter[3] = max(centerLod, rightLod);
 
-		int multiplier = (1 << in_Lod[gl_InvocationID]);
+		int multiplier = (1 << lod);
 
-		if (in_ChunkOffset[gl_InvocationID].x == Margins[in_Lod[gl_InvocationID]].xMargins.x && in_ControlPointPosition[gl_InvocationID].x == 0)
-			gl_TessLevelOuter[1] = 2 << in_Lod[gl_InvocationID];
-			
-		if (in_ChunkOffset[gl_InvocationID].x == Margins[in_Lod[gl_InvocationID]].xMargins.y - 1 && in_ControlPointPosition[gl_InvocationID].x == 7)
-			gl_TessLevelOuter[3] = 2 << in_Lod[gl_InvocationID];
-
-		if (in_ChunkOffset[gl_InvocationID].y == Margins[in_Lod[gl_InvocationID]].yMargins.x && in_ControlPointPosition[gl_InvocationID].y == 0)
-			gl_TessLevelOuter[0] = 2 << in_Lod[gl_InvocationID];
-			
-		if (in_ChunkOffset[gl_InvocationID].y == Margins[in_Lod[gl_InvocationID]].yMargins.y - 1 && in_ControlPointPosition[gl_InvocationID].y == 7)
-			gl_TessLevelOuter[2] = 2 << in_Lod[gl_InvocationID];
-
-		if (in_Lod[gl_InvocationID] != 0)
-		{
+		uint stitch = in_StitchDirection[gl_InvocationID];
 		
-		int marginminY = Margins[in_Lod[gl_InvocationID] - 1].yMargins.x / 2;
-		int marginmaxY = Margins[in_Lod[gl_InvocationID] - 1].yMargins.y / 2;
-		int marginminX = Margins[in_Lod[gl_InvocationID] - 1].xMargins.x / 2;
-		int marginmaxX = Margins[in_Lod[gl_InvocationID] - 1].xMargins.y / 2;
+		if ((stitch & 4) != 0  && cpPosition.y == 0)
+			gl_TessLevelOuter[0] = 2 << lod;
+		
+		if ((stitch & 1) != 0 && cpPosition.x == 0)
+			gl_TessLevelOuter[1] = 2 << lod;
 
-		if (in_ChunkOffset[gl_InvocationID].x == marginminX - 1 && in_ChunkOffset[gl_InvocationID].y >= marginminY && in_ChunkOffset[gl_InvocationID].y < marginmaxY
-			&& in_ControlPointPosition[gl_InvocationID].x == 7)
-			gl_TessLevelOuter[3] = 2 << in_Lod[gl_InvocationID];
-			
-		if (in_ChunkOffset[gl_InvocationID].x == marginmaxX && in_ChunkOffset[gl_InvocationID].y >= marginminY && in_ChunkOffset[gl_InvocationID].y < marginmaxY
-			&& in_ControlPointPosition[gl_InvocationID].x == 0)
-			gl_TessLevelOuter[1] = 2 << in_Lod[gl_InvocationID];
+		if ((stitch & 8) != 0  && cpPosition.y == 7)
+			gl_TessLevelOuter[2] = 2 << lod;
 
-		if (in_ChunkOffset[gl_InvocationID].y == marginminY - 1 && in_ChunkOffset[gl_InvocationID].x >= marginminX && in_ChunkOffset[gl_InvocationID].x < marginmaxX
-			&& in_ControlPointPosition[gl_InvocationID].y == 7)
-			gl_TessLevelOuter[2] = 2 << in_Lod[gl_InvocationID];
-			
-		if (in_ChunkOffset[gl_InvocationID].y == marginmaxY && in_ChunkOffset[gl_InvocationID].x >= marginminX && in_ChunkOffset[gl_InvocationID].x < marginmaxX
-			&& in_ControlPointPosition[gl_InvocationID].y == 0)
-			gl_TessLevelOuter[0] = 2 << in_Lod[gl_InvocationID];
-		}
-			
+		if ((stitch & 2) != 0 && cpPosition.x == 7)
+			gl_TessLevelOuter[3] = 2 << lod;
     }
+
     gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;
 	
 }

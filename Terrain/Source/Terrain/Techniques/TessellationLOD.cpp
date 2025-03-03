@@ -2,7 +2,16 @@
 
 #include "Graphics/Vulkan/VulkanRenderer.h"
 
+enum STITCH_DIRECTION
+{
+	LEFT	= 1 << 0,
+	RIGHT	= 1 << 1,
+	DOWN	= 1 << 2,
+	UP		= 1 << 3,
+};
+
 TessellationLOD::TessellationLOD(const TerrainSpecification& spec, const std::shared_ptr<TerrainClipmap>& clipmap)
+	: m_TerrainSpecification(spec)
 {
 	ClipmapTerrainSpecification clipmapSpec = clipmap->getSpecification();
 	m_RingSize = clipmapSpec.ClipmapSize / spec.Info.ChunkSize;
@@ -28,7 +37,6 @@ TessellationLOD::TessellationLOD(const TerrainSpecification& spec, const std::sh
 
 uint32_t TessellationLOD::Generate(const glm::ivec2& cameraPosition)
 {
-
 	std::vector<TerrainChunk> chunks;
 	std::vector<LODMargins> margins;
 
@@ -81,6 +89,22 @@ uint32_t TessellationLOD::Generate(const glm::ivec2& cameraPosition)
 			{
 				tc.Offset = packOffset(x, y);
 
+				uint32_t outDirection = 0;
+
+				if (x == minX)
+					outDirection |= 0b0001; // left
+
+				if (x == maxX - 1)
+					outDirection |= 0b0010; // right
+
+				if (y == minY)
+					outDirection |= 0b0100; // down
+
+				if (y == maxY - 1)
+					outDirection |= 0b1000; // up
+
+				tc.Lod = lod | (outDirection << 16);
+
 				if (lod != 0)
 				{
 					bool add = true;
@@ -89,6 +113,20 @@ uint32_t TessellationLOD::Generate(const glm::ivec2& cameraPosition)
 					uint32_t marginmaxY = prevmaxY / 2;
 					uint32_t marginminX = prevminX / 2;
 					uint32_t marginmaxX = prevmaxX / 2;
+
+					if (x == marginminX - 1 && y >= marginminY && y < marginmaxY)
+						outDirection |= 0b0010; // right
+
+					if (x == marginmaxX && y >= marginminY && y < marginmaxY)
+						outDirection |= 0b0001; // left
+
+					if (y == marginminY - 1 && x >= marginminX && x < marginmaxX)
+						outDirection |= 0b1000; // down
+
+					if (y == marginmaxY && x >= marginminX && x < marginmaxX)
+						outDirection |= 0b0100; // up
+
+					tc.Lod = lod | (outDirection << 16);
 
 					if (x >= marginminX && x < marginmaxX && y >= marginminY && y < marginmaxY)
 						add = false;
