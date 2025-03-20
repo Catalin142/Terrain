@@ -65,18 +65,17 @@ void QuadTreeTerrainRenderer::refreshVirtualMap(const Camera& camera)
 void QuadTreeTerrainRenderer::updateVirtualMap()
 {
 	VkCommandBuffer vkCommandBuffer = CommandBuffer->getCurrentCommandBuffer();
-	uint32_t loadedChunks = 0;
 	bool updated = false;
 
 	// Load nodes and update virtual map
 	{
 		CommandBuffer->beginQuery(QuadTreeRendererMetrics::GPU_UPDATE_VIRTUAL_MAP);
 
-		loadedChunks = m_VirtualMap->updateMap(vkCommandBuffer);
-		updated = m_VirtualMap->Updated();
+		uint32_t loadedChunks = m_VirtualMap->updateMap(vkCommandBuffer);
+		updated = m_VirtualMap->Updated() || loadedChunks != 0;
 
 		QuadTreeRendererMetrics::CHUNKS_LOADED_LAST_FRAME = loadedChunks;
-		if (updated)
+		if (updated )
 		{
 			QuadTreeRendererMetrics::CHUNKS_LOADED_LAST_UPDATE = loadedChunks;
 
