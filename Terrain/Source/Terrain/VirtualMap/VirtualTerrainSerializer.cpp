@@ -431,6 +431,45 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& tex
     restoreImageLayout(texture, auxImg);
 }
 
+void VirtualTerrainSerializer::SerializeEntireMap(const std::shared_ptr<VulkanImage>& texture, const std::string& path)
+{
+    std::ofstream imgCacheOut = std::ofstream(path, std::ios::binary | std::ios::trunc);
+
+    VkDeviceMemory memory = texture->getVkDeviceMemory();
+    char* data = nullptr;
+
+    VkDevice device = VulkanDevice::getVulkanDevice();
+    VkResult result = vkMapMemory(device, memory, 0, VK_WHOLE_SIZE, 0, (void**)&data);
+    if (result != VK_SUCCESS) {
+        std::cout << "Failed to map Vulkan memory: " << result << std::endl;
+        return;
+    }
+
+    VkImageSubresource subresource = {};
+    subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+    VkSubresourceLayout layout;
+    vkGetImageSubresourceLayout(device, texture->getVkImage(), &subresource, &layout);
+
+    char* imageData = data + layout.offset;
+
+    uint32_t size = texture->getSpecification().Width;
+    uint32_t textureSize = size * size * SIZE_OF_FLOAT16;
+
+    imgCacheOut.write((char*)&textureSize, sizeof(uint32_t));
+
+    for (uint32_t y1 = 0; y1 < size; y1++)
+    {
+        uint16_t* row = (uint16_t*)imageData;
+        for (uint32_t x1 = 0; x1 < size; x1++)
+        {
+            imgCacheOut.write((char*)row, 2);
+            row++;
+        }
+        imageData += layout.rowPitch;
+    }
+}
+
 void VirtualTerrainSerializer::SerializeClipmap(const std::shared_ptr<VulkanImage>& texture, const std::string& table, const std::string& datafile, uint32_t chunkSize, glm::uvec2 worldOffset, bool purgeContent)
 {
     VkDevice device = VulkanDevice::getVulkanDevice();
@@ -509,9 +548,6 @@ void VirtualTerrainSerializer::SerializeClipmap(const std::shared_ptr<VulkanImag
 
         // TODO: all
         // Serialize each mip 
-        char* compressedData = new char[size];
-        delete[] compressedData;
-
         for (uint32_t mip = 0; mip < 4; mip++)
         {
             uint32_t currentSize = texture->getSpecification().Width >> mip;

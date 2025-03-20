@@ -3,9 +3,9 @@
 layout (location = 0) in ivec2 in_Position;
 
 layout(location = 0) out ivec2 out_ControlPointPosition;
-layout(location = 2) out uint out_Lod;
-layout(location = 3) out ivec2 out_ChunkOffset;
-layout(location = 4) out uint out_StitchDirection;
+layout(location = 1) out uint out_Lod;
+layout(location = 2) out ivec2 out_ChunkOffset;
+layout(location = 3) out uint out_StitchDirection;
 
 struct TerrainChunk
 {

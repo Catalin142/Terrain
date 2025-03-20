@@ -18,15 +18,6 @@ ClipmapTerrainRenderer::ClipmapTerrainRenderer(const ClipmapTerrainRendererSpeci
 	SimpleVulkanMemoryTracker::Get()->Flush(ClipmapRendererMetrics::NAME);
 	SimpleVulkanMemoryTracker::Get()->Track(ClipmapRendererMetrics::NAME);
 
-	{
-		VulkanBufferProperties terrainInfoProperties;
-		terrainInfoProperties.Size = ((uint32_t)sizeof(TerrainInfo));
-		terrainInfoProperties.Type = BufferType::UNIFORM_BUFFER;
-		terrainInfoProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
-
-		m_TerrainInfoBuffer = std::make_shared<VulkanBuffer>(terrainInfoProperties);
-	}
-
 	m_Clipmap = std::make_shared<TerrainClipmap>(spec.ClipmapSpecification, m_Terrain);
 	m_ClipmapLOD = std::make_shared<ClipmapLOD>(m_Terrain->getSpecification(), m_Clipmap);
 
@@ -79,9 +70,6 @@ void ClipmapTerrainRenderer::Render(const Camera& camera)
 {
 	CommandBuffer->beginQuery(ClipmapRendererMetrics::RENDER_TERRAIN);
 
-	TerrainInfo terrainInfo = m_Terrain->getInfo();
-	m_TerrainInfoBuffer->setDataCPU(&terrainInfo, sizeof(TerrainInfo));
-
 	VkCommandBuffer commandBuffer = CommandBuffer->getCurrentCommandBuffer();
 
 	VulkanRenderer::beginRenderPass(commandBuffer, m_TerrainRenderPass);
@@ -127,13 +115,9 @@ void ClipmapTerrainRenderer::createRenderPass()
 		std::shared_ptr<VulkanDescriptorSet> DescriptorSet;
 		DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader(CLIPMAP_TERRAIN_RENDER_SHADER_NAME));
 		DescriptorSet->bindInput(0, 0, 0, m_ClipmapLOD->chunksToRender);
-		DescriptorSet->bindInput(0, 1, 0, m_TerrainInfoBuffer);
+		DescriptorSet->bindInput(0, 1, 0, m_Terrain->TerrainInfoBuffer);
 		DescriptorSet->bindInput(0, 2, 0, m_ClipmapLOD->LODMarginsBufferSet);
 		DescriptorSet->bindInput(1, 0, 0, m_Clipmap->getMap());
-		DescriptorSet->bindInput(1, 3, 0, m_Terrain->getCompositionMap());
-		DescriptorSet->bindInput(1, 4, 0, m_Terrain->getNormalMap());
-		DescriptorSet->bindInput(2, 0, 0, m_Terrain->getTerrainTextures());
-		DescriptorSet->bindInput(2, 1, 0, m_Terrain->getNormalTextures());
 
 		DescriptorSet->Create();
 		m_TerrainRenderPass.DescriptorSet = DescriptorSet;

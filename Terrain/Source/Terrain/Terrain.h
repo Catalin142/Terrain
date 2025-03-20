@@ -15,20 +15,20 @@
 struct TerrainInfo
 {
 	int32_t TerrainSize;
-	float HeightMultiplier = 0.0f;
+
+	int32_t padding_1;
+	
+	glm::vec2 ElevationRange = { -100.0f, 100.0f };
 	int32_t ChunkSize = 128;
-	uint32_t LODCount;
+	uint32_t LODCount = 5;
+	
+	int32_t padding_2[2];
 };
 
 struct TerrainSpecification
 {
-	std::shared_ptr<VulkanImage> HeightMap;
-	std::shared_ptr<VulkanImage> NormalMap;
-	std::shared_ptr<VulkanImage> CompositionMap;
-	std::shared_ptr<VulkanTexture> TerrainTextures;
-	std::shared_ptr<VulkanTexture> NormalTextures;
-
-	TerrainFileLocation Filepath;
+	TerrainFileLocation ChunkedFilepath;
+	std::string TerrainFilepath;
 
 	TerrainInfo Info;
 };
@@ -43,16 +43,15 @@ public:
 	TerrainSpecification getSpecification() { return m_Specification; }
 
 	uint32_t getSectorCount() { return uint32_t(m_Specification.Info.TerrainSize) / m_Specification.Info.ChunkSize; }
-	void setHeightMultiplier(float mul) { m_Specification.Info.HeightMultiplier = mul; }
-
-	const std::shared_ptr<VulkanImage>& getHeightMap() { return m_Specification.HeightMap; }
-	const std::shared_ptr<VulkanImage>& getNormalMap() { return m_Specification.NormalMap; }
-	const std::shared_ptr<VulkanImage>& getCompositionMap() { return m_Specification.CompositionMap; }
-	const std::shared_ptr<VulkanTexture>& getTerrainTextures() { return m_Specification.TerrainTextures; }
-	const std::shared_ptr<VulkanTexture>& getNormalTextures() { return m_Specification.NormalTextures; }
+	void setElevationRange(float lower, float upper) { m_Specification.Info.ElevationRange = { lower, upper }; }
 
 	void addChunkProperty(size_t chunk, const FileChunkProperties& props);
 	const FileChunkProperties& getChunkProperty(size_t chunk);
+
+	void updateInfo();
+
+public:
+	std::shared_ptr<VulkanBuffer> TerrainInfoBuffer;
 
 private:
 	TerrainSpecification m_Specification;

@@ -6,7 +6,6 @@
 #include "Terrain/Terrain.h"
 
 #include <fstream>
-#include <iostream>
 
 TerrainClipmap::TerrainClipmap(const ClipmapTerrainSpecification& spec, const std::unique_ptr<TerrainData>& terrainData) :
 	m_Specification(spec), m_TerrainData(terrainData)
@@ -18,7 +17,7 @@ TerrainClipmap::TerrainClipmap(const ClipmapTerrainSpecification& spec, const st
 		VulkanImageSpecification clipmapSpecification{};
 		clipmapSpecification.Width = m_Specification.ClipmapSize + m_RingSize * 2;
 		clipmapSpecification.Height = m_Specification.ClipmapSize + m_RingSize * 2;
-		clipmapSpecification.Format = VK_FORMAT_R16_SFLOAT;
+		clipmapSpecification.Format = VK_FORMAT_R16_UNORM;
 		clipmapSpecification.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
 		clipmapSpecification.LayerCount = terrainInfo.LODCount;
 		clipmapSpecification.UsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
@@ -27,7 +26,7 @@ TerrainClipmap::TerrainClipmap(const ClipmapTerrainSpecification& spec, const st
 		m_Map->Create();
 	}
 
-	m_Deserializer = std::make_shared<DynamicClipmapDeserializer>(m_Specification, terrainInfo.ChunkSize, m_TerrainData->getSpecification().Filepath.Data);
+	m_Deserializer = std::make_shared<DynamicClipmapDeserializer>(m_Specification, terrainInfo.ChunkSize, m_TerrainData->getSpecification().ChunkedFilepath.Data);
 
 }
 
@@ -51,7 +50,6 @@ void TerrainClipmap::pushLoadTasks(const glm::vec2& cameraPosition)
 	m_PositionsToProcess.pop();
 
 	std::unordered_set<size_t> m_NodesToUnload = m_LoadedNodes;
-
 	for (int32_t lod = 0; lod < terrainInfo.LODCount; lod++)
 	{
 		glm::ivec2 xBounds, yBounds;

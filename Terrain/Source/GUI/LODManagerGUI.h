@@ -25,6 +25,9 @@ private:
 	void createTessellationGUI();
 	void renderTessellationGUI();
 
+	void createBruteForceGUI();
+	void renderBruteForceGUI();
+
 public:
 	std::shared_ptr<VulkanRenderCommandBuffer> CommandBuffer;
 	
@@ -46,4 +49,6 @@ private:
 	std::shared_ptr<VulkanSampler> m_Sampler;
 
 	bool m_Wireframe = false;
+
+	glm::vec2 m_Elevation{ 0.0f, 100.0f };
 };

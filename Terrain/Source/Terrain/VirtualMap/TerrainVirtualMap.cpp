@@ -26,7 +26,7 @@ TerrainVirtualMap::TerrainVirtualMap(const VirtualTerrainMapSpecification& spec,
         VulkanImageSpecification physicalTextureSpecification{};
         physicalTextureSpecification.Width = m_Specification.PhysicalTextureSize + availableSlots * 2; // Each slots takes 2 pixels padding
         physicalTextureSpecification.Height = m_Specification.PhysicalTextureSize + availableSlots * 2;
-        physicalTextureSpecification.Format = VK_FORMAT_R16_SFLOAT;
+        physicalTextureSpecification.Format = VK_FORMAT_R16_UNORM;
         physicalTextureSpecification.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
         physicalTextureSpecification.UsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
         physicalTextureSpecification.MemoryType = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
@@ -46,7 +46,7 @@ TerrainVirtualMap::TerrainVirtualMap(const VirtualTerrainMapSpecification& spec,
     m_StatusNodes.reserve(1024);
     createStatusResources();
 
-    m_Deserializer = std::make_shared<DynamicVirtualTerrainDeserializer>(m_Specification, m_TerrainInfo.ChunkSize, m_TerrainData->getSpecification().Filepath.Data);
+    m_Deserializer = std::make_shared<DynamicVirtualTerrainDeserializer>(m_Specification, m_TerrainInfo.ChunkSize, m_TerrainData->getSpecification().ChunkedFilepath.Data);
 }
 
 uint32_t TerrainVirtualMap::pushLoadTasks(const glm::vec2& camPosition)
@@ -73,6 +73,8 @@ uint32_t TerrainVirtualMap::pushLoadTasks(const glm::vec2& camPosition)
 
     // Search for nodes that need to be loaded/unloaded
     m_NodesToUnload = m_ActiveNodesCPU;
+
+    m_Updated = true;
 
     for (int32_t lod = m_TerrainInfo.LODCount - 1; lod >= 0; lod--)
     {
@@ -260,6 +262,13 @@ void TerrainVirtualMap::prepareForRendering(VkCommandBuffer cmdBuffer)
     imgSubresource.levelCount = 1;
     imgSubresource.baseMipLevel = 0;
     VkUtils::transitionImageLayout(cmdBuffer, m_PhysicalTexture->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+}
+
+bool TerrainVirtualMap::Updated()
+{
+    bool oldUpdated = m_Updated;
+    m_Updated = false;
+    return oldUpdated;
 }
 
 

@@ -30,16 +30,13 @@
 
 #include "GUI/ProfilerGUI.h"
 
+#include "Terrain/Disk/HeightMapDiskProcessor.h"
+
 #include <future>
 #include "System/Disk.h"
 
-/*
-- Quad tree abstraction
-- Change descriptor set creation, i don t need two identical descriptors if i don t use a bufferset. Also, i want to force some pipelines to use different descritors
-- Change how image barriers are implemented, i want to put barries on all mips
-*/
+static Camera upCamera{ 45.0f, 1600.0f / 900.0f, 0.1f, 1024.0f * 32.0f };
 
-void SwapBuffers(VkCommandBuffer cmd, const std::shared_ptr<VulkanBuffer>& a, const std::shared_ptr<VulkanBuffer>& b, int howMuch);
 
 VulkanApp::VulkanApp(const std::string& title, uint32_t width, uint32_t height) : Application(title, width, height)
 { }
@@ -78,49 +75,13 @@ void VulkanApp::onCreate()
 
 	{
 		TerrainSpecification terrainSpec;
-		terrainSpec.HeightMap = m_TerrainGenerator->getHeightMap();
-		terrainSpec.CompositionMap = m_TerrainGenerator->getCompositionMap();
-		terrainSpec.NormalMap = m_TerrainGenerator->getNormalMap();
 
-		{
-			std::vector<std::string> filepaths = {
-				"Resources/Textures/Terrain/grass_d2.png",
-				"Resources/Textures/Terrain/slope_d.png",
-				"Resources/Textures/Terrain/mountain_d.png",
-				"Resources/Textures/Terrain/snow_d.png",
-			};
-
-			TextureSpecification texSpec{};
-			texSpec.CreateSampler = true;
-			texSpec.GenerateMips = true;
-			texSpec.Channles = 4;
-			texSpec.LayerCount = (uint32_t)filepaths.size();
-			texSpec.Filepath = filepaths;
-			terrainSpec.TerrainTextures = std::make_shared<VulkanTexture>(texSpec);
-		}
-		{
-			std::vector<std::string> filepaths = {
-				"Resources/Textures/Terrain/grass_n2.png",
-				"Resources/Textures/Terrain/slope_n.png",
-				"Resources/Textures/Terrain/mountain_n.png",
-				"Resources/Textures/Terrain/snow_n.png",
-			};
-
-			TextureSpecification texSpec{};
-			texSpec.CreateSampler = true;
-			texSpec.GenerateMips = true;
-			texSpec.Channles = 4;
-			texSpec.LayerCount = (uint32_t)filepaths.size();
-			texSpec.Filepath = filepaths;
-			terrainSpec.NormalTextures = std::make_shared<VulkanTexture>(texSpec);
-		}
-
-		terrainSpec.Info.TerrainSize = 1024 * 4;
-		terrainSpec.Info.LODCount = 3;
-		terrainSpec.Filepath = { "2kmterrain.tc", "2kmterrain.tb" };
+		terrainSpec.Info.TerrainSize = 1024 * 16;
+		terrainSpec.Info.LODCount = 5;
+		terrainSpec.ChunkedFilepath = { "KaerMorhen8km.rawdata", "KaerMorhen8km.metadata" };
+		terrainSpec.TerrainFilepath = "Resources/Textures/WhiteOrchard_res4096x.png";
 
 		m_Terrain = std::make_unique<TerrainData>(terrainSpec);
-		m_Terrain->setHeightMultiplier(3300.0f);
 
 		m_Sampler = std::make_shared<VulkanSampler>(SamplerSpecification{});
 
@@ -129,9 +90,12 @@ void VulkanApp::onCreate()
 
 	createFinalPass();
 
+	m_Terrain->updateInfo();
+	
 	m_LODManager = std::make_unique<LODManager>(m_Terrain, m_Output, cam);
 	m_ManagerGUI = std::make_shared<LODManagerGUI>(m_LODManager);
 
+	upCamera = Camera{ 45.0f, 1600.0f / 900.0f, 0.1f, 1024.0f * 32.0f };
 }
 
 void VulkanApp::onUpdate()
@@ -163,7 +127,7 @@ void VulkanApp::onUpdate()
 	if (camVelocity != glm::vec3(0.0f, 0.0f, 0.0f))
 	{
 		if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_SPACE))
-			cam.Move(glm::normalize(camVelocity) * 5.0f);
+			cam.Move(glm::normalize(camVelocity) * 20.0f);
 		else
 			cam.Move(glm::normalize(camVelocity) * 0.10f);
 	}
@@ -172,15 +136,6 @@ void VulkanApp::onUpdate()
 		cam.Rotate(rotation);
 
 	cam.updateMatrices();
-
-	//m_QuadTreeRenderer->refreshVirtualMap(cam);
-
-	/*if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_1))
-		m_QuadTreeRenderer->setWireframe(true);
-
-	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_2))
-		m_QuadTreeRenderer->setWireframe(false);*/
-
 	m_LODManager->preprocessTerrain();
 
 	uint32_t m_CurrentFrame = VulkanRenderer::getCurrentFrame();
@@ -193,7 +148,19 @@ void VulkanApp::onUpdate()
 		if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_3))
 			m_TerrainGenerator->runHydraulicErosion(CommandBuffer);
 
-		m_LODManager->renderTerrain(CommandBuffer);
+		if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_TAB))
+		{
+			glm::vec3 camPos = cam.getPosition();
+			glm::vec3 orientation = cam.Forward();
+
+			upCamera.setPosition(camPos - glm::vec3(orientation.x * 2500.0f, orientation.y * 2500.0f, orientation.z * 2500.0f));
+			upCamera.setFocalPoint(camPos);
+			upCamera.updateMatrices();
+			m_LODManager->renderTerrain(CommandBuffer, upCamera);
+		}
+		else
+			m_LODManager->renderTerrain(CommandBuffer, cam);
+
 
 		// Present, fullscreen quad
 		{
@@ -221,8 +188,6 @@ void VulkanApp::onUpdate()
 
 			m_ManagerGUI->CommandBuffer = CommandBuffer;
 			m_ManagerGUI->Render();
-
-			m_Terrain->setHeightMultiplier(100.0f);
 
 			endImGuiFrame();
 			CommandBuffer->endQuery("Imgui");

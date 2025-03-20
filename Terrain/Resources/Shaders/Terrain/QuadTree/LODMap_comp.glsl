@@ -29,9 +29,6 @@ layout(std430, set = 0, binding = 2) buffer _MetadataSet {
 layout(local_size_x = 8, local_size_y = 8) in;
 void main()
 {
-	if (gl_GlobalInvocationID.x >= 64 || gl_GlobalInvocationID.y >= 64)
-		return;
-
 	uvec2 texel = gl_GlobalInvocationID.xy;
 
 	for (int nodeIndex = 0; nodeIndex < metadata.ResultArrayIndex; nodeIndex++)
@@ -46,7 +43,7 @@ void main()
 		uvec2 lodTexel = (texel / chunkSize);
 		if (lodTexel.x == offset.x && lodTexel.y == offset.y)
 		{
-			imageStore(LODMap, ivec2(texel), uvec4(1u << node.Lod, 1u, 1u, 1u));
+			imageStore(LODMap, ivec2(texel), uvec4(node.Lod, 1u, 1u, 1u));
 			return;
 		}
 	}

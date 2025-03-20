@@ -18,7 +18,7 @@ layout(std430, set = 1, binding = 0) buffer _FinalResult
 layout(set = 1, binding = 1) uniform TerrainInfoUniformBuffer
 {
     int Size;
-    float heightMultiplier;
+    vec2 ElevationRange;
     int minimumChunkSize;
     uint LODCount;
 } terrainInfo;

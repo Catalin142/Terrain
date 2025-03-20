@@ -8,7 +8,7 @@
 
 QuadTreeLOD::QuadTreeLOD(const TerrainSpecification& spec, const std::shared_ptr<TerrainVirtualMap>& virtualMap) : m_TerrainSpecification(spec)
 {
-	createResources(virtualMap);
+	createComputePass(virtualMap);
 }
 
 void QuadTreeLOD::Generate(VkCommandBuffer commandBuffer, std::vector<TerrainChunk> firstPass, uint32_t bufferIndex)
@@ -73,7 +73,7 @@ void QuadTreeLOD::Generate(VkCommandBuffer commandBuffer, std::vector<TerrainChu
 		VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 }
 
-void QuadTreeLOD::createResources(const std::shared_ptr<TerrainVirtualMap>& virtualMap)
+void QuadTreeLOD::createComputePass(const std::shared_ptr<TerrainVirtualMap>& virtualMap)
 {
 	{
 		VulkanBufferProperties tempAProperties;

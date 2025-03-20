@@ -13,7 +13,7 @@ VkFormat getFormat(uint32_t channels)
 {
 	switch (channels)
 	{
-	case 1: return VK_FORMAT_R8_SRGB;
+	case 1: return VK_FORMAT_R16_UNORM;
 	case 2: 
 	case 3: 
 	case 4: return VK_FORMAT_R8G8B8A8_SRGB;
@@ -43,7 +43,7 @@ void VulkanTexture::loadTextures()
 	{
 		TextureInformation currentInfo{};
 
-		stbi_uc* pixels = stbi_load(m_Specification.Filepath[layer].c_str(), &currentInfo.Width, &currentInfo.Height,
+		uint16_t* pixels = stbi_load_16(m_Specification.Filepath[layer].c_str(), &currentInfo.Width, &currentInfo.Height,
 			&currentInfo.Channels, m_Specification.Channles);
 
 		if (layer >= 1)
@@ -75,6 +75,9 @@ void VulkanTexture::loadTextures()
 		}
 
 		VkDeviceSize imageSize = m_Info.Width * m_Info.Height * m_Info.Channels;
+
+		if (m_Info.Channels == 1)
+			imageSize *= 2;
 
 		if (!pixels)
 			assert(false);

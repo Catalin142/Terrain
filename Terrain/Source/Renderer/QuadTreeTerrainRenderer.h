@@ -62,6 +62,7 @@ public:
 	void setWireframe(bool wireframe);
 
 	const std::shared_ptr<VulkanImage>& getPhysicalTexture() { return m_VirtualMap->getPhysicalTexture(); }
+	const std::shared_ptr<VulkanImage>& getStatusTexture() { return m_VirtualMap->getLoadStatusTexture(); }
 
 private:
 	void createLODMapPipeline();
@@ -89,8 +90,6 @@ private:
 	VulkanComputePass m_LODMapComputePass;
 
 	VulkanComputePass m_NeighboursComputePass;
-
-	std::shared_ptr<VulkanBuffer> m_TerrainInfo;
 
 	std::shared_ptr<VulkanBuffer> m_VertexBuffer;
 	TerrainChunkIndexBuffer m_ChunkIndexBuffer;

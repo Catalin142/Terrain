@@ -3,9 +3,9 @@
 layout (vertices = 4) out;
 
 layout(location = 0) in ivec2 in_ControlPointPosition[];
-layout(location = 2) in uint in_Lod[];
-layout(location = 3) in ivec2 in_ChunkOffset[];
-layout(location = 4) in uint in_StitchDirection[];
+layout(location = 1) in uint in_Lod[];
+layout(location = 2) in ivec2 in_ChunkOffset[];
+layout(location = 3) in uint in_StitchDirection[];
 
 layout(location = 0) out ivec2 out_ControlPointPosition[];
 layout(location = 1) out uint out_Lod[];
@@ -15,7 +15,7 @@ layout (set = 1, binding = 0, rgba8) uniform readonly image2DArray verticalError
 
 layout(std430, set = 1, binding = 1) readonly buffer ControlSpecification
 {
-    vec4 LODThreshold;
+    float LODThreshold[];
 };
 
 struct LODMargins
@@ -92,16 +92,16 @@ void main(void)
 		uint stitch = in_StitchDirection[gl_InvocationID];
 		
 		if ((stitch & 4) != 0  && cpPosition.y == 0)
-			gl_TessLevelOuter[0] = 2 << lod;
+			gl_TessLevelOuter[0] = 1 << lod;
 		
 		if ((stitch & 1) != 0 && cpPosition.x == 0)
-			gl_TessLevelOuter[1] = 2 << lod;
+			gl_TessLevelOuter[1] = 1 << lod;
 
 		if ((stitch & 8) != 0  && cpPosition.y == 7)
-			gl_TessLevelOuter[2] = 2 << lod;
+			gl_TessLevelOuter[2] = 1 << lod;
 
 		if ((stitch & 2) != 0 && cpPosition.x == 7)
-			gl_TessLevelOuter[3] = 2 << lod;
+			gl_TessLevelOuter[3] = 1 << lod;
     }
 
     gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;

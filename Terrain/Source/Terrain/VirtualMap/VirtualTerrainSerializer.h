@@ -33,6 +33,8 @@ public:
 	static void Serialize(const std::shared_ptr<VulkanImage>& texture, const std::string& table, const std::string& data, uint32_t chunkSize,
 		glm::uvec2 worldOffset = { 0u, 0u }, bool purgeContent = true);
 
+	static void SerializeEntireMap(const std::shared_ptr<VulkanImage>& texture, const std::string& path);
+
 	static void SerializeClipmap(const std::shared_ptr<VulkanImage>& texture, const std::string& table, const std::string& data, uint32_t chunkSize,
 		glm::uvec2 worldOffset = { 0u, 0u }, bool purgeContent = true);
 };

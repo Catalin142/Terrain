@@ -17,8 +17,6 @@ struct QuadTreePassMetadata
 	uint32_t DataLoaded;
 };
 
-// Everything happens on the GPU, highly performant
-// Works only with virtual maps
 class QuadTreeLOD
 {
 public:
@@ -28,7 +26,7 @@ public:
 	void Generate(VkCommandBuffer commandBuffer, std::vector<TerrainChunk> firstPass, uint32_t bufferIndex);
 
 private:
-	void createResources(const std::shared_ptr<TerrainVirtualMap>& virtualMap);
+	void createComputePass(const std::shared_ptr<TerrainVirtualMap>& virtualMap);
 
 public:
 	std::shared_ptr<VulkanBuffer> ChunksToRender;

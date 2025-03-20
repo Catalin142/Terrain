@@ -93,7 +93,7 @@ void DynamicClipmapDeserializer::loadChunk(const FileChunkProperties& task)
     }
 
     m_FileHandle->seekg(task.inFileOffset, std::ios::beg);
-    m_FileHandle->read(&charData[m_MemoryIndex * m_TextureDataStride], task.Size);
+    m_FileHandle->read(&charData[m_MemoryIndex * m_TextureDataStride], m_TextureDataStride);
 
     {
         std::lock_guard lock(m_CopyDataMutex);
@@ -133,7 +133,6 @@ uint32_t DynamicClipmapDeserializer::Refresh(VkCommandBuffer cmdBuffer, TerrainC
         std::lock_guard lock(m_DataMutex);
         if (!m_LoadTasks.empty())
             return 0;
-
     }
 
     if (m_RegionsToCopy.size() == 0)

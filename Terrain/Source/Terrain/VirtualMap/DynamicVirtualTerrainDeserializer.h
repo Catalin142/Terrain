@@ -13,7 +13,7 @@
 #include <mutex>
 #include <vulkan/vulkan.h>
 
-#define MAX_CHUNKS_LOADING_PER_FRAME 16
+#define MAX_CHUNKS_LOADING_PER_FRAME 64
 
 class TerrainVirtualMap;
 
@@ -47,7 +47,7 @@ private:
 	std::mutex m_DataMutex;
 	std::mutex m_TaskMutex;
 
-	std::counting_semaphore<1024> m_LoadThreadSemaphore{ 0 };
+	std::counting_semaphore<16000> m_LoadThreadSemaphore{ 0 };
 	std::condition_variable m_PositionsCV;
 	bool m_ThreadRunning = true;
 

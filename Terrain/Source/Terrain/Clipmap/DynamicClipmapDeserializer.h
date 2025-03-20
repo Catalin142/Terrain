@@ -17,7 +17,7 @@
 
 #include "ClipmapData.h"
 
-#define MAX_CHUNKS_LOADING_PER_FRAME 64
+#define MAX_CHUNKS_LOADING_PER_FRAME 32 * 4
 
 class TerrainClipmap;
 

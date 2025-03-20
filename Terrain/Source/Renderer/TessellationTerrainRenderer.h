@@ -71,7 +71,7 @@ private:
 
 public:
 	std::shared_ptr<VulkanRenderCommandBuffer> CommandBuffer;
-	glm::vec4 Threshold{ 2.025f, 5.085f, 7.168f, 0.0f };
+	std::array<float, 6> Threshold = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
 
 private:
 	const std::unique_ptr<TerrainData>& m_Terrain;
@@ -85,8 +85,6 @@ private:
 
 	VulkanComputePass m_VerticalErrorPass;
 	std::shared_ptr<VulkanImage> m_VerticalErrorMap;
-
-	std::shared_ptr<VulkanBuffer> m_TerrainInfoBuffer;
 
 	std::shared_ptr<VulkanBuffer> m_VertexBuffer;
 	uint32_t m_ChunksToRender = 0;

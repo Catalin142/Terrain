@@ -1,6 +1,0 @@
-Tasks list(order by priority):
-	- QuadTree LOD
-	- Terrain materials (similar to The Witcher 3)
-	- Terrain vegetation (trees, grass)
-	- Water
-	- ? - After everyting looks good, Virtual Texturing

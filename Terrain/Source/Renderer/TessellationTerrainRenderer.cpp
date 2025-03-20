@@ -19,22 +19,14 @@ TessellationTerrainRenderer::TessellationTerrainRenderer(const TessellationTerra
 {
 	SimpleVulkanMemoryTracker::Get()->Flush(TessellationRendererMetrics::NAME);
 	SimpleVulkanMemoryTracker::Get()->Track(TessellationRendererMetrics::NAME);
-
+	
 	{
-		VulkanBufferProperties terrainInfoProperties;
-		terrainInfoProperties.Size = ((uint32_t)sizeof(TerrainInfo));
-		terrainInfoProperties.Type = BufferType::UNIFORM_BUFFER;
-		terrainInfoProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
+		VulkanBufferProperties thresholdProperties;
+		thresholdProperties.Size = ((uint32_t)sizeof(float)) * 6;
+		thresholdProperties.Type = BufferType::STORAGE_BUFFER;
+		thresholdProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
 
-		m_TerrainInfoBuffer = std::make_shared<VulkanBuffer>(terrainInfoProperties);
-	}
-	{
-		VulkanBufferProperties terrainInfoProperties;
-		terrainInfoProperties.Size = ((uint32_t)sizeof(glm::vec4));
-		terrainInfoProperties.Type = BufferType::STORAGE_BUFFER;
-		terrainInfoProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
-
-		m_ThresholdBuffer = std::make_shared<VulkanBuffer>(terrainInfoProperties);
+		m_ThresholdBuffer = std::make_shared<VulkanBuffer>(thresholdProperties);
 	}
 
 	m_Clipmap = std::make_shared<TerrainClipmap>(spec.ClipmapSpecification, m_Terrain);
@@ -85,7 +77,7 @@ void TessellationTerrainRenderer::updateClipmaps()
 	CommandBuffer->beginQuery(TessellationRendererMetrics::GPU_CREATE_VERTICAL_ERROR_MAP);
 	if (!m_VericalErrorMapGenerated)
 	{
-		VulkanRenderer::dispatchCompute(cmdBuffer, m_VerticalErrorPass, { 64, 64, 3 });
+		VulkanRenderer::dispatchCompute(cmdBuffer, m_VerticalErrorPass, { 64, 64, m_Terrain->getInfo().LODCount});
 
 		VulkanComputePipeline::imageMemoryBarrier(cmdBuffer, m_VerticalErrorMap, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT, 1, 3);
@@ -99,10 +91,7 @@ void TessellationTerrainRenderer::Render(const Camera& camera)
 {
 	CommandBuffer->beginQuery(TessellationRendererMetrics::RENDER_TERRAIN);
 
-	m_ThresholdBuffer->setDataCPU(&Threshold, sizeof(glm::vec4));
-
-	TerrainInfo terrainInfo = m_Terrain->getInfo();
-	m_TerrainInfoBuffer->setDataCPU(&terrainInfo, sizeof(TerrainInfo));
+	m_ThresholdBuffer->setDataCPU(&Threshold, sizeof(float) * 6);
 
 	VkCommandBuffer cmdBuffer = CommandBuffer->getCurrentCommandBuffer();
 	VulkanRenderer::beginRenderPass(cmdBuffer, m_TerrainRenderPass);
@@ -152,7 +141,7 @@ void TessellationTerrainRenderer::createRenderPass()
 		DescriptorSet->bindInput(1, 1, 0, m_ThresholdBuffer);
 		DescriptorSet->bindInput(1, 2, 0, m_TessellationLOD->LODMarginsBufferSet);
 		DescriptorSet->bindInput(2, 0, 0, m_Clipmap->getMap());
-		DescriptorSet->bindInput(2, 1, 0, m_TerrainInfoBuffer);
+		DescriptorSet->bindInput(2, 1, 0, m_Terrain->TerrainInfoBuffer);
 		DescriptorSet->Create();
 		m_TerrainRenderPass.DescriptorSet = DescriptorSet;
 	}
@@ -192,7 +181,7 @@ void TessellationTerrainRenderer::createVerticalErrorComputePass()
 			normalSpecification.Height = m_VerticalErrorMapSize;
 			normalSpecification.Format = VK_FORMAT_R16G16B16A16_SFLOAT;
 			normalSpecification.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-			normalSpecification.LayerCount = 3;
+			normalSpecification.LayerCount = m_Terrain->getInfo().LODCount;
 			normalSpecification.UsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 			m_VerticalErrorMap = std::make_shared<VulkanImage>(normalSpecification);
 			m_VerticalErrorMap->Create();

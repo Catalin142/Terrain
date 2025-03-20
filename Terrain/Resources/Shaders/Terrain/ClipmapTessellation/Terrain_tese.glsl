@@ -17,7 +17,7 @@ layout (set = 2, binding = 0, r16f) uniform readonly image2DArray heightMap;
 layout(set = 2, binding = 1) uniform TerrainInfoUniformBuffer
 {
     int Size;
-    float heightMultiplier;
+    vec2 ElevationRange;
     int minimumChunkSize;
     uint LODCount;
 } terrainInfo;
@@ -39,8 +39,14 @@ void main()
 	ivec2 controlPointOffset = in_ControlPointPosition[0] * 16;
     ivec3 terrainLoadLayer = ivec3(wrappedOffset + position.xz + controlPointOffset, in_Lod[0]);
 
-    float height = (-imageLoad(heightMap, terrainLoadLayer).r);
-	position.y = height * terrainInfo.heightMultiplier;
+    float height = (imageLoad(heightMap, terrainLoadLayer).r);
+	fragPos = vec3(0.0, abs(height / 2.0), 0.0);
+
+    float elevationMin = 2.0 * terrainInfo.ElevationRange.x;
+    float elevationMax = 2.0 * terrainInfo.ElevationRange.y;
+
+	height = -((height * (elevationMax - elevationMin) + elevationMin));
+	position.y = height;
 	
 	position.xz *= multiplier;
 	position.xz += controlPointOffset * multiplier;
@@ -49,5 +55,4 @@ void main()
 
 	gl_Position = Camera.Projection * Camera.View * position;
 
-	fragPos = vec3(0.0, abs(height), 0.0);
 }

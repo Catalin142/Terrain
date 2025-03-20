@@ -54,6 +54,7 @@ public:
 	void prepareForDeserialization(VkCommandBuffer cmdBuffer);
 	void prepareForRendering(VkCommandBuffer cmdBuffer);
 
+	bool Updated();
 
 private:
 	void createIndirectionResources();
@@ -90,4 +91,5 @@ private:
 	std::shared_ptr<DynamicVirtualTerrainDeserializer> m_Deserializer;
 
 	glm::ivec2 m_LastCameraPosition = { -1, -1 };
+	bool m_Updated = false;
 };

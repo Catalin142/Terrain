@@ -3,7 +3,7 @@
 #include "Graphics/Vulkan/VulkanDevice.h"
 
 LODManager::LODManager(const std::unique_ptr<TerrainData>& terrain, const std::shared_ptr<VulkanFramebuffer>& targetFramebuffer, Camera& cam)
-	: m_Terrain(terrain), m_TargetFramebuffer(targetFramebuffer), m_Camera(cam)
+	: Terrain(terrain), m_TargetFramebuffer(targetFramebuffer), SceneCamera(cam)
 {
 	refreshTechnique();
 }
@@ -23,6 +23,10 @@ void LODManager::refreshTechnique()
 	case LODTechnique::TESSELLATION:
 		createTessellationRenderer();
 		break;
+
+	case LODTechnique::BRUTE_FORCE:
+		createBruteForceRenderer();
+		break;
 	}
 }
 
@@ -32,22 +36,26 @@ void LODManager::preprocessTerrain()
 	{
 	case LODTechnique::CLIPMAP:
 		ClipmapRenderer->setWireframe(m_Wireframe);
-		ClipmapRenderer->refreshClipmaps(m_Camera);
+		ClipmapRenderer->refreshClipmaps(SceneCamera);
 		break;
 
 	case LODTechnique::QUADTREE:
 		QuadTreeRenderer->setWireframe(m_Wireframe);
-		QuadTreeRenderer->refreshVirtualMap(m_Camera);
+		QuadTreeRenderer->refreshVirtualMap(SceneCamera);
 		break;
 
 	case LODTechnique::TESSELLATION:
 		TessellationRenderer->setWireframe(m_Wireframe);
-		TessellationRenderer->refreshClipmaps(m_Camera);
+		TessellationRenderer->refreshClipmaps(SceneCamera);
+		break;
+
+	case LODTechnique::BRUTE_FORCE:
+		BruteForceRenderer->setWireframe(m_Wireframe);
 		break;
 	}
 }
 
-void LODManager::renderTerrain(const std::shared_ptr<VulkanRenderCommandBuffer>& cmdBuffer)
+void LODManager::renderTerrain(const std::shared_ptr<VulkanRenderCommandBuffer>& cmdBuffer, Camera cam)
 {
 	switch (m_CurrentTechnique)
 	{
@@ -55,21 +63,28 @@ void LODManager::renderTerrain(const std::shared_ptr<VulkanRenderCommandBuffer>&
 		ClipmapRenderer->CommandBuffer = cmdBuffer;
 
 		ClipmapRenderer->updateClipmaps();
-		ClipmapRenderer->Render(m_Camera);
+		ClipmapRenderer->Render(cam);
 		break;
 
 	case LODTechnique::QUADTREE:
 		QuadTreeRenderer->CommandBuffer = cmdBuffer;
 
 		QuadTreeRenderer->updateVirtualMap();
-		QuadTreeRenderer->Render(m_Camera);
+		QuadTreeRenderer->Render(cam);
 		break;
 
 	case LODTechnique::TESSELLATION:
 		TessellationRenderer->CommandBuffer = cmdBuffer;
 
 		TessellationRenderer->updateClipmaps();
-		TessellationRenderer->Render(m_Camera);
+		TessellationRenderer->Render(cam);
+		break;
+
+	case LODTechnique::BRUTE_FORCE:
+		BruteForceRenderer->CommandBuffer = cmdBuffer;
+
+		BruteForceRenderer->Refresh(SceneCamera);
+		BruteForceRenderer->Render(cam);
 		break;
 	}
 }
@@ -92,9 +107,9 @@ void LODManager::setWireframe(bool wireframe)
 
 void LODManager::createClipmapRenderer()
 {
-	ClipmapTerrainRendererSpecification clipmapRendererSpecification(m_Terrain);
+	ClipmapTerrainRendererSpecification clipmapRendererSpecification(Terrain);
 	clipmapRendererSpecification.TargetFramebuffer = m_TargetFramebuffer;
-	clipmapRendererSpecification.CameraStartingPosition = m_Camera.getPosition();
+	clipmapRendererSpecification.CameraStartingPosition = SceneCamera.getPosition();
 	clipmapRendererSpecification.ClipmapSpecification = ClipmapSpecification;
 
 	ClipmapRenderer = std::make_shared<ClipmapTerrainRenderer>(clipmapRendererSpecification);
@@ -102,7 +117,7 @@ void LODManager::createClipmapRenderer()
 
 void LODManager::createQuadTreeRenderer()
 {
-	QuadTreeTerrainRendererSpecification quadtreeRendererSpecification(m_Terrain);
+	QuadTreeTerrainRendererSpecification quadtreeRendererSpecification(Terrain);
 	quadtreeRendererSpecification.TargetFramebuffer = m_TargetFramebuffer;
 	quadtreeRendererSpecification.VirtualMapSpecification = VirtualMapSpecification;
 
@@ -111,11 +126,20 @@ void LODManager::createQuadTreeRenderer()
 
 void LODManager::createTessellationRenderer()
 {
-	TessellationTerrainRendererSpecification tessellationRendererSpecification(m_Terrain);
+	TessellationTerrainRendererSpecification tessellationRendererSpecification(Terrain);
 	tessellationRendererSpecification.TargetFramebuffer = m_TargetFramebuffer;
-	tessellationRendererSpecification.CameraStartingPosition = m_Camera.getPosition();
+	tessellationRendererSpecification.CameraStartingPosition = SceneCamera.getPosition();
 	tessellationRendererSpecification.ClipmapSpecification = ClipmapSpecification;
 
 	TessellationRenderer = std::make_shared<TessellationTerrainRenderer>(tessellationRendererSpecification);
+}
+
+void LODManager::createBruteForceRenderer()
+{
+	BruteForceTerrainRendererSpecification spec(Terrain);
+	spec.HeightMapFilepath = Terrain->getSpecification().TerrainFilepath;
+	spec.TargetFramebuffer = m_TargetFramebuffer;
+
+	BruteForceRenderer = std::make_shared<BruteForceTerrainRenderer>(spec);
 }
 

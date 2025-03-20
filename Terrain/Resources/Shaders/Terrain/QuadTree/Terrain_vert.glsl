@@ -28,14 +28,14 @@ layout(std430, set = 0, binding = 0) readonly buffer ChunksStorageBuffer
 layout(set = 0, binding = 1) uniform TerrainInfoUniformBuffer
 {
     int Size;
-    float heightMultiplier;
+    vec2 ElevationRange;
     int minimumChunkSize;
     uint LODCount;
 } terrainInfo;
 
 layout (set = 0, binding = 2, r8ui) uniform readonly uimage2D LODMap;
 
-layout (set = 1, binding = 0, r16f) uniform readonly image2D heightMapPhysicalTexture;
+layout (set = 1, binding = 0, r16) uniform readonly image2D heightMapPhysicalTexture;
 layout (set = 1, binding = 1, r32ui) uniform readonly uimage2D indirectionTexture[6];
 
 void main() 
@@ -48,10 +48,10 @@ void main()
     offset.y = int((chunk.Offset >> 16) & 0x0000ffffu);
 
     int currentLod = int(chunk.Lod);
-    int upLod      = int(chunk.NeighboursLod & 0xff000000u) >> 24;
-    int downLod    = int(chunk.NeighboursLod & 0x00ff0000u) >> 16;
-    int leftLod    = int(chunk.NeighboursLod & 0x0000ff00u) >> 8;
-    int rightLod   = int(chunk.NeighboursLod & 0x000000ffu);
+    int upLod      = 1 << (int(chunk.NeighboursLod & 0xff000000u) >> 24);
+    int downLod    = 1 << (int(chunk.NeighboursLod & 0x00ff0000u) >> 16);
+    int leftLod    = 1 << (int(chunk.NeighboursLod & 0x0000ff00u) >> 8);
+    int rightLod   = 1 << (int(chunk.NeighboursLod & 0x000000ffu));
     
     int chunkSize = terrainInfo.minimumChunkSize << chunk.Lod;
     int multiplier = chunkSize / terrainInfo.minimumChunkSize;
@@ -75,21 +75,19 @@ void main()
     terrainPhLoc /= 1 << chunk.Lod;
     terrainPhLoc += chunkPhysicalLocation;
     
-    ivec2 incrementPos;
-    incrementPos.x = position.x == 0 ? 1 : 0;
-    incrementPos.y = position.y == 0 ? 1 : 0;
+    float height = imageLoad(heightMapPhysicalTexture, ivec2(terrainPhLoc.x, terrainPhLoc.y)).r;
+    fragPos = vec3(0.0, abs(height / 2.0), 0.0);
 
-    terrainPhLoc += incrementPos;
-    position += incrementPos;
-    
-    float height = -imageLoad(heightMapPhysicalTexture, ivec2(terrainPhLoc.x, terrainPhLoc.y)).r;
+    float elevationMin = 2.0 * terrainInfo.ElevationRange.x;
+    float elevationMax = 2.0 * terrainInfo.ElevationRange.y;
 
-    gl_Position = Camera.Projection * Camera.View * vec4(float(position.x), height * terrainInfo.heightMultiplier, float(position.y), 1.0);
+	height = -((height * (elevationMax - elevationMin) + elevationMin));
+
+    gl_Position = Camera.Projection * Camera.View * vec4(float(position.x), height, float(position.y), 1.0);
     
     //fragPos = vec3(1.0);
     //if (height > 0.0)
     //    fragPos = vec3(0.0, 0.0, abs(height));
     //else
-    fragPos = vec3(0.0, abs(height), 0.0);
 
 }

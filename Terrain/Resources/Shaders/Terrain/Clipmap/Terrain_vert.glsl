@@ -25,7 +25,7 @@ layout(set = 0, binding = 0) readonly buffer ChunksStorageBufferSet
 layout(set = 0, binding = 1) uniform TerrainInfoUniformBuffer
 {
     int Size;
-    float heightMultiplier;
+    vec2 ElevationRange;
     int minimumChunkSize;
     uint LODCount;
 } terrainInfo;
@@ -42,7 +42,7 @@ layout(set = 0, binding = 2) readonly buffer TerrainChunksMarginsSet
 } Margins;
 
 
-layout (set = 1, binding = 0, r16f) uniform readonly image2DArray heightMap;
+layout (set = 1, binding = 0, r16) uniform readonly image2DArray heightMap;
 
 void main() 
 {
@@ -59,9 +59,10 @@ void main()
 
     int paddedSize = terrainInfo.minimumChunkSize + 2;
     wrappedOffset *= paddedSize;
-    
-    ivec2 xMargin = Margins.margin[chunk.Lod].xMargins;
-    ivec2 yMargin = Margins.margin[chunk.Lod].yMargins;
+
+    LODMargins margin = Margins.margin[chunk.Lod];
+    ivec2 xMargin = margin.xMargins;
+    ivec2 yMargin = margin.yMargins;
     
     ivec2 position = ivec2(inPosition.x, inPosition.y);
     int isOddVertexZ = position.y & 1;
@@ -78,9 +79,14 @@ void main()
     offset *= chunkSize;
     position += offset;
     
-    float height = (-imageLoad(heightMap, terrainLoadLayer).r);
+    float height = (imageLoad(heightMap, terrainLoadLayer).r);
+    fragPos = vec3(0.0, abs(height / 2.0), 0.0);
+	
+    float elevationMin = 2.0 * terrainInfo.ElevationRange.x;
+    float elevationMax = 2.0 * terrainInfo.ElevationRange.y;
 
-    gl_Position = Camera.Projection * Camera.View * vec4(float(position.x), height * terrainInfo.heightMultiplier, float(position.y), 1.0);
+	height = -((height * (elevationMax - elevationMin) + elevationMin));
+
+    gl_Position = Camera.Projection * Camera.View * vec4(float(position.x), height, float(position.y), 1.0);
     
-    fragPos = vec3(0.0, abs(height), 0.0);
 }

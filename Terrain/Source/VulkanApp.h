@@ -67,7 +67,7 @@ private:
 
 	std::shared_ptr<TerrainVirtualMap> VirtualMap;
 
-	Camera cam{ 45.0f, 1600.0f / 900.0f, 0.1f, 5000.0f };
+	Camera cam{ 45.0f, 1600.0f / 900.0f, 0.1f, 1024.0f * 32.0f };
 
 	std::unique_ptr<LODManager> m_LODManager;
 	std::shared_ptr<LODManagerGUI> m_ManagerGUI;

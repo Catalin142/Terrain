@@ -10,6 +10,7 @@ LODManagerGUI::LODManagerGUI(const std::unique_ptr<LODManager>& manager) : m_LOD
 	m_TechniqueMap["Clipmap"]  = LODTechnique::CLIPMAP;
 	m_TechniqueMap["QuadTree"] = LODTechnique::QUADTREE;
 	m_TechniqueMap["Tessellation"] = LODTechnique::TESSELLATION;
+	m_TechniqueMap["BruteForce"] = LODTechnique::BRUTE_FORCE;
 
 	switch (m_LODManager->getCurrentTechnique())
 	{
@@ -26,6 +27,11 @@ LODManagerGUI::LODManagerGUI(const std::unique_ptr<LODManager>& manager) : m_LOD
 	case LODTechnique::TESSELLATION:
 		m_CurrentTechnique = "Tessellation";
 		createTessellationGUI();
+		break;
+
+	case LODTechnique::BRUTE_FORCE:
+		m_CurrentTechnique = "BruteForce";
+		createBruteForceGUI();
 		break;
 	}
 
@@ -56,6 +62,22 @@ void LODManagerGUI::Render()
 		ImGui::EndCombo();
 	}
 
+	ImGui::Separator();
+	ImGui::Text("Terrain Elevation");
+
+	ImGui::Text("Min (meters): ");
+	ImGui::SameLine();
+	ImGui::DragFloat("##minElevation", &m_Elevation.x);
+
+	ImGui::Text("Max (meters): ");
+	ImGui::SameLine();
+	ImGui::DragFloat("##maxElevation", &m_Elevation.y);
+
+	m_LODManager->Terrain->setElevationRange(m_Elevation.x, m_Elevation.y);
+	m_LODManager->Terrain->updateInfo();
+
+	ImGui::Separator();
+
 	if (selectedTechnique != m_CurrentTechnique)
 	{
 		m_CurrentTechnique = selectedTechnique;
@@ -78,6 +100,10 @@ void LODManagerGUI::Render()
 		case LODTechnique::TESSELLATION:
 			createTessellationGUI();
 			break;
+
+		case LODTechnique::BRUTE_FORCE:
+			createBruteForceGUI();
+			break;
 		}
 	}
 
@@ -97,6 +123,9 @@ void LODManagerGUI::Render()
 	case LODTechnique::TESSELLATION:
 		renderTessellationGUI();
 		break;
+
+	case LODTechnique::BRUTE_FORCE:
+		renderBruteForceGUI();
 	}
 
 	ImGui::End();
@@ -145,6 +174,14 @@ void LODManagerGUI::pushProfilerValues()
 		m_GPUProfiler.nextFrame();
 
 		m_RenderProfiler.pushValue("Render terrain", CommandBuffer->getTime(TessellationRendererMetrics::RENDER_TERRAIN), 0xff00ff00);
+		m_RenderProfiler.nextFrame();
+		break;
+
+	case LODTechnique::BRUTE_FORCE:
+		m_GPUProfiler.pushValue("Chunk buffer", CommandBuffer->getTime(BruteForceRendererMetrics::GPU_CREATE_CHUNK_BUFFER), 0xffffff00);
+		m_GPUProfiler.nextFrame();
+
+		m_RenderProfiler.pushValue("Render terrain", CommandBuffer->getTime(BruteForceRendererMetrics::RENDER_TERRAIN), 0xff00ff00);
 		m_RenderProfiler.nextFrame();
 		break;
 	}
@@ -379,6 +416,34 @@ void LODManagerGUI::renderTessellationGUI()
 	uint32_t lodCount = m_LODManager->getTerrainInfo().LODCount;
 	uint32_t clipmapResolution = m_LODManager->ClipmapSpecification.ClipmapSize;
 
+	ImGui::Text("Threshold");
+
+	std::array<float, 6>& threshold = m_LODManager->TessellationRenderer->Threshold;
+
+	ImGui::Text("lod0: ");
+	ImGui::SameLine();
+	ImGui::DragFloat("##lod0", &threshold[0], 0.01);
+
+	ImGui::Text("lod1: ");
+	ImGui::SameLine();
+	ImGui::DragFloat("##lod1", &threshold[1], 0.01);
+
+	ImGui::Text("lod2: ");
+	ImGui::SameLine();
+	ImGui::DragFloat("##lod2", &threshold[2], 0.01);
+
+	ImGui::Text("lod3: ");
+	ImGui::SameLine();
+	ImGui::DragFloat("##lod3", &threshold[3], 0.01);
+
+	ImGui::Text("lod4: ");
+	ImGui::SameLine();
+	ImGui::DragFloat("##lod4", &threshold[4], 0.01);
+
+	ImGui::Text("lod5: ");
+	ImGui::SameLine();
+	ImGui::DragFloat("##lod5", &threshold[5], 0.01);
+
 	ImGui::Text(std::string("Maps: " + std::to_string(lodCount) + " * " + std::to_string(clipmapResolution) + "px").c_str());
 	ImGui::Spacing();
 	for (uint32_t lod = 0; lod < m_MapDescriptors.size(); lod++)
@@ -388,4 +453,78 @@ void LODManagerGUI::renderTessellationGUI()
 		if ((lod + 1) % 3 != 0)
 			ImGui::SameLine();
 	}
+}
+
+void LODManagerGUI::createBruteForceGUI()
+{
+	m_MapViews.clear();
+	m_MapDescriptors.clear();
+
+	const std::shared_ptr<VulkanImage>& map = m_LODManager->BruteForceRenderer->getTerrainMap()->getMap();
+
+	ImageViewSpecification imvSpec;
+	imvSpec.Image = map->getVkImage();
+	imvSpec.Aspect = map->getSpecification().Aspect;
+	imvSpec.Format = map->getSpecification().Format;
+	imvSpec.Layer = 0;
+	imvSpec.Mip = 0;
+
+	m_MapViews.push_back(std::make_shared<VulkanImageView>(imvSpec));
+
+	m_MapDescriptors.push_back(ImGui_ImplVulkan_AddTexture(m_Sampler->Get(),
+		m_MapViews.back()->getImageView(), VK_IMAGE_LAYOUT_GENERAL));
+}
+
+void LODManagerGUI::renderBruteForceGUI()
+{
+	ImGui::Spacing();
+
+	ImGui::Text("GPU Profiler");
+	ImGui::BeginChild("GPU Profiler", { 560, 100 });
+	m_GPUProfiler.Render({ 560, 100 });
+	ImGui::EndChild();
+
+	ImGui::Separator();
+
+	ImGui::Text("Render Profiler");
+	ImGui::BeginChild("Render Profiler", { 560, 100 });
+	m_RenderProfiler.Render({ 560, 100 });
+	ImGui::EndChild();
+
+	ImGui::Separator();
+
+	ImGui::Text("Metrics");
+	ImGui::Spacing();
+
+	std::string vertices = "Vertices: " + std::to_string(BruteForceRendererMetrics::MAX_VERTICES_RENDERED);
+	std::string memory = "Memory: " + std::to_string((float)BruteForceRendererMetrics::MEMORY_USED / 1048576.0f) + "MB";
+
+	ImGui::Text(vertices.c_str());
+	ImGui::Text(memory.c_str());
+
+	ImGui::Separator();
+
+	uint32_t lodCount = m_LODManager->getTerrainInfo().LODCount;
+	uint32_t mapResolution = m_LODManager->BruteForceRenderer->getTerrainMap()->getMap()->getSpecification().Width;
+
+	ImGui::Text("Distance threshold");
+
+	glm::vec4& threshold = m_LODManager->BruteForceRenderer->DistanceThreshold;
+
+	ImGui::Text("lod0: ");
+	ImGui::SameLine();
+	ImGui::DragFloat("##lod0", &threshold.x, 1.0f);
+
+	ImGui::Text("lod1: ");
+	ImGui::SameLine();
+	ImGui::DragFloat("##lod1: ", &threshold.y, 1.0f);
+
+	ImGui::Text("lod2: ");
+	ImGui::SameLine();
+	ImGui::DragFloat("##lod2: ", &threshold.z, 1.0f);
+
+	ImGui::Text(std::string("Map: " + std::to_string(lodCount) + " * " + std::to_string(mapResolution) + "px").c_str());
+	ImGui::Spacing();
+	ImGui::Image(m_MapDescriptors[0], ImVec2{ 128, 128 });
+
 }
