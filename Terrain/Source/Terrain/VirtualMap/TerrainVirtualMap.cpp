@@ -271,7 +271,6 @@ bool TerrainVirtualMap::Updated()
     return oldUpdated;
 }
 
-
 void TerrainVirtualMap::createIndirectionResources()
 {
     {

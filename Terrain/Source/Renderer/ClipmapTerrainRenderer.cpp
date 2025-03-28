@@ -19,10 +19,11 @@ ClipmapTerrainRenderer::ClipmapTerrainRenderer(const ClipmapTerrainRendererSpeci
 	SimpleVulkanMemoryTracker::Get()->Track(ClipmapRendererMetrics::NAME);
 
 	m_Clipmap = std::make_shared<TerrainClipmap>(spec.ClipmapSpecification, m_Terrain);
-	m_ClipmapLOD = std::make_shared<ClipmapLOD>(m_Terrain->getSpecification(), m_Clipmap);
+	m_ClipmapLOD = std::make_shared<ClipmapLOD>(m_Terrain, m_Clipmap);
 
 	m_Clipmap->hardLoad(glm::vec2(spec.CameraStartingPosition.x, spec.CameraStartingPosition.z));
-	m_ChunksToRender = m_ClipmapLOD->Generate(m_Clipmap->getLastValidCameraPosition());
+	m_ClipmapLOD->computeMargins(m_Clipmap->getLastValidCameraPosition());
+	m_ChunksToRender = 0;
 
 	createChunkIndexBuffer(1);
 	createRenderPass();
@@ -47,10 +48,12 @@ void ClipmapTerrainRenderer::refreshClipmaps(const Camera& camera)
 	Instrumentor::Get().endTimer(ClipmapRendererMetrics::CPU_LOAD_NEEDED_NODES);
 }
 
-void ClipmapTerrainRenderer::updateClipmaps()
+void ClipmapTerrainRenderer::updateClipmaps(const Camera& camera)
 {
+	VkCommandBuffer commandBuffer = CommandBuffer->getCurrentCommandBuffer();
+
 	CommandBuffer->beginQuery(ClipmapRendererMetrics::GPU_UPDATE_CLIPMAP);
-	uint32_t chunksLoaded = m_Clipmap->updateClipmaps(CommandBuffer->getCurrentCommandBuffer());
+	uint32_t chunksLoaded = m_Clipmap->updateClipmaps(commandBuffer);
 	CommandBuffer->endQuery(ClipmapRendererMetrics::GPU_UPDATE_CLIPMAP);
 
 	Instrumentor::Get().beginTimer(ClipmapRendererMetrics::CPU_CREATE_CHUNK_BUFFER);
@@ -58,12 +61,23 @@ void ClipmapTerrainRenderer::updateClipmaps()
 	{
 		ClipmapRendererMetrics::CHUNKS_LOADED_LAST_UPDATE = chunksLoaded;
 
-		m_ChunksToRender = m_ClipmapLOD->Generate(m_Clipmap->getLastValidCameraPosition());
+		m_ClipmapLOD->computeMargins(m_Clipmap->getLastValidCameraPosition());
 
 		ClipmapRendererMetrics::MAX_VERTICES_RENDERED = m_ChunksToRender * 129 * 129;
 		ClipmapRendererMetrics::MAX_INDICES_RENDERED = m_ChunksToRender * m_ChunkIndexBuffer.IndicesCount;
 	}
 	Instrumentor::Get().endTimer(ClipmapRendererMetrics::CPU_CREATE_CHUNK_BUFFER);
+
+	{
+		CommandBuffer->beginQuery(ClipmapRendererMetrics::GPU_GENERATE_AND_FRUSTUM_CULL);
+
+		m_ClipmapLOD->Generate(commandBuffer, camera);
+
+		VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, m_ClipmapLOD->ChunksToRender, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+
+		CommandBuffer->endQuery(ClipmapRendererMetrics::GPU_GENERATE_AND_FRUSTUM_CULL);
+	}
 }
 
 void ClipmapTerrainRenderer::Render(const Camera& camera)
@@ -84,8 +98,8 @@ void ClipmapTerrainRenderer::Render(const Camera& camera)
 	VkBuffer vertexBuffers[] = { m_VertexBuffer->getBuffer()};
 	VkDeviceSize offsets[] = { 0 };
 	vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-	
-	vkCmdDrawIndexed(commandBuffer, m_ChunkIndexBuffer.IndicesCount, m_ChunksToRender, 0, 0, 0);
+
+	vkCmdDrawIndexedIndirect(commandBuffer, m_ClipmapLOD->m_RenderCommand->getBuffer(), 0, 1, sizeof(VkDrawIndexedIndirectCommand));
 
 	VulkanRenderer::endRenderPass(commandBuffer);
 
@@ -114,7 +128,7 @@ void ClipmapTerrainRenderer::createRenderPass()
 	{
 		std::shared_ptr<VulkanDescriptorSet> DescriptorSet;
 		DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader(CLIPMAP_TERRAIN_RENDER_SHADER_NAME));
-		DescriptorSet->bindInput(0, 0, 0, m_ClipmapLOD->chunksToRender);
+		DescriptorSet->bindInput(0, 0, 0, m_ClipmapLOD->ChunksToRender);
 		DescriptorSet->bindInput(0, 1, 0, m_Terrain->TerrainInfoBuffer);
 		DescriptorSet->bindInput(0, 2, 0, m_ClipmapLOD->LODMarginsBufferSet);
 		DescriptorSet->bindInput(1, 0, 0, m_Clipmap->getMap());

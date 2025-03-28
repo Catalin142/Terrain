@@ -141,6 +141,7 @@ void LODManagerGUI::pushProfilerValues()
 		m_CPUProfiler.nextFrame();
 
 		m_GPUProfiler.pushValue("Update clipmap", CommandBuffer->getTime(ClipmapRendererMetrics::GPU_UPDATE_CLIPMAP), 0xffffff00);
+		m_GPUProfiler.pushValue("Generate & Frustum", CommandBuffer->getTime(ClipmapRendererMetrics::GPU_GENERATE_AND_FRUSTUM_CULL), 0xfff0ff00);
 		m_GPUProfiler.nextFrame();
 
 		m_RenderProfiler.pushValue("Render terrain", CommandBuffer->getTime(ClipmapRendererMetrics::RENDER_TERRAIN), 0xff00ff00);
@@ -157,7 +158,7 @@ void LODManagerGUI::pushProfilerValues()
 		m_GPUProfiler.pushValue("Generate LODMap", CommandBuffer->getTime(QuadTreeRendererMetrics::GPU_GENERATE_LOD_MAP), 0xffffffff);
 		m_GPUProfiler.pushValue("Generate QuadTree", CommandBuffer->getTime(QuadTreeRendererMetrics::GPU_GENERATE_QUAD_TREE), 0xff0000ff);
 		m_GPUProfiler.pushValue("Set neighbours", CommandBuffer->getTime(QuadTreeRendererMetrics::GPU_SET_NEIGHTBOURS), 0xfff0000f);
-		m_GPUProfiler.pushValue("Create render command", CommandBuffer->getTime(QuadTreeRendererMetrics::GPU_CREATE_INDIRECT_DRAW_COMMAND), 0xff0f00f0);
+		m_GPUProfiler.pushValue("Frustum culling", CommandBuffer->getTime(QuadTreeRendererMetrics::GPU_FRUSTUM_CULLING), 0xff0f00f0);
 		m_GPUProfiler.nextFrame();
 
 		m_RenderProfiler.pushValue("Render Terrain", CommandBuffer->getTime(QuadTreeRendererMetrics::RENDER_TERRAIN), 0xff00ff00);
@@ -171,6 +172,7 @@ void LODManagerGUI::pushProfilerValues()
 
 		m_GPUProfiler.pushValue("Update clipmap", CommandBuffer->getTime(TessellationRendererMetrics::GPU_UPDATE_CLIPMAP), 0xffffff00);
 		m_GPUProfiler.pushValue("Vertical error map", CommandBuffer->getTime(TessellationRendererMetrics::GPU_CREATE_VERTICAL_ERROR_MAP), 0xffffff00);
+		m_GPUProfiler.pushValue("Generate & Frustum", CommandBuffer->getTime(TessellationRendererMetrics::GPU_GENERATE_AND_FRUSTUM_CULL), 0xfff0ff00);
 		m_GPUProfiler.nextFrame();
 
 		m_RenderProfiler.pushValue("Render terrain", CommandBuffer->getTime(TessellationRendererMetrics::RENDER_TERRAIN), 0xff00ff00);

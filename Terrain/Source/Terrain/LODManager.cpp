@@ -40,13 +40,15 @@ void LODManager::preprocessTerrain()
 		break;
 
 	case LODTechnique::QUADTREE:
+		QuadTreeRenderer->SceneCamera = SceneCamera;
 		QuadTreeRenderer->setWireframe(m_Wireframe);
-		QuadTreeRenderer->refreshVirtualMap(SceneCamera);
+		QuadTreeRenderer->refreshVirtualMap();
 		break;
 
 	case LODTechnique::TESSELLATION:
+		TessellationRenderer->SceneCamera = SceneCamera;
 		TessellationRenderer->setWireframe(m_Wireframe);
-		TessellationRenderer->refreshClipmaps(SceneCamera);
+		TessellationRenderer->refreshClipmaps();
 		break;
 
 	case LODTechnique::BRUTE_FORCE:
@@ -62,7 +64,7 @@ void LODManager::renderTerrain(const std::shared_ptr<VulkanRenderCommandBuffer>&
 	case LODTechnique::CLIPMAP:
 		ClipmapRenderer->CommandBuffer = cmdBuffer;
 
-		ClipmapRenderer->updateClipmaps();
+		ClipmapRenderer->updateClipmaps(SceneCamera);
 		ClipmapRenderer->Render(cam);
 		break;
 

@@ -18,6 +18,14 @@ layout(std430, set = 0, binding = 0) readonly buffer ChunksStorageBuffer
     GPUBruteForceRenderChunk chunk[];
 } Chunks;
 
+layout(set = 1, binding = 1) uniform TerrainInfoUniformBuffer
+{
+    int Size;
+    vec2 ElevationRange;
+    int minimumChunkSize;
+    uint LODCount;
+} terrainInfo;
+
 void main()
 {
 	GPUBruteForceRenderChunk chunk = Chunks.chunk[gl_InstanceIndex];
@@ -28,5 +36,6 @@ void main()
     out_ChunkOffset.x = int(chunk.Offset & 0x0000ffffu);
     out_ChunkOffset.y = int((chunk.Offset >> 16) & 0x0000ffffu);
 
-	gl_Position = vec4(in_Position.x * 128.0, 0.0, in_Position.y * 128.0, 1.0);
+    float fChunkSize = float(terrainInfo.minimumChunkSize);
+	gl_Position = vec4(in_Position.x * fChunkSize, 0.0, in_Position.y * fChunkSize, 1.0);
 }

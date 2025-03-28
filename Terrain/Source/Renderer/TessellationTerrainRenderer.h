@@ -22,6 +22,7 @@ struct TessellationTerrainRendererSpecification
 
 	glm::vec3 CameraStartingPosition;
 	uint32_t ControlPointSize = 16;
+	uint32_t ControlPointsPerRow = 2; // power of 2
 
 	TessellationTerrainRendererSpecification(const std::unique_ptr<TerrainData>& terrain) : Terrain(terrain) {}
 };
@@ -32,6 +33,7 @@ struct TessellationRendererMetrics
 
 	inline static const std::string GPU_UPDATE_CLIPMAP				= "_GpuUpdateTessellationClipmapMap";
 	inline static const std::string GPU_CREATE_VERTICAL_ERROR_MAP	= "_GpuCreateVerticalErrorMap";
+	inline static const std::string GPU_GENERATE_AND_FRUSTUM_CULL	= "_GpuTessGenerateAndFrustumCull";
 
 	inline static const std::string CPU_CREATE_CHUNK_BUFFER			= "_CpuTessellationCreateChunkBuffer";
 	inline static const std::string CPU_LOAD_NEEDED_NODES			= "_CpuTessellationLoadNeededNodes";
@@ -51,7 +53,7 @@ public:
 	TessellationTerrainRenderer(const TessellationTerrainRendererSpecification& spec);
 	~TessellationTerrainRenderer() = default;
 
-	void refreshClipmaps(const Camera& camera);
+	void refreshClipmaps();
 	void updateClipmaps();
 
 	void Render(const Camera& camera);
@@ -73,6 +75,8 @@ public:
 	std::shared_ptr<VulkanRenderCommandBuffer> CommandBuffer;
 	std::array<float, 6> Threshold = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
 
+	Camera SceneCamera;
+
 private:
 	const std::unique_ptr<TerrainData>& m_Terrain;
 	std::shared_ptr<TerrainClipmap> m_Clipmap;
@@ -86,6 +90,8 @@ private:
 	VulkanComputePass m_VerticalErrorPass;
 	std::shared_ptr<VulkanImage> m_VerticalErrorMap;
 
+	std::shared_ptr<VulkanBuffer> m_TessellationSettings;
+
 	std::shared_ptr<VulkanBuffer> m_VertexBuffer;
 	uint32_t m_ChunksToRender = 0;
 
@@ -94,6 +100,9 @@ private:
 	bool m_InWireframe = false;
 	bool m_VericalErrorMapGenerated = false;
 
-	uint32_t m_ControlPointSize = 0;
+	int32_t m_ControlPointSize = 0;
+	int32_t m_ControlPointsPerRow = 0;
 	uint32_t m_VerticalErrorMapSize = 0;
+
+	std::shared_ptr<VulkanBuffer> m_FrustumBuffer;
 };

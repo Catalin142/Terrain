@@ -12,7 +12,7 @@
 class BruteForceLOD
 {
 public:
-	BruteForceLOD(const TerrainSpecification& spec);
+	BruteForceLOD(const std::unique_ptr<TerrainData>& terrain);
 	~BruteForceLOD() = default;
 
 	void Generate(VkCommandBuffer commandBuffer, const Camera& cam, const glm::vec4& distanceThreshold);
@@ -21,7 +21,7 @@ public:
 	uint32_t getMostRecentIndex() { return m_CurrentlyUsedBuffer; }
 
 private:
-	void createComputePass();
+	void createComputePass(const std::shared_ptr<VulkanBuffer>& infoBuffer);
 
 public:
 	std::shared_ptr<VulkanBuffer> ChunksToRender;

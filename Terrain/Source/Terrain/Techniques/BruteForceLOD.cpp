@@ -9,13 +9,14 @@
 struct GPUComputePassInfo
 {
 	glm::vec3 CameraPosition;
-	float MinimumChunkSize;
+	int32_t padding;
+
 	glm::vec4 DistanceThreshold;
 };
 
-BruteForceLOD::BruteForceLOD(const TerrainSpecification& spec) : m_TerrainSpecification(spec)
+BruteForceLOD::BruteForceLOD(const std::unique_ptr<TerrainData>& terrain) : m_TerrainSpecification(terrain->getSpecification())
 {
-	createComputePass();
+	createComputePass(terrain->TerrainInfoBuffer);
 }
 
 void BruteForceLOD::Generate(VkCommandBuffer commandBuffer, const Camera& cam, const glm::vec4& distanceThreshold)
@@ -23,7 +24,6 @@ void BruteForceLOD::Generate(VkCommandBuffer commandBuffer, const Camera& cam, c
 	GPUComputePassInfo passInfo;
 	passInfo.CameraPosition = cam.getPosition();
 	passInfo.DistanceThreshold = distanceThreshold;
-	passInfo.MinimumChunkSize = m_TerrainSpecification.Info.ChunkSize;
 
 	m_ComputePassBufferData->setDataCPU(&passInfo, sizeof(GPUComputePassInfo));
 
@@ -52,7 +52,7 @@ const std::shared_ptr<VulkanBuffer>& BruteForceLOD::getIndirectDrawCommand()
 	return m_DrawIndirectCommandsSet->getBuffer(m_CurrentlyUsedBuffer);
 }
 
-void BruteForceLOD::createComputePass()
+void BruteForceLOD::createComputePass(const std::shared_ptr<VulkanBuffer>& infoBuffer)
 {
 	{
 		VulkanBufferProperties indirectProperties;
@@ -107,6 +107,7 @@ void BruteForceLOD::createComputePass()
 		m_ConstructTerrainChunksPass.DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader(CONSTRUCT_TERRAIN_CHUNKS_BRUTE_FORCE_COMPUTE));
 		m_ConstructTerrainChunksPass.DescriptorSet->bindInput(0, 0, 0, m_ComputePassBufferData);
 		m_ConstructTerrainChunksPass.DescriptorSet->bindInput(0, 1, 0, m_FrustumBuffer);
+		m_ConstructTerrainChunksPass.DescriptorSet->bindInput(0, 2, 0, infoBuffer);
 		m_ConstructTerrainChunksPass.DescriptorSet->bindInput(1, 0, 0, ChunksToRender);
 		m_ConstructTerrainChunksPass.DescriptorSet->bindInput(1, 1, 0, ResultCount);
 		m_ConstructTerrainChunksPass.DescriptorSet->bindInput(2, 0, 0, m_DrawIndirectCommandsSet);

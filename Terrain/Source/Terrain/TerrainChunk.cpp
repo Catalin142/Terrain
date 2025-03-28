@@ -4,7 +4,6 @@
 std::vector<uint32_t> TerrainChunk::generateIndices(uint32_t lod, uint32_t vertCount)
 {
 	std::vector<uint32_t> indices;
-
 	for (uint32_t x = 0; x < vertCount - 1; x += lod * 2) {
 		for (uint32_t y = 0; y < vertCount - 1; y += lod * 2) {
 			uint32_t index = x * vertCount + y;

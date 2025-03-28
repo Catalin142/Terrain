@@ -348,7 +348,8 @@ std::vector<uint32_t> VulkanShaderCompiler::compileVulkanShader(ShaderStage stag
 
 	std::string sourceCode = readFile(filepath);
 
-	if (optimize) options.SetOptimizationLevel(shaderc_optimization_level_performance);
+	if (optimize) options.SetOptimizationLevel(shaderc_optimization_level_performance); 
+	options.SetOptimizationLevel(shaderc_optimization_level_zero);
 	options.SetGenerateDebugInfo();
 
 	size_t begString = filepath.find_last_of('/');
@@ -452,7 +453,9 @@ std::vector<ShaderInput> VulkanShaderCompiler::Reflect(ShaderStage stage, const 
 		storageBufferInput.Binding = compiler.get_decoration(storageBuffer.id, spv::DecorationBinding);
 		storageBufferInput.Count = compiler.get_type(storageBuffer.type_id).array[0] == 0 ? 1 : compiler.get_type(storageBuffer.type_id).array[0];
 
-		if (storageBuffer.name.find("Set") != std::string::npos)
+		size_t setWordPos = storageBuffer.name.rfind("Set");
+
+		if (setWordPos != std::string::npos && setWordPos + 3 == storageBuffer.name.size())
 			storageBufferInput.Type = ShaderInputType::STORAGE_BUFFER_SET;
 		else
 			storageBufferInput.Type = ShaderInputType::STORAGE_BUFFER;

@@ -22,7 +22,6 @@ layout(set = 1, binding = 1) uniform TerrainInfoUniformBuffer
 } terrainInfo;
 
 layout(quads, equal_spacing, cw) in;
-
 void main()
 {
 	vec4 pos1 = mix(gl_in[0].gl_Position, gl_in[1].gl_Position, gl_TessCoord.x);
@@ -40,7 +39,7 @@ void main()
     float elevationMax = 2.0 * terrainInfo.ElevationRange.y;
 
 	height = -((height * (elevationMax - elevationMin) + elevationMin));
-    position.z = height;
+    position.y = height;
 
 	position.xz += offset;
 

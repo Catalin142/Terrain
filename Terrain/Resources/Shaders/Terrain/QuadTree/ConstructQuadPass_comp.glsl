@@ -42,8 +42,20 @@ struct PassMetadata
     uint LoadedSize;
 };
 
-layout(std430, set = 2, binding = 0) buffer _MetadataSet {
+layout(std430, set = 2, binding = 0) buffer _MetadataSet 
+{
     PassMetadata metadata;
+};
+
+struct VkDispatchIndirectCommand {
+    uint x;
+    uint y;
+    uint z;
+};
+
+layout(std430, set = 3, binding = 0) writeonly buffer IndirectCommand 
+{
+	VkDispatchIndirectCommand indirectCommand;
 };
 
 shared uint loadedSize;
@@ -60,6 +72,9 @@ void main()
     ivec2 texel;
     texel.x = int(node.Offset & 0x0000ffffu);
     texel.y = int(node.Offset & 0xffff0000u) >> 16;
+    
+    int chunkSize = 128 << node.Lod;
+    vec2 position = texel * chunkSize;
 
     uint child0 = 0;
     uint child1 = 0;
@@ -68,9 +83,7 @@ void main()
 
     ivec2 childTexel = ivec2(texel.x * 2, texel.y * 2);
 
-    uint lod = node.Lod & 0x0000ffff;
-
-    switch (lod) 
+    switch (node.Lod) 
     {
         case 0: 
             break;
@@ -147,9 +160,13 @@ void main()
         renderNode.Lod = node.Lod;
         renderNode.ChunkPhysicalLocation = chunkPhysicalLocation;
         renderNode.NeighboursLod = 0;
-
+        
         uint index = atomicAdd(metadata.ResultArrayIndex, 1);
         FinalResult.nodes[index] = renderNode;
         atomicAdd(metadata.LoadedSize, -1);
+
+        atomicMax(indirectCommand.x, index / 16 + 1);
+        indirectCommand.y = 1;
+        indirectCommand.z = 1;
     }
 }

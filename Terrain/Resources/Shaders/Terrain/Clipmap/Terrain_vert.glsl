@@ -17,7 +17,7 @@ struct TerrainChunk
     uint Lod;
 };
 
-layout(set = 0, binding = 0) readonly buffer ChunksStorageBufferSet
+layout(set = 0, binding = 0) readonly buffer ChunksStorageBuffer
 {
     TerrainChunk chunk[];
 } Chunks;
@@ -40,7 +40,6 @@ layout(set = 0, binding = 2) readonly buffer TerrainChunksMarginsSet
 {
     LODMargins margin[];
 } Margins;
-
 
 layout (set = 1, binding = 0, r16) uniform readonly image2DArray heightMap;
 

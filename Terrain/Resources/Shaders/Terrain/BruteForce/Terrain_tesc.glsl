@@ -9,6 +9,14 @@ layout(location = 2) in uint in_Neightbours[];
 layout(location = 0) out ivec2 out_ChunkOffset[];
 layout(location = 1) out uint out_Lod[];
 
+layout(set = 1, binding = 1) uniform TerrainInfoUniformBuffer
+{
+    int Size;
+    vec2 ElevationRange;
+    int minimumChunkSize;
+    uint LODCount;
+} terrainInfo;
+
 void main(void)
 {
 	out_ChunkOffset[gl_InvocationID] = in_ChunkOffset[gl_InvocationID];
@@ -28,10 +36,10 @@ void main(void)
 
 		gl_TessLevelInner[0] = centerLod;
 		gl_TessLevelInner[1] = centerLod;
-		gl_TessLevelOuter[0] = max(centerLod, 128 / downDivisor);
-		gl_TessLevelOuter[1] = max(centerLod, 128 / leftDivisor);
-		gl_TessLevelOuter[2] = max(centerLod, 128 / upDivisor);
-		gl_TessLevelOuter[3] = max(centerLod, 128 / rightDivisor);
+		gl_TessLevelOuter[0] = max(centerLod, terrainInfo.minimumChunkSize / downDivisor);
+		gl_TessLevelOuter[1] = max(centerLod, terrainInfo.minimumChunkSize / leftDivisor);
+		gl_TessLevelOuter[2] = max(centerLod, terrainInfo.minimumChunkSize / upDivisor);
+		gl_TessLevelOuter[3] = max(centerLod, terrainInfo.minimumChunkSize / rightDivisor);
     }
 
     gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;

@@ -72,12 +72,11 @@ void VulkanApp::onCreate()
 		m_TerrainGenerator = std::make_shared<TerrainGenerator>(1024 * 4, 1024 * 4);
 	}
 
-
 	{
 		TerrainSpecification terrainSpec;
 
-		terrainSpec.Info.TerrainSize = 1024 * 16;
-		terrainSpec.Info.LODCount = 5;
+		terrainSpec.Info.TerrainSize = 1024 * 4;
+		terrainSpec.Info.LODCount = 3;
 		terrainSpec.ChunkedFilepath = { "KaerMorhen8km.rawdata", "KaerMorhen8km.metadata" };
 		terrainSpec.TerrainFilepath = "Resources/Textures/WhiteOrchard_res4096x.png";
 
@@ -153,7 +152,7 @@ void VulkanApp::onUpdate()
 			glm::vec3 camPos = cam.getPosition();
 			glm::vec3 orientation = cam.Forward();
 
-			upCamera.setPosition(camPos - glm::vec3(orientation.x * 2500.0f, orientation.y * 2500.0f, orientation.z * 2500.0f));
+			upCamera.setPosition(camPos - glm::vec3(orientation.x * 4000.0f, orientation.y * 4000.0f, orientation.z * 4000.0f));
 			upCamera.setFocalPoint(camPos);
 			upCamera.updateMatrices();
 			m_LODManager->renderTerrain(CommandBuffer, upCamera);

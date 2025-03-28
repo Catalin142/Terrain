@@ -5,20 +5,13 @@
 
 #include <memory>
 
-ClipmapLOD::ClipmapLOD(const TerrainSpecification& spec, const std::shared_ptr<TerrainClipmap>& clipmap)
-	: m_TerrainSpecification(spec)
+#define CLIPMAP_CONSTRUCT_TERRAIN_CHUNKS_COMPUTE "Terrain/Clipmap/ConstructTerrainChunks_comp.glsl"
+
+ClipmapLOD::ClipmapLOD(const std::unique_ptr<TerrainData>& terrain, const std::shared_ptr<TerrainClipmap>& clipmap)
+	: m_TerrainSpecification(terrain->getSpecification())
 {
 	ClipmapTerrainSpecification clipmapSpec = clipmap->getSpecification();
-	m_RingSize = clipmapSpec.ClipmapSize / spec.Info.ChunkSize;
-
-	{
-		VulkanBufferProperties chunkToRenderProperties;
-		chunkToRenderProperties.Size = 1024 * (uint32_t)sizeof(TerrainChunk);
-		chunkToRenderProperties.Type = BufferType::STORAGE_BUFFER;
-		chunkToRenderProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
-
-		chunksToRender = std::make_shared<VulkanBufferSet>(VulkanRenderer::getFramesInFlight(), chunkToRenderProperties);
-	}
+	m_RingSize = clipmapSpec.ClipmapSize / m_TerrainSpecification.Info.ChunkSize;
 
 	{
 		VulkanBufferProperties LODMarginsProperties;
@@ -28,17 +21,13 @@ ClipmapLOD::ClipmapLOD(const TerrainSpecification& spec, const std::shared_ptr<T
 
 		LODMarginsBufferSet = std::make_shared<VulkanBufferSet>(VulkanRenderer::getFramesInFlight(), LODMarginsProperties);
 	}
+
+	createChunkComputePass(terrain->TerrainInfoBuffer);
 }
 
-uint32_t ClipmapLOD::Generate(const glm::ivec2& cameraPosition)
+void ClipmapLOD::computeMargins(const glm::ivec2& cameraPosition)
 {
-	std::vector<TerrainChunk> chunks;
 	std::vector<LODMargins> margins;
-
-	int32_t prevminY;
-	int32_t prevmaxY;
-	int32_t prevminX;
-	int32_t prevmaxX;
 
 	TerrainInfo tInfo = m_TerrainSpecification.Info;
 
@@ -78,42 +67,64 @@ uint32_t ClipmapLOD::Generate(const glm::ivec2& cameraPosition)
 		}
 
 		margins.push_back(LODMargins{ { minX, maxX }, { minY, maxY } });
-
-		for (int32_t y = minY; y < maxY; y++)
-			for (int32_t x = minX; x < maxX; x++)
-			{
-				tc.Offset = packOffset(x, y);
-
-				if (lod != 0)
-				{
-					bool add = true;
-
-					uint32_t marginminY = prevminY / 2;
-					uint32_t marginmaxY = prevmaxY / 2;
-					uint32_t marginminX = prevminX / 2;
-					uint32_t marginmaxX = prevmaxX / 2;
-
-					if (x >= marginminX && x < marginmaxX && y >= marginminY && y < marginmaxY)
-						add = false;
-
-					if (add)
-						chunks.push_back(tc);
-				}
-				else
-					chunks.push_back(tc);
-			}
-
-		prevminY = minY;
-		prevmaxY = maxY;
-		prevminX = minX;
-		prevmaxX = maxX;
 	}
 
-	chunksToRender->getBuffer(m_NextBuffer)->setDataCPU(chunks.data(), chunks.size() * sizeof(TerrainChunk));
 	LODMarginsBufferSet->getBuffer(m_NextBuffer)->setDataCPU(margins.data(), margins.size() * sizeof(LODMargins));
 
 	m_CurrentlyUsedBuffer = m_NextBuffer;
 	(++m_NextBuffer) %= VulkanRenderer::getFramesInFlight();
+}
 
-	return (uint32_t)chunks.size();
+void ClipmapLOD::Generate(VkCommandBuffer commandBuffer, const Camera& cam)
+{
+	std::array<glm::vec4, 6> frustumPlanes = cam.getFrustum();
+	m_FrustumBuffer->setDataCPU(&frustumPlanes, 6 * sizeof(glm::vec4));
+
+	uint32_t dispatchCount = uint32_t(glm::ceil(float(m_RingSize) / 8.0f));
+
+	VulkanRenderer::dispatchCompute(commandBuffer, m_ConstructTerrainChunksPass, m_CurrentlyUsedBuffer, { dispatchCount, dispatchCount, m_TerrainSpecification.Info.LODCount });
+}
+
+void ClipmapLOD::createChunkComputePass(const std::shared_ptr<VulkanBuffer>& infoBuffer)
+{
+	{
+		VulkanBufferProperties chunkToRenderProperties;
+		chunkToRenderProperties.Size = 1024 * (uint32_t)sizeof(TerrainChunk);
+		chunkToRenderProperties.Type = BufferType::STORAGE_BUFFER;
+		chunkToRenderProperties.Usage = BufferMemoryUsage::BUFFER_ONLY_GPU;
+
+		ChunksToRender = std::make_shared<VulkanBuffer>(chunkToRenderProperties);
+	}
+	{
+		VulkanBufferProperties frustumBufferProperties;
+		frustumBufferProperties.Size = ((uint32_t)sizeof(glm::vec4)) * 6;
+		frustumBufferProperties.Type = BufferType::STORAGE_BUFFER | BufferType::TRANSFER_DST_BUFFER;
+		frustumBufferProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
+
+		m_FrustumBuffer = std::make_shared<VulkanBuffer>(frustumBufferProperties);
+	}
+	{
+		VulkanBufferProperties renderProperties;
+		renderProperties.Size = sizeof(VkDrawIndexedIndirectCommand);
+		renderProperties.Type = BufferType::INDIRECT_BUFFER | BufferType::STORAGE_BUFFER;
+		renderProperties.Usage = BufferMemoryUsage::BUFFER_ONLY_GPU;
+
+		m_RenderCommand = std::make_shared<VulkanBuffer>(renderProperties);
+	}
+
+	{
+		std::shared_ptr<VulkanShader>& frustumCullShader = ShaderManager::createShader(CLIPMAP_CONSTRUCT_TERRAIN_CHUNKS_COMPUTE);
+		frustumCullShader->addShaderStage(ShaderStage::COMPUTE, CLIPMAP_CONSTRUCT_TERRAIN_CHUNKS_COMPUTE);
+		frustumCullShader->createDescriptorSetLayouts();
+
+		m_ConstructTerrainChunksPass.DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader(CLIPMAP_CONSTRUCT_TERRAIN_CHUNKS_COMPUTE));
+		m_ConstructTerrainChunksPass.DescriptorSet->bindInput(0, 0, 0, ChunksToRender);
+		m_ConstructTerrainChunksPass.DescriptorSet->bindInput(0, 1, 0, LODMarginsBufferSet);
+		m_ConstructTerrainChunksPass.DescriptorSet->bindInput(0, 2, 0, infoBuffer);
+		m_ConstructTerrainChunksPass.DescriptorSet->bindInput(1, 0, 0, m_FrustumBuffer);
+		m_ConstructTerrainChunksPass.DescriptorSet->bindInput(2, 0, 0, m_RenderCommand);
+		m_ConstructTerrainChunksPass.DescriptorSet->Create();
+
+		m_ConstructTerrainChunksPass.Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader(CLIPMAP_CONSTRUCT_TERRAIN_CHUNKS_COMPUTE));
+	}
 }

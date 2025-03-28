@@ -18,7 +18,7 @@ BruteForceTerrainRenderer::BruteForceTerrainRenderer(const BruteForceTerrainRend
 	SimpleVulkanMemoryTracker::Get()->Track(BruteForceRendererMetrics::NAME);
 
 	m_TerrainMap = std::make_shared<TerrainMap>(specification.HeightMapFilepath);
-	m_BruteForceLOD = std::make_shared<BruteForceLOD>(m_Terrain->getSpecification());
+	m_BruteForceLOD = std::make_shared<BruteForceLOD>(m_Terrain);
 
 	createVertexBuffer();
 

@@ -25,20 +25,21 @@ struct ClipmapTerrainRendererSpecification
 
 struct ClipmapRendererMetrics
 {
-	inline static const std::string NAME						= "ClipmapRendererMetrics";
+	inline static const std::string NAME							= "ClipmapRendererMetrics";
 
-	inline static const std::string GPU_UPDATE_CLIPMAP			= "_GpuUpdateClipmapMap";
+	inline static const std::string GPU_UPDATE_CLIPMAP				= "_GpuUpdateClipmapMap";
+	inline static const std::string GPU_GENERATE_AND_FRUSTUM_CULL	= "_GpuClipGenerateAndFrustumCull";
 
-	inline static const std::string CPU_CREATE_CHUNK_BUFFER		= "_CpuClipmapCreateChunkBuffer";
-	inline static const std::string CPU_LOAD_NEEDED_NODES		= "_CpuClipmapLoadNeededNodes";
+	inline static const std::string CPU_CREATE_CHUNK_BUFFER			= "_CpuClipmapCreateChunkBuffer";
+	inline static const std::string CPU_LOAD_NEEDED_NODES			= "_CpuClipmapLoadNeededNodes";
 
-	inline static const std::string RENDER_TERRAIN				= "_ClipmapRenderTerrain";
+	inline static const std::string RENDER_TERRAIN					= "_ClipmapRenderTerrain";
 
-	inline static uint32_t CHUNKS_LOADED_LAST_UPDATE			= 0;
-	inline static uint32_t MAX_VERTICES_RENDERED				= 0;
-	inline static uint32_t MAX_INDICES_RENDERED					= 0;
+	inline static uint32_t CHUNKS_LOADED_LAST_UPDATE				= 0;
+	inline static uint32_t MAX_VERTICES_RENDERED					= 0;
+	inline static uint32_t MAX_INDICES_RENDERED						= 0;
 
-	inline static uint32_t MEMORY_USED							= 0;
+	inline static uint32_t MEMORY_USED								= 0;
 };
 
 class ClipmapTerrainRenderer
@@ -48,7 +49,7 @@ public:
 	~ClipmapTerrainRenderer() = default;
 
 	void refreshClipmaps(const Camera& camera);
-	void updateClipmaps();
+	void updateClipmaps(const Camera& camera);
 
 	void Render(const Camera& camera);
 

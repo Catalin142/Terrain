@@ -2,6 +2,8 @@
 
 #include "Graphics/Vulkan/VulkanRenderer.h"
 
+#define TESSSELLATION_CONSTRUCT_TERRAIN_CHUNKS_COMPUTE "Terrain/ClipmapTessellation/ConstructTerrainChunks_comp.glsl"
+
 enum STITCH_DIRECTION
 {
 	LEFT	= 1 << 0,
@@ -15,16 +17,7 @@ TessellationLOD::TessellationLOD(const TerrainSpecification& spec, const std::sh
 {
 	ClipmapTerrainSpecification clipmapSpec = clipmap->getSpecification();
 	m_RingSize = clipmapSpec.ClipmapSize / spec.Info.ChunkSize;
-
-	{
-		VulkanBufferProperties chunkToRenderProperties;
-		chunkToRenderProperties.Size = 1024 * (uint32_t)sizeof(TerrainChunk);
-		chunkToRenderProperties.Type = BufferType::STORAGE_BUFFER;
-		chunkToRenderProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
-
-		chunksToRender = std::make_shared<VulkanBufferSet>(VulkanRenderer::getFramesInFlight(), chunkToRenderProperties);
-	}
-
+	
 	{
 		VulkanBufferProperties LODMarginsProperties;
 		LODMarginsProperties.Size = m_TerrainSpecification.Info.LODCount * ((uint32_t)sizeof(TerrainInfo));
@@ -33,19 +26,17 @@ TessellationLOD::TessellationLOD(const TerrainSpecification& spec, const std::sh
 
 		LODMarginsBufferSet = std::make_shared<VulkanBufferSet>(VulkanRenderer::getFramesInFlight(), LODMarginsProperties);
 	}
+
 }
 
-uint32_t TessellationLOD::Generate(const glm::ivec2& cameraPosition)
+void TessellationLOD::computeMargins(const glm::ivec2& cameraPosition, uint32_t patchSize)
 {
 	std::vector<TerrainChunk> chunks;
 	std::vector<LODMargins> margins;
 
-	int32_t prevminY;
-	int32_t prevmaxY;
-	int32_t prevminX;
-	int32_t prevmaxX;
-
 	TerrainInfo tInfo = m_TerrainSpecification.Info;
+
+	uint32_t multiplier = tInfo.ChunkSize / patchSize;
 
 	for (int32_t lod = 0; lod < tInfo.LODCount; lod++)
 	{
@@ -82,73 +73,69 @@ uint32_t TessellationLOD::Generate(const glm::ivec2& cameraPosition)
 			maxY -= 1;
 		}
 
-		margins.push_back(LODMargins{ { minX, maxX }, { minY, maxY } });
-
-		for (int32_t y = minY; y < maxY; y++)
-			for (int32_t x = minX; x < maxX; x++)
-			{
-				tc.Offset = packOffset(x, y);
-
-				uint32_t outDirection = 0;
-
-				if (x == minX)
-					outDirection |= 0b0001; // left
-
-				if (x == maxX - 1)
-					outDirection |= 0b0010; // right
-
-				if (y == minY)
-					outDirection |= 0b0100; // down
-
-				if (y == maxY - 1)
-					outDirection |= 0b1000; // up
-
-				tc.Lod = lod | (outDirection << 16);
-
-				if (lod != 0)
-				{
-					bool add = true;
-
-					uint32_t marginminY = prevminY / 2;
-					uint32_t marginmaxY = prevmaxY / 2;
-					uint32_t marginminX = prevminX / 2;
-					uint32_t marginmaxX = prevmaxX / 2;
-
-					if (x == marginminX - 1 && y >= marginminY && y < marginmaxY)
-						outDirection |= 0b0010; // right
-
-					if (x == marginmaxX && y >= marginminY && y < marginmaxY)
-						outDirection |= 0b0001; // left
-
-					if (y == marginminY - 1 && x >= marginminX && x < marginmaxX)
-						outDirection |= 0b1000; // down
-
-					if (y == marginmaxY && x >= marginminX && x < marginmaxX)
-						outDirection |= 0b0100; // up
-
-					tc.Lod = lod | (outDirection << 16);
-
-					if (x >= marginminX && x < marginmaxX && y >= marginminY && y < marginmaxY)
-						add = false;
-
-					if (add)
-						chunks.push_back(tc);
-				}
-				else
-					chunks.push_back(tc);
-			}
-
-		prevminY = minY;
-		prevmaxY = maxY;
-		prevminX = minX;
-		prevmaxX = maxX;
+		margins.push_back(LODMargins{ { minX * multiplier, maxX * multiplier}, { minY * multiplier, maxY * multiplier} });
 	}
 
-	chunksToRender->getBuffer(m_NextBuffer)->setDataCPU(chunks.data(), chunks.size() * sizeof(TerrainChunk));
 	LODMarginsBufferSet->getBuffer(m_NextBuffer)->setDataCPU(margins.data(), margins.size() * sizeof(LODMargins));
 
 	m_CurrentlyUsedBuffer = m_NextBuffer;
 	(++m_NextBuffer) %= VulkanRenderer::getFramesInFlight();
+}
 
-	return (uint32_t)chunks.size();
+void TessellationLOD::Generate(VkCommandBuffer commandBuffer, const Camera& cam, uint32_t patchSize)
+{
+	std::array<glm::vec4, 6> frustumPlanes = cam.getFrustum();
+	m_FrustumBuffer->setDataCPU(&frustumPlanes, 6 * sizeof(glm::vec4));
+
+	TerrainInfo tInfo = m_TerrainSpecification.Info;
+	uint32_t multiplier = tInfo.ChunkSize / patchSize;
+
+	uint32_t dispatchCount = uint32_t(glm::ceil(float(m_RingSize * multiplier) / 8.0f));
+
+	VulkanRenderer::dispatchCompute(commandBuffer, m_ConstructTerrainChunksPass, m_CurrentlyUsedBuffer, { dispatchCount, dispatchCount, m_TerrainSpecification.Info.LODCount });
+}
+
+void TessellationLOD::createResources(const std::unique_ptr<TerrainData>& terrain, const std::shared_ptr<VulkanBuffer>& tessSettings)
+{
+	{
+		VulkanBufferProperties chunkToRenderProperties;
+		chunkToRenderProperties.Size = 8 * 1024 * (uint32_t)sizeof(TerrainChunk);
+		chunkToRenderProperties.Type = BufferType::STORAGE_BUFFER;
+		chunkToRenderProperties.Usage = BufferMemoryUsage::BUFFER_ONLY_GPU;
+
+		ChunksToRender = std::make_shared<VulkanBuffer>(chunkToRenderProperties);
+	}
+	{
+		VulkanBufferProperties frustumBufferProperties;
+		frustumBufferProperties.Size = ((uint32_t)sizeof(glm::vec4)) * 6;
+		frustumBufferProperties.Type = BufferType::STORAGE_BUFFER | BufferType::TRANSFER_DST_BUFFER;
+		frustumBufferProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
+
+		m_FrustumBuffer = std::make_shared<VulkanBuffer>(frustumBufferProperties);
+	}
+	{
+		VulkanBufferProperties renderProperties;
+		renderProperties.Size = sizeof(VkDrawIndirectCommand);
+		renderProperties.Type = BufferType::INDIRECT_BUFFER | BufferType::STORAGE_BUFFER;
+		renderProperties.Usage = BufferMemoryUsage::BUFFER_ONLY_GPU;
+
+		RenderCommand = std::make_shared<VulkanBuffer>(renderProperties);
+	}
+
+	{
+		std::shared_ptr<VulkanShader>& frustumCullShader = ShaderManager::createShader(TESSSELLATION_CONSTRUCT_TERRAIN_CHUNKS_COMPUTE);
+		frustumCullShader->addShaderStage(ShaderStage::COMPUTE, TESSSELLATION_CONSTRUCT_TERRAIN_CHUNKS_COMPUTE);
+		frustumCullShader->createDescriptorSetLayouts();
+
+		m_ConstructTerrainChunksPass.DescriptorSet = std::make_shared<VulkanDescriptorSet>(ShaderManager::getShader(TESSSELLATION_CONSTRUCT_TERRAIN_CHUNKS_COMPUTE));
+		m_ConstructTerrainChunksPass.DescriptorSet->bindInput(0, 0, 0, ChunksToRender);
+		m_ConstructTerrainChunksPass.DescriptorSet->bindInput(0, 1, 0, LODMarginsBufferSet);
+		m_ConstructTerrainChunksPass.DescriptorSet->bindInput(0, 2, 0, tessSettings);
+		m_ConstructTerrainChunksPass.DescriptorSet->bindInput(0, 3, 0, terrain->TerrainInfoBuffer);
+		m_ConstructTerrainChunksPass.DescriptorSet->bindInput(1, 0, 0, m_FrustumBuffer);
+		m_ConstructTerrainChunksPass.DescriptorSet->bindInput(2, 0, 0, RenderCommand);
+		m_ConstructTerrainChunksPass.DescriptorSet->Create();
+
+		m_ConstructTerrainChunksPass.Pipeline = std::make_shared<VulkanComputePipeline>(ShaderManager::getShader(TESSSELLATION_CONSTRUCT_TERRAIN_CHUNKS_COMPUTE));
+	}
 }

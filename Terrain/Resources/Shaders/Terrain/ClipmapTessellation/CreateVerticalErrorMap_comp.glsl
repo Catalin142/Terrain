@@ -6,17 +6,6 @@ layout (set = 0, binding = 1, rgba16f) uniform writeonly image2DArray verticalEr
 
 precision highp float;
 
-struct LODMargins
-{
-    ivec2 xMargins;
-    ivec2 yMargins;
-};
-
-layout(set = 1, binding = 0) readonly buffer TerrainChunksMarginsSet
-{
-    LODMargins Margins[];
-};
-
 shared vec4 maxVerticalError;
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
@@ -39,19 +28,12 @@ void main()
 	ivec3 heightMapSize = imageSize(heightMap) - ivec3(1, 1, 0);
 
 	float pixelHeight = imageLoad(heightMap, ivec3(texelPosition, LOD)).x;
-	vec3 verticalError = vec3(0.0);
 
-	ivec2 margin = ivec2(Margins[LOD].xMargins.y, Margins[LOD].yMargins.y) % 8 * 130;
+	vec3 verticalError = vec3(0.0);
 
 	// lod 8x8
 	{
 		ivec3 texelPosition8x8 = ivec3(texelPosition.x / 2 * 2, texelPosition.y / 2 * 2, LOD);
-
-		if (texelPosition8x8.x == margin.x - 2)
-			texelPosition8x8.x -= 2;
-			
-		if (texelPosition8x8.y == margin.y - 2)
-			texelPosition8x8.y -= 2;
 
 		ivec3 BLPos8x8 = min(texelPosition8x8, heightMapSize);
 		ivec3 BRPos8x8 = min(texelPosition8x8 + ivec3(2, 0, 0), heightMapSize);
@@ -74,12 +56,6 @@ void main()
 	// lod 4x4
 	{
 		ivec3 texelPosition4x4 = ivec3(texelPosition.x / 4 * 4, texelPosition.y / 4 * 4, LOD);
-		
-		if (texelPosition4x4.x == margin.x - 4)
-			texelPosition4x4.x -= 4;
-			
-		if (texelPosition4x4.y == margin.y - 4)
-			texelPosition4x4.y -= 4;
 
 		ivec3 BLPos4x4 = min(texelPosition4x4, heightMapSize);
 		ivec3 BRPos4x4 = min(texelPosition4x4 + ivec3(4, 0, 0), heightMapSize);
@@ -103,12 +79,6 @@ void main()
 	{
 		ivec3 texelPosition2x2 = ivec3(texelPosition.x / 8 * 8, texelPosition.y / 8 * 8, LOD);
 
-		if (texelPosition2x2.x == margin.x - 8)
-			texelPosition2x2.x -= 8;
-			
-		if (texelPosition2x2.y == margin.y - 8)
-			texelPosition2x2.y -= 8;
-
 		ivec3 BLPos2x2 = min(texelPosition2x2, heightMapSize);
 		ivec3 BRPos2x2 = min(texelPosition2x2 + ivec3(8, 0, 0), heightMapSize);
 		ivec3 TLPos2x2 = min(texelPosition2x2 + ivec3(0, 8, 0), heightMapSize);
@@ -131,10 +101,12 @@ void main()
 	atomicAdd(maxVerticalError.y, verticalError.y);
 	atomicAdd(maxVerticalError.z, verticalError.z);
 	maxVerticalError.w = 1.0;
-	
+
 	memoryBarrierShared();
 	barrier();
 
 	if (gl_LocalInvocationID.x * gl_LocalInvocationID.y == 1)
+	{
 		imageStore(verticalErrorMap, ivec3(texelChunk, LOD), maxVerticalError);
+	}
 }

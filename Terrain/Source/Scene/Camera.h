@@ -28,6 +28,7 @@ struct Frustum
 class Camera
 {
 public:
+	Camera() = default;
 	Camera(float fov, float aspectRatio, float nearPlane, float farPlane);
 
 	void Move(const glm::vec3& direction);

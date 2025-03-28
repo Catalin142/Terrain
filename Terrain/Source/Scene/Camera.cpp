@@ -50,8 +50,6 @@ glm::mat4 Camera::getView()
 
 void Camera::updateMatrices()
 {
-	getView();
-
 	glm::mat4 matrix = getProjection() * getView();
 
 	planes[LEFT].x = matrix[0].w + matrix[0].x;
