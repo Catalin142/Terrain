@@ -78,7 +78,7 @@ void VulkanApp::onCreate()
 		terrainSpec.Info.TerrainSize = 1024 * 4;
 		terrainSpec.Info.LODCount = 3;
 		terrainSpec.ChunkedFilepath = { "KaerMorhen8km.rawdata", "KaerMorhen8km.metadata" };
-		terrainSpec.TerrainFilepath = "Resources/Textures/WhiteOrchard_res4096x.png";
+		terrainSpec.TerrainFilepath = "Resources/Textures/WhiteOrchard_winter_res4096x.png";
 
 		m_Terrain = std::make_unique<TerrainData>(terrainSpec);
 
