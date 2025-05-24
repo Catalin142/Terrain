@@ -385,8 +385,8 @@ typedef VkBool32 (APIENTRY *PFN_vkGetPhysicalDeviceXcbPresentationSupportKHR)(Vk
 #endif
 
 #define _glfw_dlopen(name) dlopen(name, RTLD_LAZY | RTLD_LOCAL)
-#define _glfw_dlclose(handle) dlclose(handle)
-#define _glfw_dlsym(handle, name) dlsym(handle, name)
+#define _glfw_dlclose(Handle) dlclose(Handle)
+#define _glfw_dlsym(Handle, name) dlsym(Handle, name)
 
 #define _GLFW_PLATFORM_WINDOW_STATE         _GLFWwindowX11  x11
 #define _GLFW_PLATFORM_LIBRARY_WINDOW_STATE _GLFWlibraryX11 x11
@@ -399,7 +399,7 @@ typedef VkBool32 (APIENTRY *PFN_vkGetPhysicalDeviceXcbPresentationSupportKHR)(Vk
 typedef struct _GLFWwindowX11
 {
     Colormap        colormap;
-    Window          handle;
+    Window          Handle;
     Window          parent;
     XIC             ic;
 
@@ -517,7 +517,7 @@ typedef struct _GLFWlibraryX11
     Atom            GLFW_SELECTION;
 
     struct {
-        void*       handle;
+        void*       Handle;
         GLFWbool    utf8;
         PFN_XAllocClassHint AllocClassHint;
         PFN_XAllocSizeHints AllocSizeHints;
@@ -619,7 +619,7 @@ typedef struct _GLFWlibraryX11
 
     struct {
         GLFWbool    available;
-        void*       handle;
+        void*       Handle;
         int         eventBase;
         int         errorBase;
         int         major;
@@ -680,7 +680,7 @@ typedef struct _GLFWlibraryX11
     } xdnd;
 
     struct {
-        void*       handle;
+        void*       Handle;
         PFN_XcursorImageCreate ImageCreate;
         PFN_XcursorImageDestroy ImageDestroy;
         PFN_XcursorImageLoadCursor ImageLoadCursor;
@@ -691,7 +691,7 @@ typedef struct _GLFWlibraryX11
 
     struct {
         GLFWbool    available;
-        void*       handle;
+        void*       Handle;
         int         major;
         int         minor;
         PFN_XineramaIsActive IsActive;
@@ -700,13 +700,13 @@ typedef struct _GLFWlibraryX11
     } xinerama;
 
     struct {
-        void*       handle;
+        void*       Handle;
         PFN_XGetXCBConnection GetXCBConnection;
     } x11xcb;
 
     struct {
         GLFWbool    available;
-        void*       handle;
+        void*       Handle;
         int         eventBase;
         int         errorBase;
         PFN_XF86VidModeQueryExtension QueryExtension;
@@ -717,7 +717,7 @@ typedef struct _GLFWlibraryX11
 
     struct {
         GLFWbool    available;
-        void*       handle;
+        void*       Handle;
         int         majorOpcode;
         int         eventBase;
         int         errorBase;
@@ -729,7 +729,7 @@ typedef struct _GLFWlibraryX11
 
     struct {
         GLFWbool    available;
-        void*       handle;
+        void*       Handle;
         int         major;
         int         minor;
         int         eventBase;
@@ -741,7 +741,7 @@ typedef struct _GLFWlibraryX11
 
     struct {
         GLFWbool    available;
-        void*       handle;
+        void*       Handle;
         int         major;
         int         minor;
         int         eventBase;
@@ -772,7 +772,7 @@ typedef struct _GLFWmonitorX11
 //
 typedef struct _GLFWcursorX11
 {
-    Cursor handle;
+    Cursor Handle;
 
 } _GLFWcursorX11;
 

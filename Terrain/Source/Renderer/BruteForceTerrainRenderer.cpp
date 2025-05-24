@@ -17,7 +17,7 @@ BruteForceTerrainRenderer::BruteForceTerrainRenderer(const BruteForceTerrainRend
 	SimpleVulkanMemoryTracker::Get()->Flush(BruteForceRendererMetrics::NAME);
 	SimpleVulkanMemoryTracker::Get()->Track(BruteForceRendererMetrics::NAME);
 
-	m_TerrainMap = std::make_shared<TerrainMap>(specification.HeightMapFilepath);
+	m_TerrainMap = std::make_shared<TerrainMap>(specification.HeightMapFilepath, 1024 * 4, 1024 * 4);
 	m_BruteForceLOD = std::make_shared<BruteForceLOD>(m_Terrain);
 
 	createVertexBuffer();
@@ -31,6 +31,7 @@ BruteForceTerrainRenderer::BruteForceTerrainRenderer(const BruteForceTerrainRend
 
 void BruteForceTerrainRenderer::Render(const Camera& camera)
 {
+	CommandBuffer->beginPipelineQuery();
 	CommandBuffer->beginQuery(BruteForceRendererMetrics::RENDER_TERRAIN);
 
 	VkCommandBuffer cmdBuffer = CommandBuffer->getCurrentCommandBuffer();
@@ -50,6 +51,7 @@ void BruteForceTerrainRenderer::Render(const Camera& camera)
 	VulkanRenderer::endRenderPass(cmdBuffer);
 
 	CommandBuffer->endQuery(BruteForceRendererMetrics::RENDER_TERRAIN);
+	CommandBuffer->endPipelineQuery();
 }
 
 void BruteForceTerrainRenderer::Refresh(const Camera& camera)
@@ -93,21 +95,29 @@ void BruteForceTerrainRenderer::createRenderPass()
 
 void BruteForceTerrainRenderer::createPipeline()
 {
-	PipelineSpecification spec{};
+	RenderPipelineSpecification spec{};
 	spec.Framebuffer = m_TargetFramebuffer;
-	spec.depthTest = true;
-	spec.depthWrite = true;
-	spec.Wireframe = m_InWireframe;
-	spec.Culling = true;
 	spec.Shader = ShaderManager::getShader(BRUTE_FORCE_TERRAIN_RENDER_SHADER_NAME);
+
 	spec.vertexBufferLayout = VulkanVertexBufferLayout{ VertexType::INT_2 };
-	spec.depthCompareFunction = DepthCompare::LESS;
 	spec.Topology = PrimitiveTopology::PATCHES;
-	spec.tessellationControlPoints = 4;
 
-	spec.pushConstants.push_back({ sizeof(CameraRenderMatrices), VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT });
+	DepthStencilStateSpecification dsSpecification{};
+	dsSpecification.depthTest = true;
+	dsSpecification.depthWrite = true;
+	dsSpecification.depthCompareFunction = DepthCompare::LESS;
+	spec.depthStateSpecification = dsSpecification;
 
-	m_TerrainPipeline = std::make_shared<VulkanPipeline>(spec);
+	ResterizationStateSpecification restarizationSpecification{};
+	restarizationSpecification.Culling = true;
+	restarizationSpecification.Wireframe = m_InWireframe;
+	spec.resterizationSpecification = restarizationSpecification;
+
+	spec.tessellationPatchControlPoints = 4;
+
+	spec.pushConstants.push_back({ sizeof(CameraRenderMatrices), ShaderStage::TESSELLATION_EVALUATION });
+
+	m_TerrainPipeline = std::make_shared<VulkanRenderPipeline>(spec);
 
 	m_TerrainRenderPass.Pipeline = m_TerrainPipeline;
 }

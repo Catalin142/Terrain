@@ -54,7 +54,7 @@ GLFWbool _glfwInitVulkan(int mode)
 #if defined(_GLFW_VULKAN_LIBRARY)
     _glfw.vk.handle = _glfw_dlopen(_GLFW_VULKAN_LIBRARY);
 #elif defined(_GLFW_WIN32)
-    _glfw.vk.handle = _glfw_dlopen("vulkan-1.dll");
+    _glfw.vk.Handle = _glfw_dlopen("vulkan-1.dll");
 #elif defined(_GLFW_COCOA)
     _glfw.vk.handle = _glfw_dlopen("libvulkan.1.dylib");
     if (!_glfw.vk.handle)
@@ -62,7 +62,7 @@ GLFWbool _glfwInitVulkan(int mode)
 #else
     _glfw.vk.handle = _glfw_dlopen("libvulkan.so.1");
 #endif
-    if (!_glfw.vk.handle)
+    if (!_glfw.vk.Handle)
     {
         if (mode == _GLFW_REQUIRE_LOADER)
             _glfwInputError(GLFW_API_UNAVAILABLE, "Vulkan: Loader not found");
@@ -71,7 +71,7 @@ GLFWbool _glfwInitVulkan(int mode)
     }
 
     _glfw.vk.GetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)
-        _glfw_dlsym(_glfw.vk.handle, "vkGetInstanceProcAddr");
+        _glfw_dlsym(_glfw.vk.Handle, "vkGetInstanceProcAddr");
     if (!_glfw.vk.GetInstanceProcAddr)
     {
         _glfwInputError(GLFW_API_UNAVAILABLE,
@@ -157,8 +157,8 @@ GLFWbool _glfwInitVulkan(int mode)
 void _glfwTerminateVulkan(void)
 {
 #if !defined(_GLFW_VULKAN_STATIC)
-    if (_glfw.vk.handle)
-        _glfw_dlclose(_glfw.vk.handle);
+    if (_glfw.vk.Handle)
+        _glfw_dlclose(_glfw.vk.Handle);
 #endif
 }
 
@@ -266,7 +266,7 @@ GLFWAPI GLFWvkproc glfwGetInstanceProcAddress(VkInstance instance,
     }
 #else
     if (!proc)
-        proc = (GLFWvkproc) _glfw_dlsym(_glfw.vk.handle, procname);
+        proc = (GLFWvkproc) _glfw_dlsym(_glfw.vk.Handle, procname);
 #endif
 
     return proc;
@@ -297,11 +297,11 @@ GLFWAPI int glfwGetPhysicalDevicePresentationSupport(VkInstance instance,
 }
 
 GLFWAPI VkResult glfwCreateWindowSurface(VkInstance instance,
-                                         GLFWwindow* handle,
+                                         GLFWwindow* Handle,
                                          const VkAllocationCallbacks* allocator,
                                          VkSurfaceKHR* surface)
 {
-    _GLFWwindow* window = (_GLFWwindow*) handle;
+    _GLFWwindow* window = (_GLFWwindow*) Handle;
     assert(instance != VK_NULL_HANDLE);
     assert(window != NULL);
     assert(surface != NULL);

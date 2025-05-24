@@ -3,7 +3,6 @@
 #include "Terrain/Generator/TerrainGenerator.h"
 #include "Terrain/Terrain.h"
 
-#include "Graphics/Vulkan/VulkanTexture.h"
 #include "imgui/imgui.h"
 
 #include <memory>

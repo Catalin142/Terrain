@@ -201,8 +201,8 @@ void TerrainVirtualMap::updateIndirectionTexture(VkCommandBuffer cmdBuffer)
         VulkanRenderer::dispatchCompute(cmdBuffer, m_UpdateIndirectionComputePass, { invokes, 1, 1 },
             sizeof(GPUVirtualMapProperties), &size);
 
-        VulkanComputePipeline::imageMemoryBarrier(cmdBuffer, m_IndirectionTexture, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 6);
+        VulkanUtils::imageMemoryBarrier(cmdBuffer, m_IndirectionTexture, { VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT });
     }
 
     m_IndirectionNodes.clear();
@@ -237,8 +237,8 @@ void TerrainVirtualMap::updateStatusTexture(VkCommandBuffer cmdBuffer)
         VulkanRenderer::dispatchCompute(cmdBuffer, m_UpdateStatusComputePass, { invokes, 1, 1 },
             sizeof(GPUVirtualMapProperties), &size);
 
-        VulkanComputePipeline::imageMemoryBarrier(cmdBuffer, m_StatusTexture, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 6);
+        VulkanUtils::imageMemoryBarrier(cmdBuffer, m_StatusTexture, { VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT });
     }
 
     m_StatusNodes.clear();
@@ -251,7 +251,7 @@ void TerrainVirtualMap::prepareForDeserialization(VkCommandBuffer cmdBuffer)
     imgSubresource.layerCount = 1;
     imgSubresource.levelCount = 1;
     imgSubresource.baseMipLevel = 0;
-    VkUtils::transitionImageLayout(cmdBuffer, m_PhysicalTexture->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    VulkanUtils::transitionImageLayout(cmdBuffer, m_PhysicalTexture->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 }
 
 void TerrainVirtualMap::prepareForRendering(VkCommandBuffer cmdBuffer)
@@ -261,7 +261,7 @@ void TerrainVirtualMap::prepareForRendering(VkCommandBuffer cmdBuffer)
     imgSubresource.layerCount = 1;
     imgSubresource.levelCount = 1;
     imgSubresource.baseMipLevel = 0;
-    VkUtils::transitionImageLayout(cmdBuffer, m_PhysicalTexture->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+    VulkanUtils::transitionImageLayout(cmdBuffer, m_PhysicalTexture->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
 }
 
 bool TerrainVirtualMap::Updated()

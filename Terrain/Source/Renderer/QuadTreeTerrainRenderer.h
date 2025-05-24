@@ -2,7 +2,7 @@
 
 #include "Terrain/Terrain.h"
 
-#include "Graphics/Vulkan/VulkanPipeline.h"
+#include "Graphics/Vulkan/VulkanRenderPipeline.h"
 #include "Graphics/Vulkan/VulkanPass.h"
 #include "Graphics/Vulkan/VulkanImage.h"
 #include "Graphics/Vulkan/VulkanBuffer.h"
@@ -83,8 +83,8 @@ private:
 
 	std::shared_ptr<VulkanFramebuffer> m_TargetFramebuffer;
 
-	RenderPass m_TerrainRenderPass;
-	std::shared_ptr<VulkanPipeline> m_TerrainPipeline;
+	VulkanRenderPass m_TerrainRenderPass;
+	std::shared_ptr<VulkanRenderPipeline> m_TerrainPipeline;
 
 	std::shared_ptr<VulkanImage> m_LODMap;
 	VulkanComputePass m_LODMapComputePass;

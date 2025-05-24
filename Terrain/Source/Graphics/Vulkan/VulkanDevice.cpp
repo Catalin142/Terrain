@@ -8,10 +8,78 @@
 
 VulkanDevice* VulkanDevice::m_Instance;
 
+const char* getLayerName(GPULayer layer)
+{
+	switch (layer)
+	{
+	case GPULayer::VALIDATION:
+		return "VK_LAYER_KHRONOS_validation";
+	default:
+		break;
+	}
+}
+
+const char* getExtensionName(GPUExtension extension)
+{
+	switch (extension)
+	{
+	case GPUExtension::SWAPCHAIN:
+		return VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+	case GPUExtension::ATOMIC_FLOAT:
+		return VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME;
+	default:
+		break;
+	}
+}
+
+void enableGPUFeature(VkPhysicalDeviceFeatures& deviceFeatures, VkPhysicalDeviceFeatures supportedFeatures, GPUFeature feature)
+{
+	static const std::unordered_map<GPUFeature, VkBool32 VkPhysicalDeviceFeatures::*> featureMap = 
+	{
+	   { GPUFeature::SAMPLER_ANISOTROPY,         &VkPhysicalDeviceFeatures::samplerAnisotropy },
+	   { GPUFeature::SAMPLE_RATE_SHADING,        &VkPhysicalDeviceFeatures::sampleRateShading },
+	   { GPUFeature::FILL_MODE_NON_SOLID,        &VkPhysicalDeviceFeatures::fillModeNonSolid },
+	   { GPUFeature::GEOMETRY_SHADER,            &VkPhysicalDeviceFeatures::geometryShader },
+	   { GPUFeature::TESSELLATION_SHADER,        &VkPhysicalDeviceFeatures::tessellationShader },
+	   { GPUFeature::WIDE_LINES,                 &VkPhysicalDeviceFeatures::wideLines },
+	   { GPUFeature::PIPELINE_STATISTICS_QUERY,  &VkPhysicalDeviceFeatures::pipelineStatisticsQuery },
+	};
+
+	auto it = featureMap.find(feature);
+	if (it != featureMap.end()) 
+	{
+		VkBool32 VkPhysicalDeviceFeatures::* feature = it->second;
+		if (supportedFeatures.*feature)
+			deviceFeatures.*feature = VK_TRUE;
+		else
+		{
+			std::cout << "Feature not supported\n";
+		}
+	}
+}
+
+std::vector<const char*> getLayerList(const std::vector<GPULayer>& requestedLayers)
+{
+	std::vector<const char*> layers;
+	for (GPULayer layer : requestedLayers)
+		layers.push_back(getLayerName(layer));
+
+	return layers;
+}
+
+std::vector<const char*> getExtensionList(const std::vector<GPUExtension>& requestedExtensions)
+{
+	std::vector<const char*> extensions;
+	for (GPUExtension ext : requestedExtensions)
+		extensions.push_back(getExtensionName(ext));
+
+	return extensions;
+}
+
 /*
 * This function erase the unvailable requested layers
 */
-static void checkLayersSupport(std::vector<const char*>& requestedLayers)
+static void checkLayersSupport(std::vector<GPULayer>& requestedLayers)
 {
 	uint32_t LayerCount = 0;
 	vkEnumerateInstanceLayerProperties(&LayerCount, nullptr);
@@ -21,16 +89,16 @@ static void checkLayersSupport(std::vector<const char*>& requestedLayers)
 #if DEBUG
 	std::cout << "\nrequested layers:\n";
 	for (const auto& layer : requestedLayers)
-		std::cout << "\t" << layer << "\n";
+		std::cout << "\t" << getLayerName(layer) << "\n";
 
 	std::cout << "\navailable layers:\n";
 	for (const auto& layer : layers)
 		std::cout << "\t" << layer.layerName << "\n";
 #endif
 
-	for (auto it = requestedLayers.begin(); it != requestedLayers.end(); it++)
+	for (GPULayer layer : requestedLayers)
 	{
-		const char* layerName = *it;
+		const char* layerName = getLayerName(layer);
 		bool layerFound = false;
 		for (const auto& layer : layers)
 			if (strcmp(layerName, layer.layerName))
@@ -40,15 +108,21 @@ static void checkLayersSupport(std::vector<const char*>& requestedLayers)
 			}
 
 		if (!layerFound)
-			requestedLayers.erase(it);
+			assert(true, "Layer not found!");
 	}
 }
 
 VulkanDevice::VulkanDevice(const std::shared_ptr<Window>& window, const InstanceProperties& instanceProps)
 {
 	createInstance(instanceProps);
-	createWindowSurface(window);
-	pickPhysicalDevice(instanceProps);
+
+	if (glfwCreateWindowSurface(m_VulkanPlatform.Instance, window->getHandle(), nullptr, &m_VulkanPlatform.windowSurface) != VK_SUCCESS)
+	{
+		std::cout << "Eroare createWindowSurface\n";
+		assert(false);
+	}
+
+	pickPhysicalDevice();
 	createLogicalDevice(instanceProps);
 	
 	m_Instance = this;
@@ -58,26 +132,32 @@ VulkanDevice::~VulkanDevice()
 {
 	m_CommandPool.clear();
 	vkDestroyDevice(m_VulkanPlatform.logicalDevice, nullptr);
-	vkDestroySurfaceKHR(m_VulkanPlatform.Instance, m_VulkanPlatform.WindowSurface, nullptr);
+	vkDestroySurfaceKHR(m_VulkanPlatform.Instance, m_VulkanPlatform.windowSurface, nullptr);
 	vkDestroyInstance(m_VulkanPlatform.Instance, nullptr);
 }
 
-bool VulkanDevice::supportsMSAASamples(uint32_t sampleNumber)
+VkCommandPool VulkanDevice::getGraphicsCommandPool()
 {
-	VkSampleCountFlags counts = m_physicalDeviceProperties.limits.framebufferColorSampleCounts & m_physicalDeviceProperties.limits.framebufferDepthSampleCounts;
-	return counts & sampleNumber;
-}
+	std::map<std::thread::id, VkCommandPool>& commandPool = m_Instance->m_CommandPool;
 
-VkSampleCountFlagBits VulkanDevice::getMaximumMSAASamples()
-{
-	VkSampleCountFlags counts = m_physicalDeviceProperties.limits.framebufferColorSampleCounts & m_physicalDeviceProperties.limits.framebufferDepthSampleCounts;
-	if (counts & VK_SAMPLE_COUNT_64_BIT) return VK_SAMPLE_COUNT_64_BIT;
-	if (counts & VK_SAMPLE_COUNT_32_BIT) return VK_SAMPLE_COUNT_32_BIT;
-	if (counts & VK_SAMPLE_COUNT_16_BIT) return VK_SAMPLE_COUNT_16_BIT;
-	if (counts & VK_SAMPLE_COUNT_8_BIT)  return VK_SAMPLE_COUNT_8_BIT;
-	if (counts & VK_SAMPLE_COUNT_4_BIT)  return VK_SAMPLE_COUNT_4_BIT;
-	if (counts & VK_SAMPLE_COUNT_2_BIT)  return VK_SAMPLE_COUNT_2_BIT;
-	return VK_SAMPLE_COUNT_1_BIT;
+	if (commandPool.find(std::this_thread::get_id()) == commandPool.end())
+	{
+		VkCommandPool vkCommandPool;
+
+		VkCommandPoolCreateInfo poolInfo{};
+		poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+		poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+		poolInfo.queueFamilyIndex = VulkanDevice::getVulkanContext()->getGraphicsFamilyIndex();
+
+		if (vkCreateCommandPool(VulkanDevice::getVulkanDevice(), &poolInfo, nullptr, &vkCommandPool) != VK_SUCCESS)
+		{
+			std::cout << "eroare CommandPool\n";
+			assert(false);
+		}
+		commandPool[std::this_thread::get_id()] = vkCommandPool;
+	}
+
+	return commandPool[std::this_thread::get_id()];
 }
 
 void VulkanDevice::createInstance(InstanceProperties instanceProps)
@@ -108,7 +188,9 @@ void VulkanDevice::createInstance(InstanceProperties instanceProps)
 
 	VkDebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo{};
 	createInfo.enabledLayerCount = (uint32_t)instanceProps.requestedLayers.size();
-	createInfo.ppEnabledLayerNames = instanceProps.requestedLayers.data();
+
+	std::vector<const char*> layers = getLayerList(instanceProps.requestedLayers);
+	createInfo.ppEnabledLayerNames = layers.data();
 
 	VkResult res = vkCreateInstance(&createInfo, nullptr, &m_VulkanPlatform.Instance);
 	if (res != VK_SUCCESS)
@@ -131,34 +213,34 @@ void VulkanDevice::createInstance(InstanceProperties instanceProps)
 
 void VulkanDevice::createWindowSurface(const std::shared_ptr<Window>& window)
 {
-	if (glfwCreateWindowSurface(m_VulkanPlatform.Instance, window->getHandle(), nullptr, &m_VulkanPlatform.WindowSurface) != VK_SUCCESS)
+	if (glfwCreateWindowSurface(m_VulkanPlatform.Instance, window->getHandle(), nullptr, &m_VulkanPlatform.windowSurface) != VK_SUCCESS)
 	{
 		std::cout << "Eroare createWindowSurface\n";
 		assert(false);
 	}
 }
 
-void VulkanDevice::pickPhysicalDevice(const InstanceProperties& instanceProps)
+void VulkanDevice::pickPhysicalDevice()
 {
 	uint32_t deviceCount = 0;
 	vkEnumeratePhysicalDevices(m_VulkanPlatform.Instance, &deviceCount, nullptr);
 	std::vector<VkPhysicalDevice> physicalDevices(deviceCount);
 	vkEnumeratePhysicalDevices(m_VulkanPlatform.Instance, &deviceCount, physicalDevices.data());
 
-	m_VulkanPlatform.GPU = physicalDevices[0];
+	m_VulkanPlatform.physicalDevice = physicalDevices[0];
 
-	getGPUQueues(m_VulkanPlatform.GPU);
-	vkGetPhysicalDeviceProperties(m_VulkanPlatform.GPU, &m_physicalDeviceProperties);
-	vkGetPhysicalDeviceMemoryProperties(m_VulkanPlatform.GPU, &m_physicalDeviceMemoryProperties);
-	vkGetPhysicalDeviceFeatures(m_VulkanPlatform.GPU, &m_physicalDeviceFeatures);
-	GPUName = m_physicalDeviceProperties.deviceName;
+	getGPUQueues(m_VulkanPlatform.physicalDevice);
+	vkGetPhysicalDeviceProperties(m_VulkanPlatform.physicalDevice, &m_PhysicalDeviceProperties);
+	vkGetPhysicalDeviceMemoryProperties(m_VulkanPlatform.physicalDevice, &m_PhysicalDeviceMemoryProperties);
+	vkGetPhysicalDeviceFeatures(m_VulkanPlatform.physicalDevice, &m_PhysicalDeviceFeatures);
+	GPUName = m_PhysicalDeviceProperties.deviceName;
 
 #if DEBUG
-	std::cout << "GPU: " << m_physicalDeviceProperties.deviceName << "\n";
+	std::cout << "GPU: " << m_PhysicalDeviceProperties.deviceName << "\n";
 	uint64_t memory = 0;
-	for (uint32_t i = 0; i < m_physicalDeviceMemoryProperties.memoryHeapCount; i++)
-		if (m_physicalDeviceMemoryProperties.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
-			memory = memory + m_physicalDeviceMemoryProperties.memoryHeaps[i].size;
+	for (uint32_t i = 0; i < m_PhysicalDeviceMemoryProperties.memoryHeapCount; i++)
+		if (m_PhysicalDeviceMemoryProperties.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
+			memory = memory + m_PhysicalDeviceMemoryProperties.memoryHeaps[i].size;
 
 	std::cout << "VRAM: " << memory / 1024 / 1024 << " MB\n";
 #endif
@@ -177,50 +259,50 @@ uint32_t VulkanDevice::getGPUQueues(VkPhysicalDevice gpu)
 	// Search for separate compute queue
 	for (size_t i = 0; i < queueFamilies.size(); i++)
 	{
-		if (queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT && m_computeQueue.familyIndex == INVALID_VK_INDEX &&
+		if (queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT && m_ComputeQueue.familyIndex == INVALID_VK_INDEX &&
 			(queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0)
 		{
-			QueueBundle queueBundle;
+			GPUQueue queueBundle;
 			queueBundle.familyIndex = (uint32_t)i;
-			m_computeQueue = queueBundle;
+			m_ComputeQueue = queueBundle;
 			availableQueues++;
 			break;
 		}
 	}
 	for (size_t i = 0; i < queueFamilies.size(); i++)
 	{
-		if (queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT && m_computeQueue.familyIndex == INVALID_VK_INDEX)
+		if (queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT && m_ComputeQueue.familyIndex == INVALID_VK_INDEX)
 		{
-			QueueBundle queueBundle;
+			GPUQueue queueBundle;
 			queueBundle.familyIndex = (uint32_t)i;
-			m_computeQueue = queueBundle;
+			m_ComputeQueue = queueBundle;
 			availableQueues++;
 		}
 
-		if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT && m_graphicsQueue.familyIndex == INVALID_VK_INDEX)
+		if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT && m_GraphicsQueue.familyIndex == INVALID_VK_INDEX)
 		{
-			QueueBundle queueBundle;
+			GPUQueue queueBundle;
 			queueBundle.familyIndex = (uint32_t)i;
-			m_graphicsQueue = queueBundle;
+			m_GraphicsQueue = queueBundle;
 			availableQueues++;
 		}
 
-		if (queueFamilies[i].queueFlags & VK_QUEUE_TRANSFER_BIT && m_transferQueue.familyIndex == INVALID_VK_INDEX)
+		if (queueFamilies[i].queueFlags & VK_QUEUE_TRANSFER_BIT && m_TransferQueue.familyIndex == INVALID_VK_INDEX)
 		{
-			QueueBundle queueBundle;
+			GPUQueue queueBundle;
 			queueBundle.familyIndex = (uint32_t)i;
-			m_transferQueue = queueBundle;
+			m_TransferQueue = queueBundle;
 			availableQueues++;
 		}
 
 		VkBool32 presentSupport = false;
-		vkGetPhysicalDeviceSurfaceSupportKHR(gpu, (uint32_t)i, m_VulkanPlatform.WindowSurface, &presentSupport);
+		vkGetPhysicalDeviceSurfaceSupportKHR(gpu, (uint32_t)i, m_VulkanPlatform.windowSurface, &presentSupport);
 
-		if (presentSupport && m_presentQueue.familyIndex == INVALID_VK_INDEX)
+		if (presentSupport && m_PresentQueue.familyIndex == INVALID_VK_INDEX)
 		{
-			QueueBundle queueBundle;
+			GPUQueue queueBundle;
 			queueBundle.familyIndex = (uint32_t)i;
-			m_presentQueue = queueBundle;
+			m_PresentQueue = queueBundle;
 			availableQueues++;
 		}
 	}
@@ -228,51 +310,8 @@ uint32_t VulkanDevice::getGPUQueues(VkPhysicalDevice gpu)
 	return availableQueues;
 }
 
-std::set<std::string> VulkanDevice::getUnavailableExtensions(VkPhysicalDevice gpu, const InstanceProperties& instanceProps)
-{
-	uint32_t extensionCount;
-	vkEnumerateDeviceExtensionProperties(gpu, nullptr, &extensionCount, nullptr);
-
-	std::vector<VkExtensionProperties> availableExtensions(extensionCount);
-	vkEnumerateDeviceExtensionProperties(gpu, nullptr, &extensionCount, availableExtensions.data());
-
-	std::set<std::string> requiredExtensions(instanceProps.requestedExtensions.begin(), instanceProps.requestedExtensions.end());
-
-	for (const auto& extension : availableExtensions) 
-		requiredExtensions.erase(extension.extensionName);
-
-	return requiredExtensions;
-}
-
-SwapchainSupportDetails VulkanDevice::getSwapchainDetails(VkPhysicalDevice gpu)
-{
-	SwapchainSupportDetails details;
-
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu, m_VulkanPlatform.WindowSurface, &details.capabilities);
-
-	uint32_t formatCount;
-	vkGetPhysicalDeviceSurfaceFormatsKHR(gpu, m_VulkanPlatform.WindowSurface, &formatCount, nullptr);
-
-	if (formatCount != 0) {
-		details.formats.resize(formatCount);
-		vkGetPhysicalDeviceSurfaceFormatsKHR(gpu, m_VulkanPlatform.WindowSurface, &formatCount, details.formats.data());
-	}
-
-	uint32_t presentModeCount;
-	vkGetPhysicalDeviceSurfacePresentModesKHR(gpu, m_VulkanPlatform.WindowSurface, &presentModeCount, nullptr);
-
-	if (presentModeCount != 0) {
-		details.presentModes.resize(presentModeCount);
-		vkGetPhysicalDeviceSurfacePresentModesKHR(gpu, m_VulkanPlatform.WindowSurface, &presentModeCount, details.presentModes.data());
-	}
-
-	return details;
-}
-
 void VulkanDevice::createLogicalDevice(const InstanceProperties& instanceProps)
 {
-	// iau indexu la toate queue rile de care am nevoie
-
 	std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
 	std::set<uint32_t> uniqueQueueFamilies = { getGraphicsFamilyIndex(), getPresentFamilyIndex(), getComputeFamilyIndex()};
 
@@ -288,68 +327,84 @@ void VulkanDevice::createLogicalDevice(const InstanceProperties& instanceProps)
 	}
 
 	VkPhysicalDeviceFeatures deviceFeatures{};
-	deviceFeatures.samplerAnisotropy			  = VK_TRUE; 
-	deviceFeatures.sampleRateShading			  = VK_TRUE;
-	deviceFeatures.fillModeNonSolid				  = VK_TRUE;
-	deviceFeatures.geometryShader				  = VK_TRUE;
-	deviceFeatures.tessellationShader			  = VK_TRUE;
-	deviceFeatures.wideLines					  = VK_TRUE;
+	VkPhysicalDeviceFeatures supportedFeatures{};
+	vkGetPhysicalDeviceFeatures(m_VulkanPlatform.physicalDevice, &supportedFeatures);
 
-	VkPhysicalDeviceShaderAtomicFloatFeaturesEXT atomicFloatFeatures{};
-	atomicFloatFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_FEATURES_EXT;
-	atomicFloatFeatures.shaderSharedFloat32Atomics		= VK_TRUE;
-	atomicFloatFeatures.shaderSharedFloat32AtomicAdd	= VK_TRUE;
-
-	/*VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT atomicFloat2Features{};
-	
-	atomicFloat2Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_2_FEATURES_EXT;
-	atomicFloat2Features.shaderSharedFloat32AtomicMinMax = VK_TRUE;
-
-	atomicFloatFeatures.pNext = &atomicFloat2Features;*/
+	for (GPUFeature feature : instanceProps.requestedFeatures)
+		enableGPUFeature(deviceFeatures, supportedFeatures, feature);
 
 	VkDeviceCreateInfo deviceCreateInfo{};
+
+	VkPhysicalDeviceShaderAtomicFloatFeaturesEXT atomicFloatFeatures{};
+	VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT atomicFloat2Features{};
+
+	bool enableFloat	= false;
+	bool enableFloat2	= false;
+
+	const void* next = deviceCreateInfo.pNext;
+		
+	for (GPUFeatureEXT feature : instanceProps.requestedFeaturesEXT)
+	{
+		switch (feature)
+		{
+		case GPUFeatureEXT::ATOMICS_FLOAT32:
+			atomicFloatFeatures.shaderBufferFloat32Atomics = VK_TRUE;
+			enableFloat = true;
+			break;
+
+		case GPUFeatureEXT::ATOMIC_ADD_FLOAT32:
+			atomicFloatFeatures.shaderBufferFloat32AtomicAdd = VK_TRUE;
+			enableFloat = true;
+			break;
+
+		case GPUFeatureEXT::ATOMIC_MIN_MAX_FLOAT32_2:
+			atomicFloat2Features.shaderBufferFloat32AtomicMinMax = VK_TRUE;
+			enableFloat2 = true;
+			break;
+
+		default:
+			assert(false, "Implement this");
+			break;
+		}
+	}
+
+	if (enableFloat)
+	{
+		next = &atomicFloatFeatures;
+		next = atomicFloatFeatures.pNext;
+	}
+
+	if (enableFloat2)
+	{
+		next = &atomicFloat2Features;
+		next = atomicFloat2Features.pNext;
+	}
+
 	deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 
-	// queue
 	deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
 	deviceCreateInfo.queueCreateInfoCount = (uint32_t)queueCreateInfos.size();
-	// gpu features
+
 	deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
-	//deviceCreateInfo.pNext = &atomicFloatFeatures;
 
 	deviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(instanceProps.requestedExtensions.size());
-	deviceCreateInfo.ppEnabledExtensionNames = instanceProps.requestedExtensions.data();
+
+	std::vector<const char*> extensions = getExtensionList(instanceProps.requestedExtensions);
+	deviceCreateInfo.ppEnabledExtensionNames = extensions.data();
 
 	deviceCreateInfo.enabledLayerCount = static_cast<uint32_t>(instanceProps.requestedLayers.size());
-	deviceCreateInfo.ppEnabledLayerNames = instanceProps.requestedLayers.data();
 
-	if (vkCreateDevice(m_VulkanPlatform.GPU, &deviceCreateInfo, nullptr, &m_VulkanPlatform.logicalDevice) != VK_SUCCESS)
+	std::vector<const char*> layers = getLayerList(instanceProps.requestedLayers);
+	deviceCreateInfo.ppEnabledLayerNames = layers.data();
+
+	if (vkCreateDevice(m_VulkanPlatform.physicalDevice, &deviceCreateInfo, nullptr, &m_VulkanPlatform.logicalDevice) != VK_SUCCESS)
 	{
 		std::cerr << "Eraore creare device\n";
 		assert(false);
 	}
 
-	vkGetDeviceQueue(m_VulkanPlatform.logicalDevice, m_graphicsQueue.familyIndex, 0, &m_graphicsQueue.handle);
-	vkGetDeviceQueue(m_VulkanPlatform.logicalDevice, m_presentQueue.familyIndex, 0, &m_presentQueue.handle);
-	vkGetDeviceQueue(m_VulkanPlatform.logicalDevice, m_transferQueue.familyIndex, 0, &m_transferQueue.handle);
-	vkGetDeviceQueue(m_VulkanPlatform.logicalDevice, m_computeQueue.familyIndex, 0, &m_computeQueue.handle);
-}
-
-VulkanCommandPool::VulkanCommandPool()
-{
-	VkCommandPoolCreateInfo poolInfo{};
-	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-	poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-	poolInfo.queueFamilyIndex = VulkanDevice::getVulkanContext()->getGraphicsFamilyIndex();
-
-	if (vkCreateCommandPool(VulkanDevice::getVulkanDevice(), &poolInfo, nullptr, &m_GraphicsCommandPool) != VK_SUCCESS)
-	{
-		std::cout << "eroare CommandPool\n";
-		assert(false);
-	}
-}
-
-VulkanCommandPool::~VulkanCommandPool()
-{
-	vkDestroyCommandPool(VulkanDevice::getVulkanDevice(), m_GraphicsCommandPool, nullptr);
+	vkGetDeviceQueue(m_VulkanPlatform.logicalDevice, m_GraphicsQueue.familyIndex, 0, &m_GraphicsQueue.Handle);
+	vkGetDeviceQueue(m_VulkanPlatform.logicalDevice, m_PresentQueue.familyIndex, 0, &m_PresentQueue.Handle);
+	vkGetDeviceQueue(m_VulkanPlatform.logicalDevice, m_TransferQueue.familyIndex, 0, &m_TransferQueue.Handle);
+	vkGetDeviceQueue(m_VulkanPlatform.logicalDevice, m_ComputeQueue.familyIndex, 0, &m_ComputeQueue.Handle);
 }

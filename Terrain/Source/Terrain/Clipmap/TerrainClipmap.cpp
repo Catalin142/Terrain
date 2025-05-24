@@ -87,7 +87,7 @@ void TerrainClipmap::hardLoad(const glm::vec2& cameraPosition)
 	m_LastCameraPosition = curPosSnapped;
 	m_LastValidCameraPosition = curPosSnapped;
 
-	VkCommandBuffer currentCommandBuffer = VkUtils::beginSingleTimeCommand();
+	VkCommandBuffer currentCommandBuffer = VulkanUtils::beginSingleTimeCommand();
 	prepareForDeserialization(currentCommandBuffer);
 
 	for (int32_t lod = 0; lod < terrainInfo.LODCount; lod++)
@@ -108,8 +108,8 @@ void TerrainClipmap::hardLoad(const glm::vec2& cameraPosition)
 					m_Map->batchCopyBuffer(currentCommandBuffer, *m_Deserializer->getImageData(), m_Deserializer->getRegions());
 					m_Deserializer->Flush();
 
-					VkUtils::endSingleTimeCommand(currentCommandBuffer);
-					currentCommandBuffer = VkUtils::beginSingleTimeCommand();
+					VulkanUtils::endSingleTimeCommand(currentCommandBuffer);
+					currentCommandBuffer = VulkanUtils::beginSingleTimeCommand();
 				}
 			}
 	}
@@ -121,7 +121,7 @@ void TerrainClipmap::hardLoad(const glm::vec2& cameraPosition)
 	}
 
 	prepareForRendering(currentCommandBuffer);
-	VkUtils::endSingleTimeCommand(currentCommandBuffer);
+	VulkanUtils::endSingleTimeCommand(currentCommandBuffer);
 }
 
 void TerrainClipmap::prepareForDeserialization(VkCommandBuffer cmdBuffer)
@@ -133,7 +133,7 @@ void TerrainClipmap::prepareForDeserialization(VkCommandBuffer cmdBuffer)
 	imgSubresource.layerCount = terrainInfo.LODCount;
 	imgSubresource.levelCount = 1;
 	imgSubresource.baseMipLevel = 0;
-	VkUtils::transitionImageLayout(cmdBuffer, m_Map->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	VulkanUtils::transitionImageLayout(cmdBuffer, m_Map->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 }
 
 void TerrainClipmap::prepareForRendering(VkCommandBuffer cmdBuffer)
@@ -145,7 +145,7 @@ void TerrainClipmap::prepareForRendering(VkCommandBuffer cmdBuffer)
 	imgSubresource.layerCount = terrainInfo.LODCount;
 	imgSubresource.levelCount = 1;
 	imgSubresource.baseMipLevel = 0;
-	VkUtils::transitionImageLayout(cmdBuffer, m_Map->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+	VulkanUtils::transitionImageLayout(cmdBuffer, m_Map->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
 }
 
 void TerrainClipmap::blitNodes(VkCommandBuffer cmdBuffer, const std::shared_ptr<VulkanBuffer>& StagingBuffer, const std::vector<VkBufferImageCopy>& regions)

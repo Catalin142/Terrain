@@ -113,7 +113,7 @@ typedef BOOL (WINAPI * PFN_wglShareLists)(HGLRC,HGLRC);
 typedef struct _GLFWcontextWGL
 {
     HDC       dc;
-    HGLRC     handle;
+    HGLRC     Handle;
     int       interval;
 
 } _GLFWcontextWGL;

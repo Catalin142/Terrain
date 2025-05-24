@@ -115,7 +115,7 @@ typedef GLXContext (*PFNGLXCREATECONTEXTATTRIBSARBPROC)(Display*,GLXFBConfig,GLX
 //
 typedef struct _GLFWcontextGLX
 {
-    GLXContext      handle;
+    GLXContext      Handle;
     GLXWindow       window;
 
 } _GLFWcontextGLX;
@@ -129,7 +129,7 @@ typedef struct _GLFWlibraryGLX
     int             errorBase;
 
     // dlopen handle for libGL.so.1
-    void*           handle;
+    void*           Handle;
 
     // GLX 1.3 functions
     PFNGLXGETFBCONFIGSPROC              GetFBConfigs;

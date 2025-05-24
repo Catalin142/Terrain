@@ -2,6 +2,10 @@
 
 #include "Graphics/Vulkan/VulkanRenderer.h"
 #include "Graphics/Vulkan/VulkanDevice.h"
+#include "Graphics/Vulkan/VulkanUtils.h"
+
+#include "Graphics/Vulkan/VulkanInitializers.h"
+
 #include "Terrain/VirtualMap/DynamicVirtualTerrainDeserializer.h"
 #include "Terrain/VirtualMap/VirtualTerrainSerializer.h"
 
@@ -74,8 +78,8 @@ void QuadTreeTerrainRenderer::updateVirtualMap()
 			m_AvailableBuffer++;
 			m_AvailableBuffer %= VulkanRenderer::getFramesInFlight();
 
-			VulkanComputePipeline::imageMemoryBarrier(vkCommandBuffer, m_VirtualMap->getPhysicalTexture(), VK_ACCESS_MEMORY_WRITE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-				VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 1);
+			VulkanUtils::imageMemoryBarrier(vkCommandBuffer, m_VirtualMap->getPhysicalTexture(), { VK_ACCESS_MEMORY_WRITE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+				VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT });
 		}
 
 		CommandBuffer->endQuery(QuadTreeRendererMetrics::GPU_UPDATE_VIRTUAL_MAP);
@@ -123,8 +127,8 @@ void QuadTreeTerrainRenderer::updateVirtualMap()
 
 			VulkanRenderer::dispatchCompute(vkCommandBuffer, m_LODMapComputePass, m_BufferUsed, { slots / 8, slots / 8, 1 });
 
-			m_LODMapComputePass.Pipeline->imageMemoryBarrier(vkCommandBuffer, m_LODMap, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-				VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+			VulkanUtils::imageMemoryBarrier(vkCommandBuffer, m_LODMap, { VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT });
 		}
 
 		CommandBuffer->endQuery(QuadTreeRendererMetrics::GPU_GENERATE_LOD_MAP);
@@ -137,8 +141,8 @@ void QuadTreeTerrainRenderer::updateVirtualMap()
 		{
 			VulkanRenderer::dispatchCompute(vkCommandBuffer, m_NeighboursComputePass, m_BufferUsed, { 2, 1, 1 });
 
-			VulkanComputePipeline::bufferMemoryBarrier(vkCommandBuffer, m_QuadTreeLOD->AllChunks, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-				VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+			VulkanUtils::bufferMemoryBarrier(vkCommandBuffer, m_QuadTreeLOD->AllChunks, { VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT });
 		}
 
 		CommandBuffer->endQuery(QuadTreeRendererMetrics::GPU_SET_NEIGHTBOURS);
@@ -154,6 +158,7 @@ void QuadTreeTerrainRenderer::updateVirtualMap()
 
 void QuadTreeTerrainRenderer::Render(const Camera& camera)
 {
+	CommandBuffer->beginPipelineQuery();
 	CommandBuffer->beginQuery(QuadTreeRendererMetrics::RENDER_TERRAIN);
 
 	VkCommandBuffer cmdBuffer = CommandBuffer->getCurrentCommandBuffer();
@@ -176,6 +181,7 @@ void QuadTreeTerrainRenderer::Render(const Camera& camera)
 	VulkanRenderer::endRenderPass(cmdBuffer);
 
 	CommandBuffer->endQuery(QuadTreeRendererMetrics::RENDER_TERRAIN);
+	CommandBuffer->endPipelineQuery();
 }
 
 void QuadTreeTerrainRenderer::setWireframe(bool wireframe)
@@ -265,19 +271,27 @@ void QuadTreeTerrainRenderer::createRenderPass()
 
 void QuadTreeTerrainRenderer::createPipeline()
 {
-	PipelineSpecification spec{};
+	RenderPipelineSpecification spec{};
 	spec.Framebuffer = m_TargetFramebuffer;
-	spec.depthTest = true;
-	spec.depthWrite = true;
-	spec.Wireframe = m_InWireframe;
-	spec.Culling = true;
 	spec.Shader = ShaderManager::getShader(QUAD_TREE_TERRAIN_RENDER_SHADER_NAME);
+
 	spec.vertexBufferLayout = VulkanVertexBufferLayout{ VertexType::INT_2 };
-	spec.depthCompareFunction = DepthCompare::LESS;
+	spec.Topology = PrimitiveTopology::TRIANGLES;
 
-	spec.pushConstants.push_back({ sizeof(CameraRenderMatrices), VK_SHADER_STAGE_VERTEX_BIT });
+	DepthStencilStateSpecification dsSpecification{};
+	dsSpecification.depthTest = true;
+	dsSpecification.depthWrite = true;
+	dsSpecification.depthCompareFunction = DepthCompare::LESS;
+	spec.depthStateSpecification = dsSpecification;
 
-	m_TerrainPipeline = std::make_shared<VulkanPipeline>(spec);
+	ResterizationStateSpecification restarizationSpecification{};
+	restarizationSpecification.Culling = true;
+	restarizationSpecification.Wireframe = m_InWireframe;
+	spec.resterizationSpecification = restarizationSpecification;
+
+	spec.pushConstants.push_back({ sizeof(CameraRenderMatrices), ShaderStage::VERTEX });
+
+	m_TerrainPipeline = std::make_shared<VulkanRenderPipeline>(spec);
 
 	m_TerrainRenderPass.Pipeline = m_TerrainPipeline;
 }

@@ -18,12 +18,13 @@ void VulkanSwapchain::Initialize()
 	VulkanDevice* Device = VulkanDevice::getVulkanContext();
 	VkDevice logicalDevice = Device->getLogicalDevice();
 
-	SwapchainSupportDetails swapChainSupport = Device->getSwapchainCapabilities();
+	VkSurfaceCapabilitiesKHR swapchainCapabilities;
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Device->getPhysicalDevice(), Device->getWindowSurface(), &swapchainCapabilities);
 
-	m_ImageCount = swapChainSupport.capabilities.minImageCount + 1;
+	m_ImageCount = swapchainCapabilities.minImageCount + 1;
 
-	if (swapChainSupport.capabilities.maxImageCount > 0 && m_ImageCount > swapChainSupport.capabilities.maxImageCount)
-		m_ImageCount = swapChainSupport.capabilities.maxImageCount;
+	if (swapchainCapabilities.maxImageCount > 0 && m_ImageCount > swapchainCapabilities.maxImageCount)
+		m_ImageCount = swapchainCapabilities.maxImageCount;
 
 	m_SurfaceFormat.format = VK_FORMAT_B8G8R8A8_SRGB;
 	m_SurfaceFormat.colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
@@ -111,10 +112,11 @@ void VulkanSwapchain::Create(uint32_t width, uint32_t height)
 	VulkanDevice* Device = VulkanDevice::getVulkanContext();
 	VkDevice logicalDevice = Device->getLogicalDevice();
 
-	SwapchainSupportDetails swapChainSupport = Device->getSwapchainCapabilities();
+	VkSurfaceCapabilitiesKHR swapchainCapabilities;
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Device->getPhysicalDevice(), Device->getWindowSurface(), &swapchainCapabilities);
 
-	m_Width	= std::clamp(width, swapChainSupport.capabilities.minImageExtent.width, swapChainSupport.capabilities.maxImageExtent.width);
-	m_Height = std::clamp(height, swapChainSupport.capabilities.minImageExtent.height, swapChainSupport.capabilities.maxImageExtent.height);
+	m_Width	= std::clamp(width, swapchainCapabilities.minImageExtent.width, swapchainCapabilities.maxImageExtent.width);
+	m_Height = std::clamp(height, swapchainCapabilities.minImageExtent.height, swapchainCapabilities.maxImageExtent.height);
 
 	if (m_Width == 0 || m_Height == 0)
 		return;
@@ -146,7 +148,7 @@ void VulkanSwapchain::Create(uint32_t width, uint32_t height)
 		swapChainInfo.pQueueFamilyIndices = nullptr; // Optional
 	}
 
-	swapChainInfo.preTransform = swapChainSupport.capabilities.currentTransform;
+	swapChainInfo.preTransform = swapchainCapabilities.currentTransform;
 	swapChainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 
 	swapChainInfo.presentMode = m_PresentMode;
@@ -285,8 +287,6 @@ void VulkanSwapchain::beginFrame()
 		assert(false);
 }
 
-static std::mutex queueMutex;
-
 void VulkanSwapchain::endFrame()
 {
 	VkCommandBuffer commandBuffer = getCommandBuffer(m_currentFrameIndex);
@@ -310,7 +310,6 @@ void VulkanSwapchain::endFrame()
 	vkResetFences(device, 1, &m_inFlightFences[m_currentFrameIndex]);
 
 	{
-		std::lock_guard<std::mutex> lock(graphicsMutex);
 		if (vkQueueSubmit(VulkanDevice::getVulkanContext()->getGraphicsQueue(), 1, &submitInfo, m_inFlightFences[m_currentFrameIndex]) != VK_SUCCESS)
 			assert(false);
 	}
@@ -333,7 +332,6 @@ void VulkanSwapchain::presentFrame()
 	VkResult res = VK_SUCCESS;
 	
 	{
-		std::lock_guard<std::mutex> lock(graphicsMutex);
 		res = vkQueuePresentKHR(VulkanDevice::getVulkanContext()->getPresentQueue(), &presentInfo);
 
 		if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR) {

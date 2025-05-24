@@ -2,7 +2,7 @@
 
 #include "VulkanBuffer.h"
 #include "VulkanShader.h"
-#include "VulkanTexture.h"
+#include "VulkanImage.h"
 
 #include <vulkan/vulkan.h>
 #include <vector>
@@ -26,7 +26,6 @@ public:
 
 	void bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanBuffer>& buffer);
 	void bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanBufferSet>& bufferSet);
-	void bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanTexture>& texture);
 	void bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanImage>& image, uint32_t mip = 0);
 	void bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanSampler>& sampler);
 

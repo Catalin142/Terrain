@@ -446,6 +446,15 @@ void LODManagerGUI::renderTessellationGUI()
 	ImGui::SameLine();
 	ImGui::DragFloat("##lod5", &threshold[5], 0.01);
 
+	if (!CommandBuffer->pipelineStats.empty()) {
+		for (auto i = 0; i < CommandBuffer->pipelineStats.size(); i++) {
+			std::string caption = CommandBuffer->pipelineStatNames[i] + ": %d";
+			ImGui::Text(caption.c_str());
+			ImGui::SameLine();
+			ImGui::Text(std::to_string(CommandBuffer->pipelineStats[i]).c_str());
+		}
+	}
+
 	ImGui::Text(std::string("Maps: " + std::to_string(lodCount) + " * " + std::to_string(clipmapResolution) + "px").c_str());
 	ImGui::Spacing();
 	for (uint32_t lod = 0; lod < m_MapDescriptors.size(); lod++)
@@ -455,6 +464,7 @@ void LODManagerGUI::renderTessellationGUI()
 		if ((lod + 1) % 3 != 0)
 			ImGui::SameLine();
 	}
+
 }
 
 void LODManagerGUI::createBruteForceGUI()

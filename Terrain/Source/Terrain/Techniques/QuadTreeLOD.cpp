@@ -1,6 +1,7 @@
 #include "QuadTreeLOD.h"
 
 #include "Graphics/Vulkan/VulkanRenderer.h"
+#include "Graphics/Vulkan/VulkanUtils.h"
 
 #include <cmath>
 
@@ -68,11 +69,11 @@ void QuadTreeLOD::Generate(VkCommandBuffer commandBuffer, std::vector<TerrainChu
 		);
 	}
 
-	VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, PassMetadata->getBuffer(bufferIndex), VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+	VulkanUtils::bufferMemoryBarrier(commandBuffer, PassMetadata->getBuffer(bufferIndex), { VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT });
 
-	VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, AllChunks, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+	VulkanUtils::bufferMemoryBarrier(commandBuffer, AllChunks, { VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT });
 }
 
 void QuadTreeLOD::FrustumCull(VkCommandBuffer commandBuffer, Camera cam, uint32_t bufferIndex)
@@ -94,8 +95,8 @@ void QuadTreeLOD::FrustumCull(VkCommandBuffer commandBuffer, Camera cam, uint32_
 	if (vkQueueSubmit(VulkanDevice::getVulkanContext()->getComputeQueue(), 1, &submitInfo, nullptr) != VK_SUCCESS)
 		assert(false);
 
-	VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, ChunksToRender, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+	VulkanUtils::bufferMemoryBarrier(commandBuffer, ChunksToRender, { VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT });
 }
 
 void QuadTreeLOD::createQuadTreePass(const std::shared_ptr<TerrainVirtualMap>& virtualMap)

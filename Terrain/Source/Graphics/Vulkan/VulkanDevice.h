@@ -15,69 +15,75 @@
 
 #define INVALID_VK_INDEX 0xFFFFFFFF
 
-struct InstanceProperties
+enum class GPUExtension
 {
-	VkPhysicalDeviceType GPUType = VK_PHYSICAL_DEVICE_TYPE_OTHER;
-	std::vector<const char*> requestedExtensions;
-	std::vector<const char*> requestedLayers;
+	SWAPCHAIN,
+	ATOMIC_FLOAT,
 };
 
-// JUST GRAPHICS AND PRESENT QUEUE SUPPORTED
+enum class GPULayer
+{
+	VALIDATION,
+};
+
+enum class GPUFeature
+{
+	SAMPLER_ANISOTROPY,
+	SAMPLE_RATE_SHADING,
+	FILL_MODE_NON_SOLID,
+	GEOMETRY_SHADER,
+	TESSELLATION_SHADER,
+	WIDE_LINES,
+	PIPELINE_STATISTICS_QUERY
+};
+
+enum class GPUFeatureEXT
+{
+	ATOMICS_FLOAT32,
+	ATOMIC_ADD_FLOAT32,
+	ATOMIC_MIN_MAX_FLOAT32_2
+};
+
+struct InstanceProperties
+{
+	std::vector<GPUExtension> requestedExtensions;
+	std::vector<GPULayer> requestedLayers;
+	std::vector<GPUFeature> requestedFeatures;
+	std::vector<GPUFeatureEXT> requestedFeaturesEXT;
+};
+
 static InstanceProperties getDefaultInstanceProperties()
 {
 	InstanceProperties defaultProps;
-	defaultProps.GPUType				= VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
-	defaultProps.requestedExtensions	= { VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME };
-	defaultProps.requestedLayers		= { "VK_LAYER_KHRONOS_validation" };
+
+	defaultProps.requestedExtensions = { GPUExtension::SWAPCHAIN, GPUExtension::ATOMIC_FLOAT };
+	defaultProps.requestedLayers = { GPULayer::VALIDATION };
+	defaultProps.requestedFeatures = { 
+		GPUFeature::SAMPLER_ANISOTROPY, GPUFeature::SAMPLE_RATE_SHADING,
+		GPUFeature::FILL_MODE_NON_SOLID, GPUFeature::GEOMETRY_SHADER,
+		GPUFeature::TESSELLATION_SHADER, GPUFeature::WIDE_LINES,
+		GPUFeature::PIPELINE_STATISTICS_QUERY
+	};
+	defaultProps.requestedFeaturesEXT = {};
 
 	return defaultProps;
 }
 
-/*
-* Holds information specific to the swapchain based on the GPU used
-*/
-struct SwapchainSupportDetails
+struct GPUQueue
 {
-	VkSurfaceCapabilitiesKHR capabilities;
-	std::vector<VkSurfaceFormatKHR> formats;
-	std::vector<VkPresentModeKHR> presentModes;
-};
-
-/*
-* Holds information releated to a Queue
-*/
-struct QueueBundle
-{
-	VkQueue handle				= VK_NULL_HANDLE;
+	VkQueue Handle				= VK_NULL_HANDLE;
 	uint32_t familyIndex		= INVALID_VK_INDEX;
 };
 
-/*
-* A collection of vulkan handles
-*/
 struct VulkanPlatform
 {
-	VkInstance Instance			= VK_NULL_HANDLE;
-	VkSurfaceKHR WindowSurface	= VK_NULL_HANDLE;
-	VkPhysicalDevice GPU		= VK_NULL_HANDLE;
-	VkDevice logicalDevice		= VK_NULL_HANDLE;
+	VkInstance Instance					= VK_NULL_HANDLE;
+	VkSurfaceKHR windowSurface			= VK_NULL_HANDLE;
+	VkPhysicalDevice physicalDevice		= VK_NULL_HANDLE;
+	VkDevice logicalDevice				= VK_NULL_HANDLE;
 };
 
-class VulkanCommandPool
-{
-public:
-	VulkanCommandPool();
-	~VulkanCommandPool();
-
-	VkCommandPool getGraphicsCommandPool() { return m_GraphicsCommandPool; }
-	VkCommandPool getComputeCommandPool()  { return m_ComputeCommandPool; }
-
-private:
-	VkCommandPool m_GraphicsCommandPool;
-	VkCommandPool m_ComputeCommandPool;
-};
-
-static std::mutex graphicsMutex;
+struct VkSurfaceCapabilitiesKHR;
 
 class VulkanDevice
 {
@@ -85,27 +91,23 @@ public:
 	VulkanDevice(const std::shared_ptr<Window>& window, const InstanceProperties& gpuProps = getDefaultInstanceProperties());
 	~VulkanDevice();
 
-	bool supportsMSAASamples(uint32_t sampleNumber);
-	VkSampleCountFlagBits getMaximumMSAASamples();
+	inline VkInstance getInstance()	const					{ return m_VulkanPlatform.Instance; }
+	inline VkSurfaceKHR getWindowSurface() const			{ return m_VulkanPlatform.windowSurface; }
+	inline VkPhysicalDevice getPhysicalDevice() const		{ return m_VulkanPlatform.physicalDevice; }
+	inline VkDevice getLogicalDevice() const				{ return m_VulkanPlatform.logicalDevice; }
 
-	inline VkInstance getInstance()	const			{ return m_VulkanPlatform.Instance; }
-	inline VkSurfaceKHR getWindowSurface() const	{ return m_VulkanPlatform.WindowSurface; }
-	inline VkPhysicalDevice getGPU() const			{ return m_VulkanPlatform.GPU; }
-	inline VkDevice getLogicalDevice() const		{ return m_VulkanPlatform.logicalDevice; }
+	inline VkQueue getGraphicsQueue() const					{ return m_GraphicsQueue.Handle; }
+	inline VkQueue getPresentQueue() const					{ return m_PresentQueue.Handle; }
+	inline VkQueue getComputeQueue() const					{ return m_ComputeQueue.Handle; }
+																	 
+	inline uint32_t getGraphicsFamilyIndex() const			{ return m_GraphicsQueue.familyIndex; }
+	inline uint32_t getPresentFamilyIndex() const			{ return m_PresentQueue.familyIndex; }
+	inline uint32_t getComputeFamilyIndex() const			{ return m_ComputeQueue.familyIndex; }
 
-	inline VkQueue getGraphicsQueue() const			{ return m_graphicsQueue.handle; }
-	inline VkQueue getPresentQueue() const			{ return m_presentQueue.handle; }
-	inline VkQueue getComputeQueue() const			{ return m_computeQueue.handle; }
-															 
-	inline uint32_t getGraphicsFamilyIndex() const	{ return m_graphicsQueue.familyIndex; }
-	inline uint32_t getPresentFamilyIndex() const	{ return m_presentQueue.familyIndex; }
-	inline uint32_t getComputeFamilyIndex() const	{ return m_computeQueue.familyIndex; }
+	VkPhysicalDeviceLimits getPhysicalDeviceLimits() const			{ return m_PhysicalDeviceProperties.limits; }
+	VkPhysicalDeviceProperties getPhysicalDeviceProperties() const	{ return m_PhysicalDeviceProperties; }
 
-	VkPhysicalDeviceLimits getPhysicalDeviceLimits() const { return m_physicalDeviceProperties.limits; }
-	VkPhysicalDeviceProperties getPhysicalDeviceProperties() const { return m_physicalDeviceProperties; }
-
-	inline SwapchainSupportDetails getSwapchainCapabilities() { return getSwapchainDetails(m_VulkanPlatform.GPU); }
-
+public:
 	static VulkanDevice* getVulkanContext()
 	{
 		return m_Instance;
@@ -116,17 +118,8 @@ public:
 		return m_Instance->m_VulkanPlatform.logicalDevice;
 	}
 
-	static VkCommandPool getGraphicsCommandPool()
-	{
-		std::map<std::thread::id, std::shared_ptr<VulkanCommandPool>>& commandPool = m_Instance->m_CommandPool;
+	static VkCommandPool getGraphicsCommandPool();
 
-		if (commandPool.find(std::this_thread::get_id()) == commandPool.end())
-			commandPool[std::this_thread::get_id()] = std::make_shared<VulkanCommandPool>();
-
-		return commandPool[std::this_thread::get_id()]->getGraphicsCommandPool();
-	}
-
-	// TODO modify
 	std::string GPUName;
 
 private:
@@ -134,18 +127,7 @@ private:
 
 	void createInstance(InstanceProperties gpuProps);
 	void createWindowSurface(const std::shared_ptr<Window>& window);
-
-	/*
-	* Based on the scores of the GPUS, picks the best options of them all
-	*/
-	void pickPhysicalDevice(const InstanceProperties& gpuProps);
-
-	/*
-	* Returns a list of all the unvailable extensions that are specified in the InstanceProperties
-	*/
-	std::set<std::string> getUnavailableExtensions(VkPhysicalDevice gpu, const InstanceProperties& gpuProps);
-	SwapchainSupportDetails getSwapchainDetails(VkPhysicalDevice gpu);
-
+	void pickPhysicalDevice();
 	void createLogicalDevice(const InstanceProperties& gpuProps);
 
 	uint32_t getGPUQueues(VkPhysicalDevice gpu);
@@ -153,16 +135,16 @@ private:
 private:
 	VulkanPlatform m_VulkanPlatform;
 
-	QueueBundle m_graphicsQueue;
-	QueueBundle m_presentQueue;
-	QueueBundle m_transferQueue;
-	QueueBundle m_computeQueue;
+	GPUQueue m_GraphicsQueue;
+	GPUQueue m_PresentQueue;
+	GPUQueue m_TransferQueue;
+	GPUQueue m_ComputeQueue;
 
-	std::map<std::thread::id, std::shared_ptr<VulkanCommandPool>> m_CommandPool;
+	std::map<std::thread::id, VkCommandPool> m_CommandPool;
 
-	VkPhysicalDeviceFeatures m_physicalDeviceFeatures;
-	VkPhysicalDeviceProperties m_physicalDeviceProperties; 
-	VkPhysicalDeviceMemoryProperties m_physicalDeviceMemoryProperties;
+	VkPhysicalDeviceFeatures m_PhysicalDeviceFeatures;
+	VkPhysicalDeviceProperties m_PhysicalDeviceProperties; 
+	VkPhysicalDeviceMemoryProperties m_PhysicalDeviceMemoryProperties;
 
 	VkPhysicalDeviceProperties m_GPUProperties{};
 	VkPhysicalDeviceMemoryProperties m_VRAMProperties{};

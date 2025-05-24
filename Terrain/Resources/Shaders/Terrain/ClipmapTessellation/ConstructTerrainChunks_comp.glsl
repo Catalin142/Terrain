@@ -126,7 +126,7 @@ void main()
 			remove = true;
     }
 
-    if (remove || !frustumCheck(chunkPosition * chunkSize, -terrainInfo.ElevationRange.x * 2.0, -terrainInfo.ElevationRange.y * 2.0, chunkSize))
+    if (remove)// || !frustumCheck(chunkPosition * chunkSize, -terrainInfo.ElevationRange.x * 2.0, -terrainInfo.ElevationRange.y * 2.0, chunkSize))
         return;
         
     TerrainChunk chunk;

@@ -43,7 +43,7 @@ void VulkanImgui::Initialize(const std::shared_ptr<Window>& window)
 	//this initializes imgui for Vulkan
 	ImGui_ImplVulkan_InitInfo init_info = {};
 	init_info.Instance = Device->getInstance();
-	init_info.PhysicalDevice = Device->getGPU();
+	init_info.PhysicalDevice = Device->getPhysicalDevice();
 	init_info.Device = Device->getLogicalDevice();
 	init_info.Queue = Device->getGraphicsQueue();
 	init_info.DescriptorPool = m_DescriptorPool;

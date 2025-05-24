@@ -62,8 +62,8 @@ typedef VkBool32 (APIENTRY *PFN_vkGetPhysicalDeviceWaylandPresentationSupportKHR
 #include "wayland-idle-inhibit-unstable-v1-client-protocol.h"
 
 #define _glfw_dlopen(name) dlopen(name, RTLD_LAZY | RTLD_LOCAL)
-#define _glfw_dlclose(handle) dlclose(handle)
-#define _glfw_dlsym(handle, name) dlsym(handle, name)
+#define _glfw_dlclose(Handle) dlclose(Handle)
+#define _glfw_dlsym(Handle, name) dlsym(Handle, name)
 
 #define _GLFW_PLATFORM_WINDOW_STATE         _GLFWwindowWayland  wl
 #define _GLFW_PLATFORM_LIBRARY_WINDOW_STATE _GLFWlibraryWayland wl
@@ -259,7 +259,7 @@ typedef struct _GLFWlibraryWayland
     short int                   scancodes[GLFW_KEY_LAST + 1];
 
     struct {
-        void*                   handle;
+        void*                   Handle;
         struct xkb_context*     context;
         struct xkb_keymap*      keymap;
         struct xkb_state*       state;
@@ -303,7 +303,7 @@ typedef struct _GLFWlibraryWayland
     _GLFWwindow*                keyboardFocus;
 
     struct {
-        void*                   handle;
+        void*                   Handle;
 
         PFN_wl_cursor_theme_load theme_load;
         PFN_wl_cursor_theme_destroy theme_destroy;
@@ -312,7 +312,7 @@ typedef struct _GLFWlibraryWayland
     } cursor;
 
     struct {
-        void*                   handle;
+        void*                   Handle;
 
         PFN_wl_egl_window_create window_create;
         PFN_wl_egl_window_destroy window_destroy;

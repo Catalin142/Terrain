@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <fstream>
 #include <format>
 
 #include "Graphics/Vulkan/VulkanDevice.h"
@@ -46,6 +47,12 @@ void ProfilerGUI::pushValue(const std::string& name, float value, uint32_t color
 	m_ProfilerAverage[name] -= m_ProfilerValues[name][m_End];
 
 	m_ProfilerValues[name][m_End] = value;
+
+	if (name == "Render terrain")
+	{
+		static std::ofstream outFile("out.txt");
+		outFile << value << ",";
+	}
 }
 
 void ProfilerGUI::nextFrame()

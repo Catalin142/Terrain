@@ -9,7 +9,7 @@
 
 #include "Graphics/Vulkan/VulkanFramebuffer.h"
 #include "Graphics/Vulkan/VulkanRenderCommandBuffer.h"
-#include "Graphics/Vulkan/VulkanPipeline.h"
+#include "Graphics/Vulkan/VulkanRenderPipeline.h"
 #include "Graphics/Vulkan/VulkanPass.h"
 
 #include <memory>
@@ -84,8 +84,8 @@ private:
 
 	std::shared_ptr<VulkanFramebuffer> m_TargetFramebuffer;
 
-	RenderPass m_TerrainRenderPass;
-	std::shared_ptr<VulkanPipeline> m_TerrainPipeline;
+	VulkanRenderPass m_TerrainRenderPass;
+	std::shared_ptr<VulkanRenderPipeline> m_TerrainPipeline;
 
 	VulkanComputePass m_VerticalErrorPass;
 	std::shared_ptr<VulkanImage> m_VerticalErrorMap;

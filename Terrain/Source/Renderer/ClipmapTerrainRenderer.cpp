@@ -4,6 +4,9 @@
 
 #include "Graphics/Vulkan/VulkanDevice.h"
 #include "Graphics/Vulkan/VulkanRenderer.h"
+#include "Graphics/Vulkan/VulkanUtils.h"
+
+#include "Graphics/Vulkan/VulkanInitializers.h"
 
 #include "Core/Instrumentor.h"
 #include "Core/VulkanMemoryTracker.h"
@@ -73,8 +76,8 @@ void ClipmapTerrainRenderer::updateClipmaps(const Camera& camera)
 
 		m_ClipmapLOD->Generate(commandBuffer, camera);
 
-		VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, m_ClipmapLOD->ChunksToRender, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+		VulkanUtils::bufferMemoryBarrier(commandBuffer, m_ClipmapLOD->ChunksToRender, { VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT });
 
 		CommandBuffer->endQuery(ClipmapRendererMetrics::GPU_GENERATE_AND_FRUSTUM_CULL);
 	}
@@ -82,6 +85,7 @@ void ClipmapTerrainRenderer::updateClipmaps(const Camera& camera)
 
 void ClipmapTerrainRenderer::Render(const Camera& camera)
 {
+	CommandBuffer->beginPipelineQuery();
 	CommandBuffer->beginQuery(ClipmapRendererMetrics::RENDER_TERRAIN);
 
 	VkCommandBuffer commandBuffer = CommandBuffer->getCurrentCommandBuffer();
@@ -104,6 +108,7 @@ void ClipmapTerrainRenderer::Render(const Camera& camera)
 	VulkanRenderer::endRenderPass(commandBuffer);
 
 	CommandBuffer->endQuery(ClipmapRendererMetrics::RENDER_TERRAIN);
+	CommandBuffer->endPipelineQuery();
 }
 
 void ClipmapTerrainRenderer::setWireframe(bool wireframe)
@@ -140,19 +145,27 @@ void ClipmapTerrainRenderer::createRenderPass()
 
 void ClipmapTerrainRenderer::createPipeline()
 {
-	PipelineSpecification spec{};
+	RenderPipelineSpecification spec{};
 	spec.Framebuffer = m_TargetFramebuffer;
-	spec.depthTest = true;
-	spec.depthWrite = true;
-	spec.Wireframe = m_InWireframe;
-	spec.Culling = true;
 	spec.Shader = ShaderManager::getShader(CLIPMAP_TERRAIN_RENDER_SHADER_NAME);
+
 	spec.vertexBufferLayout = VulkanVertexBufferLayout{ VertexType::INT_2 };
-	spec.depthCompareFunction = DepthCompare::LESS;
+	spec.Topology = PrimitiveTopology::TRIANGLES;
 
-	spec.pushConstants.push_back({ sizeof(CameraRenderMatrices), VK_SHADER_STAGE_VERTEX_BIT });
+	DepthStencilStateSpecification dsSpecification{};
+	dsSpecification.depthTest = true;
+	dsSpecification.depthWrite = true;
+	dsSpecification.depthCompareFunction = DepthCompare::LESS;
+	spec.depthStateSpecification = dsSpecification;
 
-	m_TerrainPipeline = std::make_shared<VulkanPipeline>(spec);
+	ResterizationStateSpecification restarizationSpecification{};
+	restarizationSpecification.Culling = true;
+	restarizationSpecification.Wireframe = m_InWireframe;
+	spec.resterizationSpecification = restarizationSpecification;
+
+	spec.pushConstants.push_back({ sizeof(CameraRenderMatrices), ShaderStage::VERTEX });
+
+	m_TerrainPipeline = std::make_shared<VulkanRenderPipeline>(spec);
 
 	m_TerrainRenderPass.Pipeline = m_TerrainPipeline;
 }

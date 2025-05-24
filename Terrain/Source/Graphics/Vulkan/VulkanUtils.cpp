@@ -9,7 +9,7 @@
 
 static std::mutex queueMutex;
 
-VkCommandBuffer VkUtils::beginSingleTimeCommand()
+VkCommandBuffer VulkanUtils::beginSingleTimeCommand()
 {
 	VkCommandBufferAllocateInfo allocInfo{};
 	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -29,7 +29,7 @@ VkCommandBuffer VkUtils::beginSingleTimeCommand()
 	return commandBuffer;
 }
 
-void VkUtils::endSingleTimeCommand(VkCommandBuffer buffer)
+void VulkanUtils::endSingleTimeCommand(VkCommandBuffer buffer)
 {
 	vkEndCommandBuffer(buffer);
 
@@ -41,7 +41,6 @@ void VkUtils::endSingleTimeCommand(VkCommandBuffer buffer)
 	VulkanDevice* deviceContext = VulkanDevice::getVulkanContext();
 
 	{
-		std::lock_guard<std::mutex> lock(graphicsMutex);
 		vkQueueSubmit(deviceContext->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
 		vkQueueWaitIdle(deviceContext->getGraphicsQueue());
 	}
@@ -49,14 +48,13 @@ void VkUtils::endSingleTimeCommand(VkCommandBuffer buffer)
 	vkFreeCommandBuffers(deviceContext->getLogicalDevice(), VulkanDevice::getGraphicsCommandPool(), 1, &buffer);
 }
 
-void VkUtils::endSingleTimeCommand(VkCommandBuffer buffer, VkSubmitInfo info)
+void VulkanUtils::endSingleTimeCommand(VkCommandBuffer buffer, VkSubmitInfo info)
 {
 	vkEndCommandBuffer(buffer);
 
 	VulkanDevice* deviceContext = VulkanDevice::getVulkanContext();
 
 	{
-		std::lock_guard<std::mutex> lock(graphicsMutex);
 		vkQueueSubmit(deviceContext->getGraphicsQueue(), 1, &info, VK_NULL_HANDLE);
 		vkQueueWaitIdle(deviceContext->getGraphicsQueue());
 	}
@@ -64,7 +62,7 @@ void VkUtils::endSingleTimeCommand(VkCommandBuffer buffer, VkSubmitInfo info)
 	vkFreeCommandBuffers(deviceContext->getLogicalDevice(), VulkanDevice::getGraphicsCommandPool(), 1, &buffer);
 }
 
-void VkUtils::flushCommandBuffer(VkCommandBuffer commandBuffer)
+void VulkanUtils::flushCommandBuffer(VkCommandBuffer commandBuffer)
 {
 	if (commandBuffer == VK_NULL_HANDLE)
 		return;
@@ -85,7 +83,6 @@ void VkUtils::flushCommandBuffer(VkCommandBuffer commandBuffer)
 		assert(false);
 
 	{
-		std::lock_guard<std::mutex> lock(graphicsMutex);
 		vkQueueSubmit(VulkanDevice::getVulkanContext()->getGraphicsQueue(), 1, &submitInfo, fence);
 		vkWaitForFences(VulkanDevice::getVulkanDevice(), 1, &fence, VK_TRUE, UINT64_MAX);
 	}
@@ -93,7 +90,7 @@ void VkUtils::flushCommandBuffer(VkCommandBuffer commandBuffer)
 	vkFreeCommandBuffers(VulkanDevice::getVulkanDevice(), VulkanDevice::getVulkanContext()->getGraphicsCommandPool(), 1, &commandBuffer);
 }
 
-void VkUtils::transitionImageLayout(VkImage image, VkImageSubresourceRange subresourceRange, VkImageLayout oldLayout, VkImageLayout newLayout,
+void VulkanUtils::transitionImageLayout(VkImage image, VkImageSubresourceRange subresourceRange, VkImageLayout oldLayout, VkImageLayout newLayout,
 	VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask)
 {
 	VkCommandBuffer commandBuffer = beginSingleTimeCommand();
@@ -101,7 +98,7 @@ void VkUtils::transitionImageLayout(VkImage image, VkImageSubresourceRange subre
 	endSingleTimeCommand(commandBuffer);
 }
 
-void VkUtils::transitionImageLayout(VkCommandBuffer cmdBuffer, VkImage image, VkImageSubresourceRange subresourceRange, VkImageLayout oldLayout, VkImageLayout newLayout, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask)
+void VulkanUtils::transitionImageLayout(VkCommandBuffer cmdBuffer, VkImage image, VkImageSubresourceRange subresourceRange, VkImageLayout oldLayout, VkImageLayout newLayout, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask)
 {
 	VkImageMemoryBarrier barrier{};
 	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -186,7 +183,42 @@ void VkUtils::transitionImageLayout(VkCommandBuffer cmdBuffer, VkImage image, Vk
 
 }
 
-uint32_t VkUtils::calculateNumberOfMips(uint32_t width, uint32_t height)
+uint32_t VulkanUtils::calculateNumberOfMips(uint32_t width, uint32_t height)
 {
 	return (uint32_t)glm::floor(glm::log2(glm::min(width, height))) + 1;
+}
+
+void VulkanUtils::bufferMemoryBarrier(VkCommandBuffer cmdBuffer, const std::shared_ptr<VulkanBuffer>& buffer, MemoryBarrierSpecification barrierSpecification)
+{
+	VkBufferMemoryBarrier bufferMemoryBarrier = {};
+	bufferMemoryBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+	bufferMemoryBarrier.buffer = buffer->getBuffer();
+	bufferMemoryBarrier.offset = 0;
+	bufferMemoryBarrier.size = VK_WHOLE_SIZE;
+	bufferMemoryBarrier.srcAccessMask = barrierSpecification.fromAccess;
+	bufferMemoryBarrier.dstAccessMask = barrierSpecification.toAccess;
+
+	vkCmdPipelineBarrier(cmdBuffer, barrierSpecification.fromStage, barrierSpecification.toStage, 
+		0, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr);
+}
+
+void VulkanUtils::imageMemoryBarrier(VkCommandBuffer cmdBuffer, const std::shared_ptr<VulkanImage>& image, MemoryBarrierSpecification barrierSpecification)
+{
+	VkImageMemoryBarrier imageMemoryBarrier = {};
+	imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+	imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+	imageMemoryBarrier.image = image->getVkImage();
+	imageMemoryBarrier.subresourceRange.aspectMask = image->getSpecification().Aspect;
+	imageMemoryBarrier.subresourceRange.baseArrayLayer = 0;
+
+	VulkanImageSpecification imgSpecification = image->getSpecification();
+	imageMemoryBarrier.subresourceRange.layerCount = imgSpecification.LayerCount;
+	imageMemoryBarrier.subresourceRange.levelCount = imgSpecification.Mips;
+	imageMemoryBarrier.subresourceRange.baseMipLevel = 0;
+	imageMemoryBarrier.srcAccessMask = barrierSpecification.fromAccess;
+	imageMemoryBarrier.dstAccessMask = barrierSpecification.toAccess;
+
+	vkCmdPipelineBarrier(cmdBuffer, barrierSpecification.fromStage, barrierSpecification.toStage,
+		0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
 }

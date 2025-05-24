@@ -36,10 +36,10 @@ void main(void)
 
 		gl_TessLevelInner[0] = centerLod;
 		gl_TessLevelInner[1] = centerLod;
-		gl_TessLevelOuter[0] = max(centerLod, terrainInfo.minimumChunkSize / downDivisor);
-		gl_TessLevelOuter[1] = max(centerLod, terrainInfo.minimumChunkSize / leftDivisor);
-		gl_TessLevelOuter[2] = max(centerLod, terrainInfo.minimumChunkSize / upDivisor);
-		gl_TessLevelOuter[3] = max(centerLod, terrainInfo.minimumChunkSize / rightDivisor);
+		gl_TessLevelOuter[0] = min(centerLod, terrainInfo.minimumChunkSize / downDivisor);
+		gl_TessLevelOuter[1] = min(centerLod, terrainInfo.minimumChunkSize / leftDivisor);
+		gl_TessLevelOuter[2] = min(centerLod, terrainInfo.minimumChunkSize / upDivisor);
+		gl_TessLevelOuter[3] = min(centerLod, terrainInfo.minimumChunkSize / rightDivisor);
     }
 
     gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;

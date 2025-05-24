@@ -2,6 +2,9 @@
 
 #include "Graphics/Vulkan/VulkanDevice.h"
 #include "Graphics/Vulkan/VulkanRenderer.h"
+#include "Graphics/Vulkan/VulkanUtils.h"
+
+#include "Graphics/Vulkan/VulkanInitializers.h"
 
 #include "Core/Instrumentor.h"
 #include "Core/VulkanMemoryTracker.h"
@@ -103,8 +106,8 @@ void TessellationTerrainRenderer::updateClipmaps()
 	{
 		VulkanRenderer::dispatchCompute(cmdBuffer, m_VerticalErrorPass, { 64, 64, m_Terrain->getInfo().LODCount});
 
-		VulkanComputePipeline::imageMemoryBarrier(cmdBuffer, m_VerticalErrorMap, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT, 1, 3);
+		VulkanUtils::imageMemoryBarrier(cmdBuffer, m_VerticalErrorMap, { VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT });
 
 		m_VericalErrorMapGenerated = true;
 	}
@@ -113,14 +116,16 @@ void TessellationTerrainRenderer::updateClipmaps()
 	CommandBuffer->beginQuery(TessellationRendererMetrics::GPU_GENERATE_AND_FRUSTUM_CULL);
 	m_TessellationLOD->Generate(cmdBuffer, SceneCamera, patchSize);
 
-	VulkanComputePipeline::bufferMemoryBarrier(cmdBuffer, m_TessellationLOD->ChunksToRender, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+	VulkanUtils::bufferMemoryBarrier(cmdBuffer, m_TessellationLOD->ChunksToRender, { VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT });
 
 	CommandBuffer->endQuery(TessellationRendererMetrics::GPU_GENERATE_AND_FRUSTUM_CULL);
 }
 
 void TessellationTerrainRenderer::Render(const Camera& camera)
 {
+	CommandBuffer->beginPipelineQuery();
+
 	int32_t tessSettings[4] = {m_ControlPointSize, m_ControlPointsPerRow};
 	m_TessellationSettings->setDataCPU(&tessSettings, 4 * sizeof(int32_t));
 
@@ -148,6 +153,8 @@ void TessellationTerrainRenderer::Render(const Camera& camera)
 	VulkanRenderer::endRenderPass(cmdBuffer);
 
 	CommandBuffer->endQuery(TessellationRendererMetrics::RENDER_TERRAIN);
+
+	CommandBuffer->endPipelineQuery();
 }
 
 void TessellationTerrainRenderer::setWireframe(bool wireframe)
@@ -188,21 +195,29 @@ void TessellationTerrainRenderer::createRenderPass()
 
 void TessellationTerrainRenderer::createPipeline()
 {
-	PipelineSpecification spec{};
+	RenderPipelineSpecification spec{};
 	spec.Framebuffer = m_TargetFramebuffer;
-	spec.depthTest = true;
-	spec.depthWrite = true;
-	spec.Wireframe = m_InWireframe;
-	spec.Culling = true;
 	spec.Shader = ShaderManager::getShader(TESSELLATION_TERRAIN_RENDER_SHADER_NAME);
+
 	spec.vertexBufferLayout = VulkanVertexBufferLayout{ VertexType::INT_2 };
-	spec.depthCompareFunction = DepthCompare::LESS;
 	spec.Topology = PrimitiveTopology::PATCHES;
-	spec.tessellationControlPoints = 4;
 
-	spec.pushConstants.push_back({ sizeof(CameraRenderMatrices), VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT });
+	DepthStencilStateSpecification dsSpecification{};
+	dsSpecification.depthTest = true;
+	dsSpecification.depthWrite = true;
+	dsSpecification.depthCompareFunction = DepthCompare::LESS;
+	spec.depthStateSpecification = dsSpecification;
 
-	m_TerrainPipeline = std::make_shared<VulkanPipeline>(spec);
+	ResterizationStateSpecification restarizationSpecification{};
+	restarizationSpecification.Culling = true;
+	restarizationSpecification.Wireframe = m_InWireframe;
+	spec.resterizationSpecification = restarizationSpecification;
+
+	spec.tessellationPatchControlPoints = 4;
+
+	spec.pushConstants.push_back({ sizeof(CameraRenderMatrices), ShaderStage::TESSELLATION_EVALUATION });
+
+	m_TerrainPipeline = std::make_shared<VulkanRenderPipeline>(spec);
 
 	m_TerrainRenderPass.Pipeline = m_TerrainPipeline;
 }

@@ -23,11 +23,22 @@ public:
 
 	void beginQuery(const std::string& name);
 	void endQuery(const std::string& name);
+	
+	void beginPipelineQuery();
+	void endPipelineQuery();
+
+	void getQueryResult();
+
 	void queryResults();
 
 	float getCommandBufferTime();
 	float getTime(const std::string& name);
 	bool getCurrentBufferStatus();
+
+	void setupQueryPool();
+
+	std::vector<uint64_t> pipelineStats{};
+	std::vector<std::string> pipelineStatNames{};
 
 private:
 	VkCommandPool m_CommandPool = VK_NULL_HANDLE;
@@ -43,4 +54,6 @@ private:
 	uint32_t m_QueryFrame = 0;
 
 	bool m_OwnedBySwapchain = false;
+
+	VkQueryPool m_QueryPoolsPipelineStats;
 };

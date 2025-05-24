@@ -338,7 +338,7 @@ struct _GLFWfbconfig
     GLFWbool    sRGB;
     GLFWbool    doublebuffer;
     GLFWbool    transparent;
-    uintptr_t   handle;
+    uintptr_t   Handle;
 };
 
 // Context structure
@@ -559,7 +559,7 @@ struct _GLFWlibrary
 
     struct {
         GLFWbool        available;
-        void*           handle;
+        void*           Handle;
         char*           extensions[2];
 #if !defined(_GLFW_VULKAN_STATIC)
         PFN_vkEnumerateInstanceExtensionProperties EnumerateInstanceExtensionProperties;

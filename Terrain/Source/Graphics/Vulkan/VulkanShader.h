@@ -63,11 +63,14 @@ public:
 	const std::vector<ShaderInput> getInputs(uint32_t set) { return m_Input[set]; }
 	uint32_t getNumberOfSets() { return (uint32_t)m_DescriptorSetLayouts.size(); }
 
+	uint32_t getDescriptorSetCount() { return m_DescriptorSetCount; }
+
 private:
 	std::unordered_map<ShaderStage, std::shared_ptr<VulkanShaderStage>> m_Stages;
 	std::map<uint32_t, std::vector<ShaderInput>> m_Input;
 
 	std::vector<VkDescriptorSetLayout> m_DescriptorSetLayouts;
+	uint32_t m_DescriptorSetCount = 1;
 };
 
 class ShaderManager

@@ -29,7 +29,7 @@ public:
 	VkVertexInputBindingDescription getBindindDescription() const { return m_BindingDescription; }
 	const std::vector<VkVertexInputAttributeDescription>& getInputAttributeDescriptions() const { return m_InputAttributeDescriptions; }
 
-	bool hasInput() { return m_InputAttributeDescriptions.size() != 0; }
+	bool hasInput() const { return m_InputAttributeDescriptions.size() != 0; }
 
 private:
 	VkVertexInputBindingDescription m_BindingDescription;

@@ -321,9 +321,9 @@ GLFWAPI GLFWmonitor* glfwGetPrimaryMonitor(void)
     return (GLFWmonitor*) _glfw.monitors[0];
 }
 
-GLFWAPI void glfwGetMonitorPos(GLFWmonitor* handle, int* xpos, int* ypos)
+GLFWAPI void glfwGetMonitorPos(GLFWmonitor* Handle, int* xpos, int* ypos)
 {
-    _GLFWmonitor* monitor = (_GLFWmonitor*) handle;
+    _GLFWmonitor* monitor = (_GLFWmonitor*) Handle;
     assert(monitor != NULL);
 
     if (xpos)
@@ -336,11 +336,11 @@ GLFWAPI void glfwGetMonitorPos(GLFWmonitor* handle, int* xpos, int* ypos)
     _glfwPlatformGetMonitorPos(monitor, xpos, ypos);
 }
 
-GLFWAPI void glfwGetMonitorWorkarea(GLFWmonitor* handle,
+GLFWAPI void glfwGetMonitorWorkarea(GLFWmonitor* Handle,
                                     int* xpos, int* ypos,
                                     int* width, int* height)
 {
-    _GLFWmonitor* monitor = (_GLFWmonitor*) handle;
+    _GLFWmonitor* monitor = (_GLFWmonitor*) Handle;
     assert(monitor != NULL);
 
     if (xpos)
@@ -357,9 +357,9 @@ GLFWAPI void glfwGetMonitorWorkarea(GLFWmonitor* handle,
     _glfwPlatformGetMonitorWorkarea(monitor, xpos, ypos, width, height);
 }
 
-GLFWAPI void glfwGetMonitorPhysicalSize(GLFWmonitor* handle, int* widthMM, int* heightMM)
+GLFWAPI void glfwGetMonitorPhysicalSize(GLFWmonitor* Handle, int* widthMM, int* heightMM)
 {
-    _GLFWmonitor* monitor = (_GLFWmonitor*) handle;
+    _GLFWmonitor* monitor = (_GLFWmonitor*) Handle;
     assert(monitor != NULL);
 
     if (widthMM)
@@ -375,10 +375,10 @@ GLFWAPI void glfwGetMonitorPhysicalSize(GLFWmonitor* handle, int* widthMM, int* 
         *heightMM = monitor->heightMM;
 }
 
-GLFWAPI void glfwGetMonitorContentScale(GLFWmonitor* handle,
+GLFWAPI void glfwGetMonitorContentScale(GLFWmonitor* Handle,
                                         float* xscale, float* yscale)
 {
-    _GLFWmonitor* monitor = (_GLFWmonitor*) handle;
+    _GLFWmonitor* monitor = (_GLFWmonitor*) Handle;
     assert(monitor != NULL);
 
     if (xscale)
@@ -390,27 +390,27 @@ GLFWAPI void glfwGetMonitorContentScale(GLFWmonitor* handle,
     _glfwPlatformGetMonitorContentScale(monitor, xscale, yscale);
 }
 
-GLFWAPI const char* glfwGetMonitorName(GLFWmonitor* handle)
+GLFWAPI const char* glfwGetMonitorName(GLFWmonitor* Handle)
 {
-    _GLFWmonitor* monitor = (_GLFWmonitor*) handle;
+    _GLFWmonitor* monitor = (_GLFWmonitor*) Handle;
     assert(monitor != NULL);
 
     _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
     return monitor->name;
 }
 
-GLFWAPI void glfwSetMonitorUserPointer(GLFWmonitor* handle, void* pointer)
+GLFWAPI void glfwSetMonitorUserPointer(GLFWmonitor* Handle, void* pointer)
 {
-    _GLFWmonitor* monitor = (_GLFWmonitor*) handle;
+    _GLFWmonitor* monitor = (_GLFWmonitor*) Handle;
     assert(monitor != NULL);
 
     _GLFW_REQUIRE_INIT();
     monitor->userPointer = pointer;
 }
 
-GLFWAPI void* glfwGetMonitorUserPointer(GLFWmonitor* handle)
+GLFWAPI void* glfwGetMonitorUserPointer(GLFWmonitor* Handle)
 {
-    _GLFWmonitor* monitor = (_GLFWmonitor*) handle;
+    _GLFWmonitor* monitor = (_GLFWmonitor*) Handle;
     assert(monitor != NULL);
 
     _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
@@ -424,9 +424,9 @@ GLFWAPI GLFWmonitorfun glfwSetMonitorCallback(GLFWmonitorfun cbfun)
     return cbfun;
 }
 
-GLFWAPI const GLFWvidmode* glfwGetVideoModes(GLFWmonitor* handle, int* count)
+GLFWAPI const GLFWvidmode* glfwGetVideoModes(GLFWmonitor* Handle, int* count)
 {
-    _GLFWmonitor* monitor = (_GLFWmonitor*) handle;
+    _GLFWmonitor* monitor = (_GLFWmonitor*) Handle;
     assert(monitor != NULL);
     assert(count != NULL);
 
@@ -441,9 +441,9 @@ GLFWAPI const GLFWvidmode* glfwGetVideoModes(GLFWmonitor* handle, int* count)
     return monitor->modes;
 }
 
-GLFWAPI const GLFWvidmode* glfwGetVideoMode(GLFWmonitor* handle)
+GLFWAPI const GLFWvidmode* glfwGetVideoMode(GLFWmonitor* Handle)
 {
-    _GLFWmonitor* monitor = (_GLFWmonitor*) handle;
+    _GLFWmonitor* monitor = (_GLFWmonitor*) Handle;
     assert(monitor != NULL);
 
     _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
@@ -452,13 +452,13 @@ GLFWAPI const GLFWvidmode* glfwGetVideoMode(GLFWmonitor* handle)
     return &monitor->currentMode;
 }
 
-GLFWAPI void glfwSetGamma(GLFWmonitor* handle, float gamma)
+GLFWAPI void glfwSetGamma(GLFWmonitor* Handle, float gamma)
 {
     unsigned int i;
     unsigned short* values;
     GLFWgammaramp ramp;
     const GLFWgammaramp* original;
-    assert(handle != NULL);
+    assert(Handle != NULL);
     assert(gamma > 0.f);
     assert(gamma <= FLT_MAX);
 
@@ -470,7 +470,7 @@ GLFWAPI void glfwSetGamma(GLFWmonitor* handle, float gamma)
         return;
     }
 
-    original = glfwGetGammaRamp(handle);
+    original = glfwGetGammaRamp(Handle);
     if (!original)
         return;
 
@@ -495,13 +495,13 @@ GLFWAPI void glfwSetGamma(GLFWmonitor* handle, float gamma)
     ramp.blue = values;
     ramp.size = original->size;
 
-    glfwSetGammaRamp(handle, &ramp);
+    glfwSetGammaRamp(Handle, &ramp);
     free(values);
 }
 
-GLFWAPI const GLFWgammaramp* glfwGetGammaRamp(GLFWmonitor* handle)
+GLFWAPI const GLFWgammaramp* glfwGetGammaRamp(GLFWmonitor* Handle)
 {
-    _GLFWmonitor* monitor = (_GLFWmonitor*) handle;
+    _GLFWmonitor* monitor = (_GLFWmonitor*) Handle;
     assert(monitor != NULL);
 
     _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
@@ -513,9 +513,9 @@ GLFWAPI const GLFWgammaramp* glfwGetGammaRamp(GLFWmonitor* handle)
     return &monitor->currentRamp;
 }
 
-GLFWAPI void glfwSetGammaRamp(GLFWmonitor* handle, const GLFWgammaramp* ramp)
+GLFWAPI void glfwSetGammaRamp(GLFWmonitor* Handle, const GLFWgammaramp* ramp)
 {
-    _GLFWmonitor* monitor = (_GLFWmonitor*) handle;
+    _GLFWmonitor* monitor = (_GLFWmonitor*) Handle;
     assert(monitor != NULL);
     assert(ramp != NULL);
     assert(ramp->size > 0);

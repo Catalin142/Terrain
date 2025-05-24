@@ -3,6 +3,7 @@
 #include "Terrain/BruteForce/BruteForceData.h"
 
 #include "Graphics/Vulkan/VulkanRenderer.h"
+#include "Graphics/Vulkan/VulkanUtils.h"
 
 #define CONSTRUCT_TERRAIN_CHUNKS_BRUTE_FORCE_COMPUTE "Terrain/BruteForce/ConstructTerrainChunks_comp.glsl"
 
@@ -37,11 +38,11 @@ void BruteForceLOD::Generate(VkCommandBuffer commandBuffer, const Camera& cam, c
 
 	VulkanRenderer::dispatchCompute(commandBuffer, m_ConstructTerrainChunksPass, m_NextBuffer, { dispatchCount, dispatchCount, 1 });
 
-	VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, ChunksToRender, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+	VulkanUtils::bufferMemoryBarrier(commandBuffer, ChunksToRender, { VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT });
 
-	VulkanComputePipeline::bufferMemoryBarrier(commandBuffer, m_DrawIndirectCommandsSet->getBuffer(m_NextBuffer), VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		VK_ACCESS_MEMORY_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+	VulkanUtils::bufferMemoryBarrier(commandBuffer, m_DrawIndirectCommandsSet->getBuffer(m_NextBuffer), { VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_ACCESS_MEMORY_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT });
 
 	m_CurrentlyUsedBuffer = m_NextBuffer;
 	(++m_NextBuffer) %= VulkanRenderer::getFramesInFlight();

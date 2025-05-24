@@ -58,7 +58,7 @@ typedef GLFWglproc (GLAPIENTRY * PFN_OSMesaGetProcAddress)(const char*);
 //
 typedef struct _GLFWcontextOSMesa
 {
-    OSMesaContext       handle;
+    OSMesaContext       Handle;
     int                 width;
     int                 height;
     void*               buffer;
@@ -69,7 +69,7 @@ typedef struct _GLFWcontextOSMesa
 //
 typedef struct _GLFWlibraryOSMesa
 {
-    void*           handle;
+    void*           Handle;
 
     PFN_OSMesaCreateContextExt      CreateContextExt;
     PFN_OSMesaCreateContextAttribs  CreateContextAttribs;

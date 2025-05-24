@@ -96,7 +96,7 @@ void DynamicVirtualTerrainDeserializer::loadChunk(VirtualMapLoadTask task)
 
     {
         std::lock_guard<std::mutex> lock(m_DataMutex);
-
+ 
         char* charData = (char*)m_RawImageData[m_AvailableBuffer]->getMappedData();
         std::memcpy(&charData[m_MemoryIndex * m_TextureDataStride], buffer, m_TextureDataStride);
 

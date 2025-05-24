@@ -110,7 +110,7 @@ struct ImGui_ImplVulkanH_WindowRenderBuffers
 struct ImGui_ImplVulkan_Data
 {
     ImGui_ImplVulkan_InitInfo   VulkanInitInfo;
-    VkRenderPass                RenderPass;
+    VkRenderPass                VulkanRenderPass;
     VkDeviceSize                BufferMemoryAlignment;
     VkPipelineCreateFlags       PipelineCreateFlags;
     VkDescriptorSetLayout       DescriptorSetLayout;
@@ -1009,7 +1009,7 @@ bool ImGui_ImplVulkan_CreateDeviceObjects()
         check_vk_result(err);
     }
 
-    ImGui_ImplVulkan_CreatePipeline(v->Device, v->Allocator, v->PipelineCache, bd->RenderPass, v->MSAASamples, &bd->Pipeline, bd->Subpass);
+    ImGui_ImplVulkan_CreatePipeline(v->Device, v->Allocator, v->PipelineCache, bd->VulkanRenderPass, v->MSAASamples, &bd->Pipeline, bd->Subpass);
 
     return true;
 }
@@ -1097,7 +1097,7 @@ bool    ImGui_ImplVulkan_Init(ImGui_ImplVulkan_InitInfo* info, VkRenderPass rend
         IM_ASSERT(render_pass != VK_NULL_HANDLE);
 
     bd->VulkanInitInfo = *info;
-    bd->RenderPass = render_pass;
+    bd->VulkanRenderPass = render_pass;
     bd->Subpass = info->Subpass;
 
     ImGui_ImplVulkan_CreateDeviceObjects();
@@ -1348,8 +1348,8 @@ void ImGui_ImplVulkanH_CreateWindowSwapChain(VkPhysicalDevice physical_device, V
     wd->Frames = nullptr;
     wd->FrameSemaphores = nullptr;
     wd->ImageCount = 0;
-    if (wd->RenderPass)
-        vkDestroyRenderPass(device, wd->RenderPass, allocator);
+    if (wd->VulkanRenderPass)
+        vkDestroyRenderPass(device, wd->VulkanRenderPass, allocator);
     if (wd->Pipeline)
         vkDestroyPipeline(device, wd->Pipeline, allocator);
 
@@ -1446,7 +1446,7 @@ void ImGui_ImplVulkanH_CreateWindowSwapChain(VkPhysicalDevice physical_device, V
         info.pSubpasses = &subpass;
         info.dependencyCount = 1;
         info.pDependencies = &dependency;
-        err = vkCreateRenderPass(device, &info, allocator, &wd->RenderPass);
+        err = vkCreateRenderPass(device, &info, allocator, &wd->VulkanRenderPass);
         check_vk_result(err);
 
         // We do not create a pipeline by default as this is also used by examples' main.cpp,
@@ -1481,7 +1481,7 @@ void ImGui_ImplVulkanH_CreateWindowSwapChain(VkPhysicalDevice physical_device, V
         VkImageView attachment[1];
         VkFramebufferCreateInfo info = {};
         info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        info.renderPass = wd->RenderPass;
+        info.renderPass = wd->VulkanRenderPass;
         info.attachmentCount = 1;
         info.pAttachments = attachment;
         info.width = wd->Width;
@@ -1521,7 +1521,7 @@ void ImGui_ImplVulkanH_DestroyWindow(VkInstance instance, VkDevice device, ImGui
     wd->Frames = nullptr;
     wd->FrameSemaphores = nullptr;
     vkDestroyPipeline(device, wd->Pipeline, allocator);
-    vkDestroyRenderPass(device, wd->RenderPass, allocator);
+    vkDestroyRenderPass(device, wd->VulkanRenderPass, allocator);
     vkDestroySwapchainKHR(device, wd->Swapchain, allocator);
     vkDestroySurfaceKHR(instance, wd->Surface, allocator);
 

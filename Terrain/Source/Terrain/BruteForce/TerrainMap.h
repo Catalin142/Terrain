@@ -8,7 +8,7 @@
 class TerrainMap
 {
 public:
-	TerrainMap(const std::string& filepath);
+	TerrainMap(const std::string& filepath, uint32_t width, uint32_t height);
 
 	const std::shared_ptr<VulkanImage>& getMap() { return m_HeightMap; }
 

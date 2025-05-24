@@ -5,7 +5,6 @@
 #include <array>
 
 #include "Core/Application.h"
-#include "Graphics/Vulkan/VulkanTexture.h"
 #include "Graphics/Vulkan/VulkanBuffer.h"
 #include "Graphics/Vulkan/VulkanVertexBufferLayout.h"
 #include "Graphics/Vulkan/VulkanRenderCommandBuffer.h"
@@ -55,7 +54,7 @@ private:
 
 private:
 	std::shared_ptr<VulkanRenderCommandBuffer> CommandBuffer;
-	RenderPass m_FinalPass;
+	VulkanRenderPass m_FinalPass;
 
 	std::shared_ptr<VulkanFramebuffer> m_Output;
 

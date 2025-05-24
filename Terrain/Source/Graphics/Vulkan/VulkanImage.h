@@ -4,6 +4,7 @@
 #include "VulkanBuffer.h"
 
 #include <vector>
+#include <string>
 #include <vulkan/vulkan.h>
 
 struct VulkanImageSpecification
@@ -13,6 +14,7 @@ struct VulkanImageSpecification
 	uint32_t Samples = 1;
 	uint32_t Mips = 1;
 	uint32_t LayerCount = 1;
+	uint32_t Channels = 4;
 
 	float MaxAnisotropy = 0.0f;
 
@@ -50,7 +52,11 @@ public:
 		const glm::uvec2& offset = glm::ivec2(0u, 0u));
 	void copyBuffer(VkCommandBuffer cmdBuffer, const VulkanBuffer& buffer, uint32_t layer = 0, const glm::uvec2& srcExtent = glm::uvec2(0u, 0u),
 		const glm::uvec2& offset = glm::ivec2(0u, 0u));
+
+	void batchCopyBuffer(const VulkanBuffer& buffer, const std::vector<VkBufferImageCopy>& regions);
 	void batchCopyBuffer(VkCommandBuffer cmdBuffer, const VulkanBuffer& buffer, const std::vector<VkBufferImageCopy>& regions);
+
+	void loadFromFile(const std::vector<std::string>& filepaths, uint32_t bpp = 16);
 
 	void generateMips(VkFilter filter = VK_FILTER_LINEAR);
 

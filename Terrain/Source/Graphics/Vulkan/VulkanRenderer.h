@@ -22,18 +22,16 @@ public:
 	static uint32_t getFramesInFlight();
 	static uint32_t getCurrentFrame();
 
-	static void beginRenderPass(VkCommandBuffer commandBuffer, const RenderPass& renderPass);
+	static void beginRenderPass(VkCommandBuffer commandBuffer, const VulkanRenderPass& renderPass);
 	static void endRenderPass(VkCommandBuffer commandBuffer);
 
-	static void beginSwapchainRenderPass(VkCommandBuffer commandBuffer, const RenderPass& renderpass);
+	static void beginSwapchainRenderPass(VkCommandBuffer commandBuffer);
 
-	static void preparePipeline(VkCommandBuffer commandBuffer, const RenderPass& renderPass);
-
-	static void preparePipeline(VkCommandBuffer commandBuffer, const RenderPass& renderPass, uint32_t descriptorSetIndex);
+	static void preparePipeline(VkCommandBuffer commandBuffer, const VulkanRenderPass& renderPass);
+	static void preparePipeline(VkCommandBuffer commandBuffer, const VulkanRenderPass& renderPass, uint32_t descriptorSetIndex);
 
 	static void dispatchCompute(VkCommandBuffer commandBuffer,
 		const VulkanComputePass& computePass, uint32_t descriptorSetUsed, glm::ivec3 workgroups, uint32_t pushConstantSize = 0, void* data = nullptr);
-
 	static void dispatchCompute(VkCommandBuffer commandBuffer,
 		const VulkanComputePass& computePass, glm::ivec3 workgroups, uint32_t pushConstantSize = 0, void* data = nullptr);
 

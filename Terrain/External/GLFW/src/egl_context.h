@@ -157,7 +157,7 @@ typedef EGLSurface (EGLAPIENTRY * PFNEGLCREATEPLATFORMWINDOWSURFACEEXTPROC)(EGLD
 typedef struct _GLFWcontextEGL
 {
    EGLConfig        config;
-   EGLContext       handle;
+   EGLContext       Handle;
    EGLSurface       surface;
 
    void*            client;
@@ -188,7 +188,7 @@ typedef struct _GLFWlibraryEGL
     GLFWbool        ANGLE_platform_angle_vulkan;
     GLFWbool        ANGLE_platform_angle_metal;
 
-    void*           handle;
+    void*           Handle;
 
     PFN_eglGetConfigAttrib      GetConfigAttrib;
     PFN_eglGetConfigs           GetConfigs;

@@ -34,7 +34,8 @@ void main()
     ivec2 terrainLoadLayer = ivec2(offset + position.xz);
 
     float height = imageLoad(heightMap, terrainLoadLayer).r;
-	
+	fragPos = vec3(0.0);
+
     float elevationMin = 2.0 * terrainInfo.ElevationRange.x;
     float elevationMax = 2.0 * terrainInfo.ElevationRange.y;
 
@@ -45,5 +46,4 @@ void main()
 
 	gl_Position = Camera.Projection * Camera.View * position;
     
-	fragPos = vec3(0.0, abs(height), 0.0);
 }

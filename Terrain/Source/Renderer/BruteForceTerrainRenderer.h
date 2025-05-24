@@ -9,7 +9,7 @@
 
 #include "Graphics/Vulkan/VulkanFramebuffer.h"
 #include "Graphics/Vulkan/VulkanFramebuffer.h"
-#include "Graphics/Vulkan/VulkanPipeline.h"
+#include "Graphics/Vulkan/VulkanRenderPipeline.h"
 #include "Graphics/Vulkan/VulkanPass.h"
 
 #include "Scene/Camera.h"
@@ -70,8 +70,8 @@ private:
 
 	std::shared_ptr<BruteForceLOD> m_BruteForceLOD;
 
-	RenderPass m_TerrainRenderPass;
-	std::shared_ptr<VulkanPipeline> m_TerrainPipeline;
+	VulkanRenderPass m_TerrainRenderPass;
+	std::shared_ptr<VulkanRenderPipeline> m_TerrainPipeline;
 
 	std::shared_ptr<VulkanBuffer> m_VertexBuffer;
 

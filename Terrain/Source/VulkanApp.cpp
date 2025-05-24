@@ -51,6 +51,7 @@ void VulkanApp::onCreate()
 		framebufferSpecification.Height = 900;
 		framebufferSpecification.Samples = 1;
 		framebufferSpecification.Clear = true;
+		framebufferSpecification.colorClear = { 1.0, 1.0, 1.0, 1.0 };
 
 		framebufferSpecification.DepthAttachment.Format = VK_FORMAT_D32_SFLOAT;
 		framebufferSpecification.DepthAttachment.Blend = false;
@@ -75,8 +76,8 @@ void VulkanApp::onCreate()
 	{
 		TerrainSpecification terrainSpec;
 
-		terrainSpec.Info.TerrainSize = 1024 * 4;
-		terrainSpec.Info.LODCount = 3;
+		terrainSpec.Info.TerrainSize = 1024 * 16;
+		terrainSpec.Info.LODCount = 5;
 		terrainSpec.ChunkedFilepath = { "KaerMorhen8km.rawdata", "KaerMorhen8km.metadata" };
 		terrainSpec.TerrainFilepath = "Resources/Textures/WhiteOrchard_winter_res4096x.png";
 
@@ -165,7 +166,7 @@ void VulkanApp::onUpdate()
 		{
 			CommandBuffer->beginQuery("PresentPass");
 
-			VulkanRenderer::beginSwapchainRenderPass(commandBuffer, m_FinalPass);
+			VulkanRenderer::beginSwapchainRenderPass(commandBuffer);
 			VulkanRenderer::preparePipeline(commandBuffer, m_FinalPass);
 
 			vkCmdDraw(commandBuffer, 6, 1, 0, 0);
@@ -230,6 +231,7 @@ void VulkanApp::onDestroy()
 void VulkanApp::postFrame()
 {
 	CommandBuffer->queryResults();
+	CommandBuffer->getQueryResult();
 }
 
 void VulkanApp::createFinalPass()
@@ -249,10 +251,10 @@ void VulkanApp::createFinalPass()
 		m_FinalPass.DescriptorSet = DescriptorSet;
 	}
 	{
-		PipelineSpecification spec{};
+		RenderPipelineSpecification spec{};
 		spec.Framebuffer = nullptr;
 		spec.Shader = ShaderManager::getShader("FinalShader");
 		spec.vertexBufferLayout = VulkanVertexBufferLayout{};
-		m_FinalPass.Pipeline = std::make_shared<VulkanPipeline>(spec);
+		m_FinalPass.Pipeline = std::make_shared<VulkanRenderPipeline>(spec);
 	}
 }

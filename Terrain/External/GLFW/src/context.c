@@ -610,9 +610,9 @@ GLFWbool _glfwStringInExtensionString(const char* string, const char* extensions
 //////                        GLFW public API                       //////
 //////////////////////////////////////////////////////////////////////////
 
-GLFWAPI void glfwMakeContextCurrent(GLFWwindow* handle)
+GLFWAPI void glfwMakeContextCurrent(GLFWwindow* Handle)
 {
-    _GLFWwindow* window = (_GLFWwindow*) handle;
+    _GLFWwindow* window = (_GLFWwindow*) Handle;
     _GLFWwindow* previous = _glfwPlatformGetTls(&_glfw.contextSlot);
 
     _GLFW_REQUIRE_INIT();
@@ -640,9 +640,9 @@ GLFWAPI GLFWwindow* glfwGetCurrentContext(void)
     return _glfwPlatformGetTls(&_glfw.contextSlot);
 }
 
-GLFWAPI void glfwSwapBuffers(GLFWwindow* handle)
+GLFWAPI void glfwSwapBuffers(GLFWwindow* Handle)
 {
-    _GLFWwindow* window = (_GLFWwindow*) handle;
+    _GLFWwindow* window = (_GLFWwindow*) Handle;
     assert(window != NULL);
 
     _GLFW_REQUIRE_INIT();

@@ -486,9 +486,9 @@ void _glfwCenterCursorInContentArea(_GLFWwindow* window)
 //////                        GLFW public API                       //////
 //////////////////////////////////////////////////////////////////////////
 
-GLFWAPI int glfwGetInputMode(GLFWwindow* handle, int mode)
+GLFWAPI int glfwGetInputMode(GLFWwindow* Handle, int mode)
 {
-    _GLFWwindow* window = (_GLFWwindow*) handle;
+    _GLFWwindow* window = (_GLFWwindow*) Handle;
     assert(window != NULL);
 
     _GLFW_REQUIRE_INIT_OR_RETURN(0);
@@ -511,9 +511,9 @@ GLFWAPI int glfwGetInputMode(GLFWwindow* handle, int mode)
     return 0;
 }
 
-GLFWAPI void glfwSetInputMode(GLFWwindow* handle, int mode, int value)
+GLFWAPI void glfwSetInputMode(GLFWwindow* Handle, int mode, int value)
 {
-    _GLFWwindow* window = (_GLFWwindow*) handle;
+    _GLFWwindow* window = (_GLFWwindow*) Handle;
     assert(window != NULL);
 
     _GLFW_REQUIRE_INIT();
@@ -642,9 +642,9 @@ GLFWAPI int glfwGetKeyScancode(int key)
     return _glfwPlatformGetKeyScancode(key);
 }
 
-GLFWAPI int glfwGetKey(GLFWwindow* handle, int key)
+GLFWAPI int glfwGetKey(GLFWwindow* Handle, int key)
 {
-    _GLFWwindow* window = (_GLFWwindow*) handle;
+    _GLFWwindow* window = (_GLFWwindow*) Handle;
     assert(window != NULL);
 
     _GLFW_REQUIRE_INIT_OR_RETURN(GLFW_RELEASE);
@@ -665,9 +665,9 @@ GLFWAPI int glfwGetKey(GLFWwindow* handle, int key)
     return (int) window->keys[key];
 }
 
-GLFWAPI int glfwGetMouseButton(GLFWwindow* handle, int button)
+GLFWAPI int glfwGetMouseButton(GLFWwindow* Handle, int button)
 {
-    _GLFWwindow* window = (_GLFWwindow*) handle;
+    _GLFWwindow* window = (_GLFWwindow*) Handle;
     assert(window != NULL);
 
     _GLFW_REQUIRE_INIT_OR_RETURN(GLFW_RELEASE);
@@ -688,9 +688,9 @@ GLFWAPI int glfwGetMouseButton(GLFWwindow* handle, int button)
     return (int) window->mouseButtons[button];
 }
 
-GLFWAPI void glfwGetCursorPos(GLFWwindow* handle, double* xpos, double* ypos)
+GLFWAPI void glfwGetCursorPos(GLFWwindow* Handle, double* xpos, double* ypos)
 {
-    _GLFWwindow* window = (_GLFWwindow*) handle;
+    _GLFWwindow* window = (_GLFWwindow*) Handle;
     assert(window != NULL);
 
     if (xpos)
@@ -711,9 +711,9 @@ GLFWAPI void glfwGetCursorPos(GLFWwindow* handle, double* xpos, double* ypos)
         _glfwPlatformGetCursorPos(window, xpos, ypos);
 }
 
-GLFWAPI void glfwSetCursorPos(GLFWwindow* handle, double xpos, double ypos)
+GLFWAPI void glfwSetCursorPos(GLFWwindow* Handle, double xpos, double ypos)
 {
-    _GLFWwindow* window = (_GLFWwindow*) handle;
+    _GLFWwindow* window = (_GLFWwindow*) Handle;
     assert(window != NULL);
 
     _GLFW_REQUIRE_INIT();
@@ -798,9 +798,9 @@ GLFWAPI GLFWcursor* glfwCreateStandardCursor(int shape)
     return (GLFWcursor*) cursor;
 }
 
-GLFWAPI void glfwDestroyCursor(GLFWcursor* handle)
+GLFWAPI void glfwDestroyCursor(GLFWcursor* Handle)
 {
-    _GLFWcursor* cursor = (_GLFWcursor*) handle;
+    _GLFWcursor* cursor = (_GLFWcursor*) Handle;
 
     _GLFW_REQUIRE_INIT();
 
@@ -846,9 +846,9 @@ GLFWAPI void glfwSetCursor(GLFWwindow* windowHandle, GLFWcursor* cursorHandle)
     _glfwPlatformSetCursor(window, cursor);
 }
 
-GLFWAPI GLFWkeyfun glfwSetKeyCallback(GLFWwindow* handle, GLFWkeyfun cbfun)
+GLFWAPI GLFWkeyfun glfwSetKeyCallback(GLFWwindow* Handle, GLFWkeyfun cbfun)
 {
-    _GLFWwindow* window = (_GLFWwindow*) handle;
+    _GLFWwindow* window = (_GLFWwindow*) Handle;
     assert(window != NULL);
 
     _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
@@ -856,9 +856,9 @@ GLFWAPI GLFWkeyfun glfwSetKeyCallback(GLFWwindow* handle, GLFWkeyfun cbfun)
     return cbfun;
 }
 
-GLFWAPI GLFWcharfun glfwSetCharCallback(GLFWwindow* handle, GLFWcharfun cbfun)
+GLFWAPI GLFWcharfun glfwSetCharCallback(GLFWwindow* Handle, GLFWcharfun cbfun)
 {
-    _GLFWwindow* window = (_GLFWwindow*) handle;
+    _GLFWwindow* window = (_GLFWwindow*) Handle;
     assert(window != NULL);
 
     _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
@@ -866,9 +866,9 @@ GLFWAPI GLFWcharfun glfwSetCharCallback(GLFWwindow* handle, GLFWcharfun cbfun)
     return cbfun;
 }
 
-GLFWAPI GLFWcharmodsfun glfwSetCharModsCallback(GLFWwindow* handle, GLFWcharmodsfun cbfun)
+GLFWAPI GLFWcharmodsfun glfwSetCharModsCallback(GLFWwindow* Handle, GLFWcharmodsfun cbfun)
 {
-    _GLFWwindow* window = (_GLFWwindow*) handle;
+    _GLFWwindow* window = (_GLFWwindow*) Handle;
     assert(window != NULL);
 
     _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
@@ -876,10 +876,10 @@ GLFWAPI GLFWcharmodsfun glfwSetCharModsCallback(GLFWwindow* handle, GLFWcharmods
     return cbfun;
 }
 
-GLFWAPI GLFWmousebuttonfun glfwSetMouseButtonCallback(GLFWwindow* handle,
+GLFWAPI GLFWmousebuttonfun glfwSetMouseButtonCallback(GLFWwindow* Handle,
                                                       GLFWmousebuttonfun cbfun)
 {
-    _GLFWwindow* window = (_GLFWwindow*) handle;
+    _GLFWwindow* window = (_GLFWwindow*) Handle;
     assert(window != NULL);
 
     _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
@@ -887,10 +887,10 @@ GLFWAPI GLFWmousebuttonfun glfwSetMouseButtonCallback(GLFWwindow* handle,
     return cbfun;
 }
 
-GLFWAPI GLFWcursorposfun glfwSetCursorPosCallback(GLFWwindow* handle,
+GLFWAPI GLFWcursorposfun glfwSetCursorPosCallback(GLFWwindow* Handle,
                                                   GLFWcursorposfun cbfun)
 {
-    _GLFWwindow* window = (_GLFWwindow*) handle;
+    _GLFWwindow* window = (_GLFWwindow*) Handle;
     assert(window != NULL);
 
     _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
@@ -898,10 +898,10 @@ GLFWAPI GLFWcursorposfun glfwSetCursorPosCallback(GLFWwindow* handle,
     return cbfun;
 }
 
-GLFWAPI GLFWcursorenterfun glfwSetCursorEnterCallback(GLFWwindow* handle,
+GLFWAPI GLFWcursorenterfun glfwSetCursorEnterCallback(GLFWwindow* Handle,
                                                       GLFWcursorenterfun cbfun)
 {
-    _GLFWwindow* window = (_GLFWwindow*) handle;
+    _GLFWwindow* window = (_GLFWwindow*) Handle;
     assert(window != NULL);
 
     _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
@@ -909,10 +909,10 @@ GLFWAPI GLFWcursorenterfun glfwSetCursorEnterCallback(GLFWwindow* handle,
     return cbfun;
 }
 
-GLFWAPI GLFWscrollfun glfwSetScrollCallback(GLFWwindow* handle,
+GLFWAPI GLFWscrollfun glfwSetScrollCallback(GLFWwindow* Handle,
                                             GLFWscrollfun cbfun)
 {
-    _GLFWwindow* window = (_GLFWwindow*) handle;
+    _GLFWwindow* window = (_GLFWwindow*) Handle;
     assert(window != NULL);
 
     _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
@@ -920,9 +920,9 @@ GLFWAPI GLFWscrollfun glfwSetScrollCallback(GLFWwindow* handle,
     return cbfun;
 }
 
-GLFWAPI GLFWdropfun glfwSetDropCallback(GLFWwindow* handle, GLFWdropfun cbfun)
+GLFWAPI GLFWdropfun glfwSetDropCallback(GLFWwindow* Handle, GLFWdropfun cbfun)
 {
-    _GLFWwindow* window = (_GLFWwindow*) handle;
+    _GLFWwindow* window = (_GLFWwindow*) Handle;
     assert(window != NULL);
 
     _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
@@ -1359,7 +1359,7 @@ GLFWAPI int glfwGetGamepadState(int jid, GLFWgamepadstate* state)
     return GLFW_TRUE;
 }
 
-GLFWAPI void glfwSetClipboardString(GLFWwindow* handle, const char* string)
+GLFWAPI void glfwSetClipboardString(GLFWwindow* Handle, const char* string)
 {
     assert(string != NULL);
 
@@ -1367,7 +1367,7 @@ GLFWAPI void glfwSetClipboardString(GLFWwindow* handle, const char* string)
     _glfwPlatformSetClipboardString(string);
 }
 
-GLFWAPI const char* glfwGetClipboardString(GLFWwindow* handle)
+GLFWAPI const char* glfwGetClipboardString(GLFWwindow* Handle)
 {
     _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
     return _glfwPlatformGetClipboardString();

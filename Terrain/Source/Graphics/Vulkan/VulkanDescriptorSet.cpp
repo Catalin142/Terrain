@@ -39,10 +39,9 @@ void VulkanDescriptorSet::Create()
 
 	// ================== CREATE DESCRIPTOR SETS ==================
 	std::vector<VkDescriptorSetLayout> descriptorLayouts = m_Shader->getDescriptorSetLayouts();
-	m_DescriptorSets.resize(FRAMES_IN_FLIGHT);
+	m_DescriptorSets.resize(m_Shader->getDescriptorSetCount());
 
-	// TODO(cata): not all shaders and pipelines need 2 descriptors
-	for (uint32_t frameIndex = 0; frameIndex < FRAMES_IN_FLIGHT; frameIndex++)
+	for (uint32_t frameIndex = 0; frameIndex < m_Shader->getDescriptorSetCount(); frameIndex++)
 	{
 		for (uint32_t currentSet = 0; currentSet < m_Shader->getNumberOfSets(); currentSet++)
 		{
@@ -95,16 +94,6 @@ void VulkanDescriptorSet::bindInput(uint32_t set, uint32_t binding, uint32_t ind
 	}
 }
 
-void VulkanDescriptorSet::bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanTexture>& texture)
-{
-	VkDescriptorImageInfo imageInfo{};
-	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	imageInfo.imageView = texture->getVkImageView();
-	imageInfo.sampler = texture->getVkSampler();
-
-	m_DescriptorBindings.ImageInfos[getHash(set, binding, index)] = imageInfo;
-}
-
 void VulkanDescriptorSet::bindInput(uint32_t set, uint32_t binding, uint32_t index, const std::shared_ptr<VulkanImage>& image, uint32_t mip)
 {
 	VkDescriptorImageInfo imageInfo{};
@@ -127,8 +116,7 @@ void VulkanDescriptorSet::bindInput(uint32_t set, uint32_t binding, uint32_t ind
 
 std::vector<VkDescriptorSet> VulkanDescriptorSet::getDescriptorSet(uint32_t frameIndex)
 {
-	assert(frameIndex < m_DescriptorSets.size());
-	return m_DescriptorSets[frameIndex];
+	return m_DescriptorSets[frameIndex % m_Shader->getDescriptorSetCount()];
 }
 
 VkWriteDescriptorSet VulkanDescriptorSet::getWriteDescriptorSet(const ShaderInput& input, uint32_t index, VkDescriptorSet set, uint32_t frame = 0)

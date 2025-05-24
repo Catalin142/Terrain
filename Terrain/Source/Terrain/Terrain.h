@@ -1,8 +1,6 @@
 #pragma once
 
 #include "TerrainChunk.h"
-#include "Graphics/Vulkan/VulkanImage.h"
-#include "Graphics/Vulkan/VulkanTexture.h"
 
 #include "glm/glm.hpp"
 

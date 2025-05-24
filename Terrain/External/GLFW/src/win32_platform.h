@@ -285,8 +285,8 @@ typedef VkBool32 (APIENTRY *PFN_vkGetPhysicalDeviceWin32PresentationSupportKHR)(
 #endif
 
 #define _glfw_dlopen(name) LoadLibraryA(name)
-#define _glfw_dlclose(handle) FreeLibrary((HMODULE) handle)
-#define _glfw_dlsym(handle, name) GetProcAddress((HMODULE) handle, name)
+#define _glfw_dlclose(Handle) FreeLibrary((HMODULE) Handle)
+#define _glfw_dlsym(Handle, name) GetProcAddress((HMODULE) Handle, name)
 
 #define _GLFW_PLATFORM_WINDOW_STATE         _GLFWwindowWin32  win32
 #define _GLFW_PLATFORM_LIBRARY_WINDOW_STATE _GLFWlibraryWin32 win32
@@ -301,7 +301,7 @@ typedef VkBool32 (APIENTRY *PFN_vkGetPhysicalDeviceWin32PresentationSupportKHR)(
 //
 typedef struct _GLFWwindowWin32
 {
-    HWND                handle;
+    HWND                Handle;
     HICON               bigIcon;
     HICON               smallIcon;
 
@@ -396,7 +396,7 @@ typedef struct _GLFWlibraryWin32
 //
 typedef struct _GLFWmonitorWin32
 {
-    HMONITOR            handle;
+    HMONITOR            Handle;
     // This size matches the static size of DISPLAY_DEVICE.DeviceName
     WCHAR               adapterName[32];
     WCHAR               displayName[32];
@@ -411,7 +411,7 @@ typedef struct _GLFWmonitorWin32
 //
 typedef struct _GLFWcursorWin32
 {
-    HCURSOR             handle;
+    HCURSOR             Handle;
 
 } _GLFWcursorWin32;
 
@@ -458,5 +458,5 @@ void _glfwInitTimerWin32(void);
 void _glfwPollMonitorsWin32(void);
 void _glfwSetVideoModeWin32(_GLFWmonitor* monitor, const GLFWvidmode* desired);
 void _glfwRestoreVideoModeWin32(_GLFWmonitor* monitor);
-void _glfwGetMonitorContentScaleWin32(HMONITOR handle, float* xscale, float* yscale);
+void _glfwGetMonitorContentScaleWin32(HMONITOR Handle, float* xscale, float* yscale);
 

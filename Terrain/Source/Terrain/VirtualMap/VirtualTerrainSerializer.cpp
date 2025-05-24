@@ -15,7 +15,7 @@
 
 static void prepareImageLayout(std::shared_ptr<VulkanImage> src, std::shared_ptr<VulkanImage> dst)
 {
-    VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
+    VkCommandBuffer cmdBuffer = VulkanUtils::beginSingleTimeCommand();
     {
         VkImageMemoryBarrier imageMemoryBarrier = {};
         imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -47,12 +47,12 @@ static void prepareImageLayout(std::shared_ptr<VulkanImage> src, std::shared_ptr
         imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
         vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
     }
-    VkUtils::flushCommandBuffer(cmdBuffer);
+    VulkanUtils::flushCommandBuffer(cmdBuffer);
 }
 
 static void restoreImageLayout(std::shared_ptr<VulkanImage> src, std::shared_ptr<VulkanImage> dst)
 {
-    VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
+    VkCommandBuffer cmdBuffer = VulkanUtils::beginSingleTimeCommand();
     {
         VkImageMemoryBarrier imageMemoryBarrier = {};
         imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -84,7 +84,7 @@ static void restoreImageLayout(std::shared_ptr<VulkanImage> src, std::shared_ptr
         imageMemoryBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
         vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
     }
-    VkUtils::flushCommandBuffer(cmdBuffer);
+    VulkanUtils::flushCommandBuffer(cmdBuffer);
 }
 
 void generateImageMips(const std::shared_ptr<VulkanImage>& image)
@@ -100,7 +100,7 @@ void generateImageMips(const std::shared_ptr<VulkanImage>& image)
     imgSubresource.baseMipLevel = 0;
 
     // Generate mips for heightmap
-    VkUtils::transitionImageLayout(image->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    VulkanUtils::transitionImageLayout(image->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     image->generateMips(VK_FILTER_NEAREST);
 }
 
@@ -146,11 +146,11 @@ void VirtualTerrainSerializer::Serialize(const SerializeSettings& settings)
     generateImageMips(settings.normalMap);
     generateImageMips(settings.compositionMap);
 
-    VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
+    VkCommandBuffer cmdBuffer = VulkanUtils::beginSingleTimeCommand();
     prepareImageLayout(cmdBuffer, settings.heightMap);
     prepareImageLayout(cmdBuffer, settings.normalMap);
     prepareImageLayout(cmdBuffer, settings.compositionMap);
-    VkUtils::endSingleTimeCommand(cmdBuffer);
+    VulkanUtils::endSingleTimeCommand(cmdBuffer);
     
     uint32_t paddingChunkSize = settings.chunkSize + 2;
 
@@ -212,7 +212,7 @@ void VirtualTerrainSerializer::Serialize(const SerializeSettings& settings)
                     memset((void*)cData, 0, normalMapLayout.size);
                 }
 
-                VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
+                VkCommandBuffer cmdBuffer = VulkanUtils::beginSingleTimeCommand();
                 VkImageBlit blit{};
 
                 int32_t iChunkSize = settings.chunkSize;
@@ -264,7 +264,7 @@ void VirtualTerrainSerializer::Serialize(const SerializeSettings& settings)
                     1, &blit,
                     VK_FILTER_NEAREST);
 
-                VkUtils::flushCommandBuffer(cmdBuffer);
+                VulkanUtils::flushCommandBuffer(cmdBuffer);
             }
     }
 }
@@ -283,7 +283,7 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& tex
     imgSubresource.baseMipLevel = 0;
 
     // Generate mips for heightmap
-    VkUtils::transitionImageLayout(texture->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    VulkanUtils::transitionImageLayout(texture->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     texture->generateMips(VK_FILTER_NEAREST);
 
     std::shared_ptr<VulkanImage> auxImg;
@@ -356,7 +356,7 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& tex
                 {
                     const char* imageData = data + layout.offset;
                     memset((void*)imageData, 0, layout.size);
-                    VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
+                    VkCommandBuffer cmdBuffer = VulkanUtils::beginSingleTimeCommand();
 
                     // Blit portion of heightmap to dstImage
                     VkImageBlit blit{};
@@ -398,7 +398,7 @@ void VirtualTerrainSerializer::Serialize(const std::shared_ptr<VulkanImage>& tex
                         1, &blit,
                         VK_FILTER_NEAREST);
 
-                    VkUtils::flushCommandBuffer(cmdBuffer);
+                    VulkanUtils::flushCommandBuffer(cmdBuffer);
 
                     // Serialize to file
                     uint32_t worldOffsetPacked = packOffset(worldOffset.x + x, worldOffset.y + y);
@@ -482,7 +482,7 @@ void VirtualTerrainSerializer::SerializeClipmap(const std::shared_ptr<VulkanImag
     imgSubresource.baseMipLevel = 0;
 
     // Generate mips for heightmap
-    VkUtils::transitionImageLayout(texture->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    VulkanUtils::transitionImageLayout(texture->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     texture->generateMips(VK_FILTER_NEAREST);
 
     std::shared_ptr<VulkanImage> auxImg;
@@ -557,7 +557,7 @@ void VirtualTerrainSerializer::SerializeClipmap(const std::shared_ptr<VulkanImag
                 {
                     char* imageData = data + layout.offset;
                     memset((void*)imageData, 0, layout.size);
-                    VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
+                    VkCommandBuffer cmdBuffer = VulkanUtils::beginSingleTimeCommand();
 
                     // Blit portion of heightmap to dstImage
                     VkImageBlit blit{};
@@ -584,7 +584,7 @@ void VirtualTerrainSerializer::SerializeClipmap(const std::shared_ptr<VulkanImag
                         1, &blit,
                         VK_FILTER_NEAREST);
 
-                    VkUtils::flushCommandBuffer(cmdBuffer);
+                    VulkanUtils::flushCommandBuffer(cmdBuffer);
 
                     // Serialize to file
                     uint32_t worldOffsetPacked = packOffset(worldOffset.x + x, worldOffset.y + y);

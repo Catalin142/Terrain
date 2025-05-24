@@ -42,7 +42,7 @@ uint32_t VulkanRenderer::getCurrentFrame()
 	return m_Swapchain->getCurrentFrame();
 }
 
-void VulkanRenderer::beginRenderPass(VkCommandBuffer commandBuffer, const RenderPass& renderPass)
+void VulkanRenderer::beginRenderPass(VkCommandBuffer commandBuffer, const VulkanRenderPass& renderPass)
 {
 	VkExtent2D extent = { m_Swapchain->getWidth(), m_Swapchain->getHeight() };
 
@@ -80,7 +80,7 @@ void VulkanRenderer::endRenderPass(VkCommandBuffer commandBuffer)
 	vkCmdEndRenderPass(commandBuffer);
 }
 
-void VulkanRenderer::beginSwapchainRenderPass(VkCommandBuffer commandBuffer, const RenderPass& renderPass)
+void VulkanRenderer::beginSwapchainRenderPass(VkCommandBuffer commandBuffer)
 {
 	VkExtent2D extent = { m_Swapchain->getWidth(), m_Swapchain->getHeight() };
 
@@ -101,12 +101,12 @@ void VulkanRenderer::beginSwapchainRenderPass(VkCommandBuffer commandBuffer, con
 	vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 }
 
-void VulkanRenderer::preparePipeline(VkCommandBuffer commandBuffer, const RenderPass& renderPass)
+void VulkanRenderer::preparePipeline(VkCommandBuffer commandBuffer, const VulkanRenderPass& renderPass)
 {
 	preparePipeline(commandBuffer, renderPass, m_Swapchain->getCurrentFrame());
 }
 
-void VulkanRenderer::preparePipeline(VkCommandBuffer commandBuffer, const RenderPass& renderPass, uint32_t descriptorSetIndex)
+void VulkanRenderer::preparePipeline(VkCommandBuffer commandBuffer, const VulkanRenderPass& renderPass, uint32_t descriptorSetIndex)
 {
 	VkExtent2D extent = { m_Swapchain->getWidth(), m_Swapchain->getHeight() };
 
@@ -119,10 +119,8 @@ void VulkanRenderer::preparePipeline(VkCommandBuffer commandBuffer, const Render
 	viewport.maxDepth = 1.0f;
 	vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
-	float lineWidth = renderPass.Pipeline->getSpecification().lineWidth;
-
-	if (renderPass.Pipeline->getSpecification().lineWidth != 1.0f)
-		vkCmdSetLineWidth(commandBuffer, renderPass.Pipeline->getSpecification().lineWidth);
+	float lineWidth = renderPass.Pipeline->getSpecification().resterizationSpecification.lineWidth;
+	vkCmdSetLineWidth(commandBuffer, lineWidth);
 
 	VkRect2D scissor{};
 	scissor.offset = { 0, 0 };

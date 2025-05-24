@@ -31,6 +31,7 @@ public:
 	uint32_t getHeight() { return m_Window->getHeight(); }
 
 	VkExtent2D getExtent() { return m_Swapchain->getExtent(); }
+	uint32_t getCurrentFrameIndex() { return m_Swapchain->getCurrentFrame(); }
 
 	const std::shared_ptr<Window>& getWindow() { return m_Window; }
 

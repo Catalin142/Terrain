@@ -7,19 +7,46 @@
 
 #include <iostream>
 #include <cassert>
+#include <stb_image.h>
+
+VkFormat getFormat(uint32_t channels)
+{
+	switch (channels)
+	{
+	case 1: return VK_FORMAT_R16_UNORM;
+	case 2:
+	case 3:
+	case 4: return VK_FORMAT_R8G8B8A8_SRGB;
+	default: assert(false);
+	}
+	return VK_FORMAT_UNDEFINED;
+}
+
 
 static uint32_t getFormatSizeInBytes(VkFormat format) {
 	switch (format)
 	{
-	case VK_FORMAT_R32_SFLOAT: return 4;
+	case VK_FORMAT_R16G16B16A16_SFLOAT: return 8;
+
+	case VK_FORMAT_D32_SFLOAT:
+	case VK_FORMAT_R32_UINT:
+	case VK_FORMAT_R32_SFLOAT:
+	case VK_FORMAT_R8G8B8A8_SNORM:
+	case VK_FORMAT_R8G8B8A8_SRGB: return 4;
+
+	case VK_FORMAT_R16_UNORM:
 	case VK_FORMAT_R16_SFLOAT: return 2;
+
+	case VK_FORMAT_R8_UINT: return 1;
+
+	default: assert(false);
 	}
 }
 
 static uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags memFlags)
 {
 	VkPhysicalDeviceMemoryProperties memProperties;
-	vkGetPhysicalDeviceMemoryProperties(VulkanDevice::getVulkanContext()->getGPU(), &memProperties);
+	vkGetPhysicalDeviceMemoryProperties(VulkanDevice::getVulkanContext()->getPhysicalDevice(), &memProperties);
 
 	for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
 		if ((typeFilter & 1) == 1 && (memProperties.memoryTypes[i].propertyFlags & memFlags) == memFlags) {
@@ -47,10 +74,10 @@ void VulkanImage::Create()
 
 	if (m_Specification.UsageFlags & VK_IMAGE_USAGE_STORAGE_BIT)
 	{
-		VkUtils::transitionImageLayout(m_Image, { VK_IMAGE_ASPECT_COLOR_BIT, 0, m_Specification.Mips, 0, m_Specification.LayerCount }, VK_IMAGE_LAYOUT_UNDEFINED,
+		VulkanUtils::transitionImageLayout(m_Image, { VK_IMAGE_ASPECT_COLOR_BIT, 0, m_Specification.Mips, 0, m_Specification.LayerCount }, VK_IMAGE_LAYOUT_UNDEFINED,
 			VK_IMAGE_LAYOUT_GENERAL);
 
-		VkCommandBuffer commandBuffer = VkUtils::beginSingleTimeCommand();
+		VkCommandBuffer commandBuffer = VulkanUtils::beginSingleTimeCommand();
 		VkImageMemoryBarrier imageMemoryBarrier = {};
 		imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 		imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -69,7 +96,7 @@ void VulkanImage::Create()
 			0, nullptr,
 			0, nullptr,
 			1, &imageMemoryBarrier);
-		VkUtils::flushCommandBuffer(commandBuffer);
+		VulkanUtils::flushCommandBuffer(commandBuffer);
 	}
 
 	createView();
@@ -100,9 +127,9 @@ void VulkanImage::Release()
 
 void VulkanImage::copyBuffer(const VulkanBuffer& buffer, uint32_t layer, const glm::uvec2& srcExtent, const glm::uvec2& offset)
 {
-	VkCommandBuffer commandBuffer = VkUtils::beginSingleTimeCommand();
+	VkCommandBuffer commandBuffer = VulkanUtils::beginSingleTimeCommand();
 	copyBuffer(commandBuffer, buffer, layer, srcExtent, offset);
-	VkUtils::endSingleTimeCommand(commandBuffer);
+	VulkanUtils::endSingleTimeCommand(commandBuffer);
 }
 
 void VulkanImage::copyBuffer(VkCommandBuffer cmdBuffer, const VulkanBuffer& buffer, uint32_t layer, const glm::uvec2& srcExtent, const glm::uvec2& offset)
@@ -138,6 +165,13 @@ void VulkanImage::copyBuffer(VkCommandBuffer cmdBuffer, const VulkanBuffer& buff
 	);
 }
 
+void VulkanImage::batchCopyBuffer(const VulkanBuffer& buffer, const std::vector<VkBufferImageCopy>& regions)
+{
+	VkCommandBuffer commandBuffer = VulkanUtils::beginSingleTimeCommand();
+	batchCopyBuffer(commandBuffer, buffer, regions);
+	VulkanUtils::endSingleTimeCommand(commandBuffer);
+}
+
 void VulkanImage::batchCopyBuffer(VkCommandBuffer cmdBuffer, const VulkanBuffer& buffer, const std::vector<VkBufferImageCopy>& regions)
 {
 	vkCmdCopyBufferToImage(
@@ -150,15 +184,85 @@ void VulkanImage::batchCopyBuffer(VkCommandBuffer cmdBuffer, const VulkanBuffer&
 	);
 }
 
+void VulkanImage::loadFromFile(const std::vector<std::string>& filepaths, uint32_t bpp)
+{
+	if (filepaths.empty())
+		return;
+
+	if (filepaths.size() > m_Specification.LayerCount)
+		assert(false);
+
+	size_t imageSize = size_t(m_Specification.Width * m_Specification.Height * m_Specification.Channels * getFormatSizeInBytes(m_Specification.Format));
+
+	VulkanBufferProperties stagingBufferProperties;
+	stagingBufferProperties.Size = (uint32_t)imageSize * filepaths.size();
+	stagingBufferProperties.Type = BufferType::TRANSFER_SRC_BUFFER | BufferType::TRANSFER_DST_BUFFER;
+	stagingBufferProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
+	std::shared_ptr<VulkanBuffer> stagingBuffer = std::make_shared<VulkanBuffer>(stagingBufferProperties);
+
+	VkImageSubresourceRange imgSubresource{};
+	imgSubresource.aspectMask = m_Specification.Aspect;
+	imgSubresource.layerCount = m_Specification.LayerCount;
+	imgSubresource.levelCount = m_Specification.Mips;
+	imgSubresource.baseMipLevel = 0;
+	VulkanUtils::transitionImageLayout(m_Image, imgSubresource, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+	std::vector<VkBufferImageCopy> copyRegions{};
+	copyRegions.reserve(m_Specification.LayerCount);
+
+	stagingBuffer->Map();
+	for (uint32_t layer = 0; layer < m_Specification.LayerCount; layer++)
+	{
+		int32_t width, height, channels;
+
+		void* pixels;
+		if (bpp == 16)
+			pixels = stbi_load_16(filepaths[layer].c_str(), &width, &height, &channels, m_Specification.Channels);
+		else
+			pixels = stbi_load(filepaths[layer].c_str(), &width, &height, &channels, m_Specification.Channels);
+
+		if (!pixels)
+			assert(false);
+
+		assert(m_Specification.Width == width && m_Specification.Height == height);
+
+		char* charData = (char*)stagingBuffer->getMappedData();
+		std::memcpy(&charData[imageSize * layer], pixels, imageSize);
+
+		stbi_image_free(pixels);
+
+		VkBufferImageCopy region{};
+
+		region.bufferOffset = imageSize * layer;
+		region.bufferRowLength = 0;
+		region.bufferImageHeight = 0;
+
+		region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		region.imageSubresource.mipLevel = 0;
+		region.imageSubresource.baseArrayLayer = layer;
+		region.imageSubresource.layerCount = 1;
+
+		region.imageOffset = { 0, 0, 0 };
+		region.imageExtent = { m_Specification.Width,  m_Specification.Height, 1 };
+
+		copyRegions.push_back(region);
+	}
+	stagingBuffer->Unmap();
+
+	batchCopyBuffer(*stagingBuffer, copyRegions);
+
+	VulkanUtils::transitionImageLayout(m_Image, imgSubresource, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+}
+
 void VulkanImage::generateMips(VkFilter filter)
 {
 	VkFormatProperties formatProperties;
-	vkGetPhysicalDeviceFormatProperties(VulkanDevice::getVulkanContext()->getGPU(), VK_FORMAT_R8G8B8A8_SRGB, &formatProperties);
+	vkGetPhysicalDeviceFormatProperties(VulkanDevice::getVulkanContext()->getPhysicalDevice(), VK_FORMAT_R8G8B8A8_SRGB, &formatProperties);
 	if (!(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT)) {
 		assert(false); // nu suporta linear filtering
 	}
 
-	VkCommandBuffer commandBuffer = VkUtils::beginSingleTimeCommand();
+	VkCommandBuffer commandBuffer = VulkanUtils::beginSingleTimeCommand();
 
 	VkImageMemoryBarrier barrier{};
 	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -236,7 +340,7 @@ void VulkanImage::generateMips(VkFilter filter)
 		0, nullptr,
 		1, &barrier);
 
-	VkUtils::endSingleTimeCommand(commandBuffer);
+	VulkanUtils::endSingleTimeCommand(commandBuffer);
 }
 
 void VulkanImage::createImage()

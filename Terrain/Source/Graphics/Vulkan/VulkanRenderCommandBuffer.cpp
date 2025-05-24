@@ -55,6 +55,8 @@ VulkanRenderCommandBuffer::VulkanRenderCommandBuffer(bool swapchain) : m_OwnedBy
 	m_QueryPools.resize(2);
 	for (VkQueryPool& queryPool : m_QueryPools)
 		vkCreateQueryPool(VulkanDevice::getVulkanDevice(), &query_pool_info, nullptr, &queryPool);
+
+	setupQueryPool();
 }
 
 VulkanRenderCommandBuffer::~VulkanRenderCommandBuffer()
@@ -93,6 +95,8 @@ void VulkanRenderCommandBuffer::Begin()
 	// Render time of the command buffer
 	vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_QueryPools[currentFrameIndex], 0);
 	m_QueryFrame = currentFrameIndex;
+
+	vkCmdResetQueryPool(commandBuffer, m_QueryPoolsPipelineStats, 0, 1);
 }
 
 void VulkanRenderCommandBuffer::End()
@@ -122,7 +126,6 @@ void VulkanRenderCommandBuffer::Submit()
 
 
 	{
-		std::lock_guard<std::mutex> lock(graphicsMutex);
 		if (vkQueueSubmit(VulkanDevice::getVulkanContext()->getGraphicsQueue(), 1, &submitInfo,
 			m_inFlightFences[m_QueryFrame]) != VK_SUCCESS)
 			assert(false);
@@ -145,6 +148,34 @@ void VulkanRenderCommandBuffer::endQuery(const std::string& name)
 
 	uint32_t startIndex = m_QueryStart[name];
 	vkCmdWriteTimestamp(m_CurrentCommandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_QueryPools[m_QueryFrame], startIndex + 1);
+}
+
+void VulkanRenderCommandBuffer::beginPipelineQuery()
+{
+	vkCmdBeginQuery(m_CurrentCommandBuffer, m_QueryPoolsPipelineStats, 0, 0);
+}
+
+void VulkanRenderCommandBuffer::endPipelineQuery()
+{
+	vkCmdEndQuery(m_CurrentCommandBuffer, m_QueryPoolsPipelineStats, 0);
+}
+
+void VulkanRenderCommandBuffer::getQueryResult()
+{
+	// The size of the data we want to fetch ist based on the count of statistics values
+	uint32_t dataSize = static_cast<uint32_t>(pipelineStats.size()) * sizeof(uint64_t);
+	// The stride between queries is the no. of unique value entries
+	uint32_t stride = static_cast<uint32_t>(pipelineStatNames.size()) * sizeof(uint64_t);
+	// Note: for one query both values have the same size, but to make it easier to expand this sample these are properly calculated
+	vkGetQueryPoolResults(
+		VulkanDevice::getVulkanDevice(),
+		m_QueryPoolsPipelineStats,
+		0,
+		1,
+		dataSize,
+		pipelineStats.data(),
+		stride,
+		VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
 }
 
 void VulkanRenderCommandBuffer::queryResults()
@@ -179,4 +210,38 @@ float VulkanRenderCommandBuffer::getTime(const std::string& name)
 bool VulkanRenderCommandBuffer::getCurrentBufferStatus()
 { 
 	return vkGetFenceStatus(VulkanDevice::getVulkanDevice(), m_inFlightFences[m_QueryFrame]);
+}
+
+void VulkanRenderCommandBuffer::setupQueryPool()
+{
+	pipelineStatNames = {
+			   "Input assembly vertex count        ",
+			   "Input assembly primitives count    ",
+			   "Vertex shader invocations          ",
+			   "Clipping stage primitives processed",
+			   "Clipping stage primitives output    ",
+			   "Fragment shader invocations        ",
+				"Tess. control shader patches       ",
+				"Tess. eval. shader invocations     ",
+	};
+
+	pipelineStats.resize(pipelineStatNames.size());
+
+	VkQueryPoolCreateInfo queryPoolInfo = {};
+	queryPoolInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+	// This query pool will store pipeline statistics
+	queryPoolInfo.queryType = VK_QUERY_TYPE_PIPELINE_STATISTICS;
+	// Pipeline counters to be returned for this pool
+	queryPoolInfo.pipelineStatistics =
+		VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_VERTICES_BIT |
+		VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_PRIMITIVES_BIT |
+		VK_QUERY_PIPELINE_STATISTIC_VERTEX_SHADER_INVOCATIONS_BIT |
+		VK_QUERY_PIPELINE_STATISTIC_CLIPPING_INVOCATIONS_BIT |
+		VK_QUERY_PIPELINE_STATISTIC_CLIPPING_PRIMITIVES_BIT |
+		VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT |
+		VK_QUERY_PIPELINE_STATISTIC_TESSELLATION_CONTROL_SHADER_PATCHES_BIT |
+		VK_QUERY_PIPELINE_STATISTIC_TESSELLATION_EVALUATION_SHADER_INVOCATIONS_BIT;
+
+	queryPoolInfo.queryCount = 2;
+	vkCreateQueryPool(VulkanDevice::getVulkanDevice(), &queryPoolInfo, NULL, &m_QueryPoolsPipelineStats);
 }

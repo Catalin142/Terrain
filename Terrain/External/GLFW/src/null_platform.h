@@ -41,8 +41,8 @@
 
 #if defined(_GLFW_WIN32)
  #define _glfw_dlopen(name) LoadLibraryA(name)
- #define _glfw_dlclose(handle) FreeLibrary((HMODULE) handle)
- #define _glfw_dlsym(handle, name) GetProcAddress((HMODULE) handle, name)
+ #define _glfw_dlclose(Handle) FreeLibrary((HMODULE) Handle)
+ #define _glfw_dlsym(Handle, name) GetProcAddress((HMODULE) Handle, name)
 #else
  #define _glfw_dlopen(name) dlopen(name, RTLD_LAZY | RTLD_LOCAL)
  #define _glfw_dlclose(handle) dlclose(handle)

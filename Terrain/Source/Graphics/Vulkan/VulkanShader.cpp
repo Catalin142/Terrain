@@ -19,41 +19,6 @@ std::unordered_map<std::string, std::shared_ptr<VulkanShader>> ShaderManager::m_
 #define SOURCE_FILEPATH "Resources/Shaders/"
 #define CACHE_FILEPATH "Cache/Shaders/"
 
-static VkShaderStageFlagBits getStage(const ShaderStage& stage)
-{
-	switch (stage)
-	{
-	case ShaderStage::VERTEX:						return VK_SHADER_STAGE_VERTEX_BIT;
-	case ShaderStage::GEOMETRY:						return VK_SHADER_STAGE_GEOMETRY_BIT;
-	case ShaderStage::TESSELLATION_CONTROL:			return VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
-	case ShaderStage::TESSELLATION_EVALUATION:		return VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
-	case ShaderStage::FRAGMENT:						return VK_SHADER_STAGE_FRAGMENT_BIT; 
-	case ShaderStage::COMPUTE:						return VK_SHADER_STAGE_COMPUTE_BIT; 
-	case ShaderStage::NONE:							assert(false); break;
-	default:
-		return VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM;
-	}
-
-	return VK_SHADER_STAGE_ALL;
-}
-
-static VkDescriptorType getInputType(const ShaderInputType& type)
-{
-	switch (type)
-	{
-	case ShaderInputType::UNIFORM_BUFFER: return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	case ShaderInputType::UNIFORM_BUFFER_SET: return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	case ShaderInputType::STORAGE_BUFFER: return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	case ShaderInputType::STORAGE_BUFFER_SET: return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	case ShaderInputType::COMBINED_IMAGE_SAMPLER: return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	case ShaderInputType::TEXTURE: return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-	case ShaderInputType::SAMPLER: return VK_DESCRIPTOR_TYPE_SAMPLER;
-	case ShaderInputType::STORAGE_IMAGE: return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-	}
-
-	return VK_DESCRIPTOR_TYPE_MAX_ENUM;
-}
-
 static std::vector<uint32_t> readCachedShaderData(const std::string& filepath)
 {
 	FILE* f;
@@ -61,7 +26,7 @@ static std::vector<uint32_t> readCachedShaderData(const std::string& filepath)
 
 	if (!f)
 	{
-		std::cerr << "FIsierul " << filepath << " nu exista\n";
+		std::cerr << "Fisierul " << filepath << " nu exista\n";
 		assert(false);
 	}
 
@@ -244,6 +209,9 @@ std::map<uint32_t, std::vector<VkDescriptorSetLayoutBinding>> VulkanShader::getD
 
 		for (const ShaderInput& i : input)
 		{
+			if (i.Type == ShaderInputType::STORAGE_BUFFER_SET || i.Type == ShaderInputType::UNIFORM_BUFFER_SET)
+				m_DescriptorSetCount = 2;
+
 			if (inputs.find(i.DebugName) != inputs.end())
 			{
 				inputs[i.DebugName].stageFlags |= getStage(i.Stage);
@@ -265,7 +233,6 @@ std::map<uint32_t, std::vector<VkDescriptorSetLayoutBinding>> VulkanShader::getD
 
 	return bindings;
 }
-
 
 VkPipelineShaderStageCreateInfo const VulkanShader::getStageCreateInfo(ShaderStage stage)
 {

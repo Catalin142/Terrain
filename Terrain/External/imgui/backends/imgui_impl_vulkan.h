@@ -147,7 +147,7 @@ struct ImGui_ImplVulkanH_Window
     VkSurfaceKHR        Surface;
     VkSurfaceFormatKHR  SurfaceFormat;
     VkPresentModeKHR    PresentMode;
-    VkRenderPass        RenderPass;
+    VkRenderPass        VulkanRenderPass;
     VkPipeline          Pipeline;               // The window pipeline may uses a different VkRenderPass than the one passed in ImGui_ImplVulkan_InitInfo
     bool                UseDynamicRendering;
     bool                ClearEnable;

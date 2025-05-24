@@ -12,7 +12,7 @@
 static uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags memFlags)
 {
 	VkPhysicalDeviceMemoryProperties memProperties;
-	vkGetPhysicalDeviceMemoryProperties(VulkanDevice::getVulkanContext()->getGPU(), &memProperties);
+	vkGetPhysicalDeviceMemoryProperties(VulkanDevice::getVulkanContext()->getPhysicalDevice(), &memProperties);
 
 	for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
 		if (typeFilter & (1 << i) && (memProperties.memoryTypes[i].propertyFlags & memFlags) == memFlags) {
@@ -122,7 +122,7 @@ VulkanBuffer::~VulkanBuffer()
 
 void VulkanBuffer::setDataGPU(void* data, uint32_t size)
 {
-	VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
+	VkCommandBuffer cmdBuffer = VulkanUtils::beginSingleTimeCommand();
 
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingMemory;
@@ -147,7 +147,7 @@ void VulkanBuffer::setDataGPU(void* data, uint32_t size)
 	copyRegion.size = size;
 	vkCmdCopyBuffer(cmdBuffer, stagingBuffer, m_Buffer, 1, &copyRegion);
 
-	VkUtils::endSingleTimeCommand(cmdBuffer);
+	VulkanUtils::endSingleTimeCommand(cmdBuffer);
 
 	vkDestroyBuffer(VulkanDevice::getVulkanDevice(), stagingBuffer, nullptr);
 	vkFreeMemory(VulkanDevice::getVulkanDevice(), stagingMemory, nullptr);

@@ -14,7 +14,7 @@
 
 static void prepareImageLayout(std::shared_ptr<VulkanImage> src, std::shared_ptr<VulkanImage> dst)
 {
-    VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
+    VkCommandBuffer cmdBuffer = VulkanUtils::beginSingleTimeCommand();
     {
         VkImageMemoryBarrier imageMemoryBarrier = {};
         imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -45,12 +45,12 @@ static void prepareImageLayout(std::shared_ptr<VulkanImage> src, std::shared_ptr
         imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
         vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
     }
-    VkUtils::flushCommandBuffer(cmdBuffer);
+    VulkanUtils::flushCommandBuffer(cmdBuffer);
 }
 
 static void restoreImageLayout(std::shared_ptr<VulkanImage> src, std::shared_ptr<VulkanImage> dst)
 {
-    VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
+    VkCommandBuffer cmdBuffer = VulkanUtils::beginSingleTimeCommand();
     {
         VkImageMemoryBarrier imageMemoryBarrier = {};
         imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -81,7 +81,7 @@ static void restoreImageLayout(std::shared_ptr<VulkanImage> src, std::shared_ptr
         imageMemoryBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
         vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
     }
-    VkUtils::flushCommandBuffer(cmdBuffer);
+    VulkanUtils::flushCommandBuffer(cmdBuffer);
 }
 
 
@@ -129,7 +129,7 @@ HeightMapDiskProcessor::HeightMapDiskProcessor(const std::string& filepath, uint
 	imgSubresource.levelCount = texSpec.Mips;
 	imgSubresource.baseMipLevel = 0;
 
-	VkUtils::transitionImageLayout(m_HeightMap->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	VulkanUtils::transitionImageLayout(m_HeightMap->getVkImage(), imgSubresource, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
 	m_HeightMap->copyBuffer(*stagingBuffer);
 	m_HeightMap->generateMips(VK_FILTER_NEAREST);
@@ -189,7 +189,7 @@ void HeightMapDiskProcessor::serializeChunked(const SerializeChunkedSettings& se
             {
                 const char* imageData = data + layout.offset;
                 memset((void*)imageData, 0, layout.size);
-                VkCommandBuffer cmdBuffer = VkUtils::beginSingleTimeCommand();
+                VkCommandBuffer cmdBuffer = VulkanUtils::beginSingleTimeCommand();
 
                 VkImageBlit blit{};
 
@@ -230,7 +230,7 @@ void HeightMapDiskProcessor::serializeChunked(const SerializeChunkedSettings& se
                     1, &blit,
                     VK_FILTER_NEAREST);
 
-                VkUtils::flushCommandBuffer(cmdBuffer);
+                VulkanUtils::flushCommandBuffer(cmdBuffer);
 
                 metadataOut << mip << " ";
                 metadataOut << packOffset(x, y) << " ";

@@ -38,7 +38,7 @@
 
 // Callback for EnumDisplayMonitors in createMonitor
 //
-static BOOL CALLBACK monitorCallback(HMONITOR handle,
+static BOOL CALLBACK monitorCallback(HMONITOR Handle,
                                      HDC dc,
                                      RECT* rect,
                                      LPARAM data)
@@ -47,11 +47,11 @@ static BOOL CALLBACK monitorCallback(HMONITOR handle,
     ZeroMemory(&mi, sizeof(mi));
     mi.cbSize = sizeof(mi);
 
-    if (GetMonitorInfoW(handle, (MONITORINFO*) &mi))
+    if (GetMonitorInfoW(Handle, (MONITORINFO*) &mi))
     {
         _GLFWmonitor* monitor = (_GLFWmonitor*) data;
         if (wcscmp(mi.szDevice, monitor->win32.adapterName) == 0)
-            monitor->win32.handle = handle;
+            monitor->win32.Handle = Handle;
     }
 
     return TRUE;
@@ -314,12 +314,12 @@ void _glfwRestoreVideoModeWin32(_GLFWmonitor* monitor)
     }
 }
 
-void _glfwGetMonitorContentScaleWin32(HMONITOR handle, float* xscale, float* yscale)
+void _glfwGetMonitorContentScaleWin32(HMONITOR Handle, float* xscale, float* yscale)
 {
     UINT xdpi, ydpi;
 
     if (IsWindows8Point1OrGreater())
-        GetDpiForMonitor(handle, MDT_EFFECTIVE_DPI, &xdpi, &ydpi);
+        GetDpiForMonitor(Handle, MDT_EFFECTIVE_DPI, &xdpi, &ydpi);
     else
     {
         const HDC dc = GetDC(NULL);
@@ -363,7 +363,7 @@ void _glfwPlatformGetMonitorPos(_GLFWmonitor* monitor, int* xpos, int* ypos)
 void _glfwPlatformGetMonitorContentScale(_GLFWmonitor* monitor,
                                          float* xscale, float* yscale)
 {
-    _glfwGetMonitorContentScaleWin32(monitor->win32.handle, xscale, yscale);
+    _glfwGetMonitorContentScaleWin32(monitor->win32.Handle, xscale, yscale);
 }
 
 void _glfwPlatformGetMonitorWorkarea(_GLFWmonitor* monitor,
@@ -371,7 +371,7 @@ void _glfwPlatformGetMonitorWorkarea(_GLFWmonitor* monitor,
                                      int* width, int* height)
 {
     MONITORINFO mi = { sizeof(mi) };
-    GetMonitorInfo(monitor->win32.handle, &mi);
+    GetMonitorInfo(monitor->win32.Handle, &mi);
 
     if (xpos)
         *xpos = mi.rcWork.left;
@@ -521,16 +521,16 @@ void _glfwPlatformSetGammaRamp(_GLFWmonitor* monitor, const GLFWgammaramp* ramp)
 //////                        GLFW native API                       //////
 //////////////////////////////////////////////////////////////////////////
 
-GLFWAPI const char* glfwGetWin32Adapter(GLFWmonitor* handle)
+GLFWAPI const char* glfwGetWin32Adapter(GLFWmonitor* Handle)
 {
-    _GLFWmonitor* monitor = (_GLFWmonitor*) handle;
+    _GLFWmonitor* monitor = (_GLFWmonitor*) Handle;
     _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
     return monitor->win32.publicAdapterName;
 }
 
-GLFWAPI const char* glfwGetWin32Monitor(GLFWmonitor* handle)
+GLFWAPI const char* glfwGetWin32Monitor(GLFWmonitor* Handle)
 {
-    _GLFWmonitor* monitor = (_GLFWmonitor*) handle;
+    _GLFWmonitor* monitor = (_GLFWmonitor*) Handle;
     _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
     return monitor->win32.publicDisplayName;
 }
