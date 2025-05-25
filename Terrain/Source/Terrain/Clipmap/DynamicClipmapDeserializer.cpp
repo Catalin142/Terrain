@@ -1,7 +1,8 @@
 #include "DynamicClipmapDeserializer.h"
 
 #include "Terrain/TerrainChunk.h"
-#include "Graphics/Vulkan/VulkanRenderer.h"
+#include "Graphics/Vulkan/VulkanSwapchain.h"
+
 #include "Terrain/Clipmap/TerrainClipmap.h"
 #include "Terrain/Terrain.h"
 
@@ -19,7 +20,7 @@ DynamicClipmapDeserializer::DynamicClipmapDeserializer(const ClipmapTerrainSpeci
         RawDataProperties.Type = BufferType::TRANSFER_SRC_BUFFER | BufferType::TRANSFER_DST_BUFFER;
         RawDataProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
 
-        for (uint32_t frame = 0; frame < VulkanRenderer::getFramesInFlight() + 1; frame++)
+        for (uint32_t frame = 0; frame < VulkanSwapchain::framesInFlight + 1; frame++)
         {
             m_RawImageData.push_back(std::make_shared<VulkanBuffer>(RawDataProperties));
             m_RawImageData.back()->Map();
@@ -153,7 +154,7 @@ uint32_t DynamicClipmapDeserializer::Refresh(VkCommandBuffer cmdBuffer, TerrainC
         std::lock_guard lock(m_DataMutex);
 
         m_AvailableBuffer++;
-        m_AvailableBuffer %= (VulkanRenderer::getFramesInFlight() + 1);
+        m_AvailableBuffer %= (VulkanSwapchain::framesInFlight + 1);
     }
 
     m_Available = true;

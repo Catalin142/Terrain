@@ -55,9 +55,9 @@ public:
 	~QuadTreeTerrainRenderer() = default;
 
 	void refreshVirtualMap();
-	void updateVirtualMap();
+	void updateVirtualMap(uint32_t frameIndex);
 
-	void Render(const Camera& camera);
+	void Render(const Camera& camera, uint32_t frameIndex);
 
 	void setWireframe(bool wireframe);
 

@@ -130,7 +130,9 @@ VulkanDevice::VulkanDevice(const std::shared_ptr<Window>& window, const Instance
 
 VulkanDevice::~VulkanDevice()
 {
-	m_CommandPool.clear();
+	for(auto& [tId, cmdPool] : m_CommandPool)
+		vkDestroyCommandPool(m_VulkanPlatform.logicalDevice, cmdPool, nullptr);
+
 	vkDestroyDevice(m_VulkanPlatform.logicalDevice, nullptr);
 	vkDestroySurfaceKHR(m_VulkanPlatform.Instance, m_VulkanPlatform.windowSurface, nullptr);
 	vkDestroyInstance(m_VulkanPlatform.Instance, nullptr);

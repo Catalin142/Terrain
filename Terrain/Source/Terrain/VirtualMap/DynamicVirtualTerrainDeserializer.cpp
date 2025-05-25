@@ -1,7 +1,6 @@
 #include "DynamicVirtualTerrainDeserializer.h"
 
 #include "TerrainVirtualMap.h"
-#include "Graphics/Vulkan/VulkanRenderer.h"
 #include "Graphics/Vulkan/VulkanUtils.h"
 #include "Core/Instrumentor.h"
 
@@ -21,7 +20,7 @@ DynamicVirtualTerrainDeserializer::DynamicVirtualTerrainDeserializer(const Virtu
         RawDataProperties.Type = BufferType::TRANSFER_SRC_BUFFER | BufferType::TRANSFER_DST_BUFFER;
         RawDataProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
 
-        for (uint32_t frame = 0; frame <= VulkanRenderer::getFramesInFlight(); frame++)
+        for (uint32_t frame = 0; frame <= VulkanSwapchain::framesInFlight; frame++)
         {
             m_RawImageData.push_back(std::make_shared<VulkanBuffer>(RawDataProperties));
             m_RawImageData.back()->Map();
@@ -130,7 +129,7 @@ void DynamicVirtualTerrainDeserializer::Refresh(VkCommandBuffer cmdBuffer, Terra
         LastUpdate.StatusNodes = m_StatusNodes;
 
         currentBuffer = m_AvailableBuffer++;
-        m_AvailableBuffer %= (VulkanRenderer::getFramesInFlight() + 1);
+        m_AvailableBuffer %= (VulkanSwapchain::framesInFlight + 1);
 
         regions = m_RegionsToCopy;
 

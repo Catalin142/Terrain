@@ -1,6 +1,5 @@
 #include "TerrainGenerator.h"
 
-#include "Graphics/Vulkan/VulkanRenderer.h"
 #include "Graphics/Vulkan/VulkanUtils.h"
 
 TerrainGenerator::TerrainGenerator(uint32_t width, uint32_t height) : m_Width(width), m_Height(height)
@@ -18,7 +17,7 @@ TerrainGenerator::TerrainGenerator(uint32_t width, uint32_t height) : m_Width(wi
 	createCompute();
 }
 
-void TerrainGenerator::Generate(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer)
+void TerrainGenerator::Generate(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer, uint32_t frameIndex)
 {
 	if (!m_Valid)
 	{
@@ -34,33 +33,28 @@ void TerrainGenerator::Generate(const std::shared_ptr<VulkanRenderCommandBuffer>
 		barrierComputeFragmentSpecification.toAccess = VK_ACCESS_SHADER_READ_BIT;
 		barrierComputeFragmentSpecification.toStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 
-		VkCommandBuffer currentBuffer = commandBuffer->getCurrentCommandBuffer();
+		VkCommandBuffer currentBuffer = commandBuffer->getCommandBuffer(frameIndex);
 		HydraulicSimulations = 0;
 		{
-			VulkanRenderer::dispatchCompute(currentBuffer, m_NoiseGenerationPass, { m_Width / 8, m_Height / 8, 1 },
-				sizeof(GenerationParameters), &Noise);
+			m_NoiseGenerationPass.Prepare(currentBuffer, frameIndex, sizeof(GenerationParameters), &Noise);
+			m_NoiseGenerationPass.Dispatch(currentBuffer, { m_Width / 8, m_Height / 8, 1 });
 
 			// Prevents the composition pass to read noise and normals before they are finished
 			VulkanUtils::imageMemoryBarrier(currentBuffer, m_Noise, barrierComputeComputeSpecification);
 		}
 
-		{
-			VulkanRenderer::dispatchCompute(currentBuffer, m_HydraulicErosionPass, { 1, 1, 1 });
-
-			VulkanUtils::imageMemoryBarrier(currentBuffer, m_Noise, barrierComputeComputeSpecification);
-			VulkanUtils::imageMemoryBarrier(currentBuffer, m_Noise, barrierComputeFragmentSpecification);
-		}
-
 		// compute normals
 		{
-			VulkanRenderer::dispatchCompute(currentBuffer, m_NormalComputePass, { m_Width / 8, m_Height / 8, 1 });
+			m_NormalComputePass.Prepare(currentBuffer, frameIndex);
+			m_NormalComputePass.Dispatch(currentBuffer, { m_Width / 8, m_Height / 8, 1 });
 
 			VulkanUtils::imageMemoryBarrier(currentBuffer, m_Normals, barrierComputeComputeSpecification);
 			VulkanUtils::imageMemoryBarrier(currentBuffer, m_Normals, barrierComputeFragmentSpecification);
 		}
 
 		{
-			VulkanRenderer::dispatchCompute(currentBuffer, m_CompositionPass, { m_Width / 8, m_Height / 8, 1 });
+			m_CompositionPass.Prepare(currentBuffer, frameIndex);
+			m_CompositionPass.Dispatch(currentBuffer, { m_Width / 8, m_Height / 8, 1 });
 
 			// prevernts terrain fragment shader read from composition image until it is finished
 			VulkanUtils::imageMemoryBarrier(currentBuffer, m_Composition, barrierComputeFragmentSpecification);
@@ -70,7 +64,7 @@ void TerrainGenerator::Generate(const std::shared_ptr<VulkanRenderCommandBuffer>
 	}
 
 	if (RunHydraulicErosion)
-		runHydraulicErosion(commandBuffer);
+		runHydraulicErosion(commandBuffer, frameIndex);
 }
 
 void TerrainGenerator::Resize(uint32_t width, uint32_t height)
@@ -81,7 +75,7 @@ void TerrainGenerator::Resize(uint32_t width, uint32_t height)
 	m_Valid = false;
 }
 
-void TerrainGenerator::runHydraulicErosion(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer)
+void TerrainGenerator::runHydraulicErosion(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer, uint32_t frameIndex)
 {
 	static float t = 0.0f;
 	static float r = 0.0f;
@@ -90,7 +84,7 @@ void TerrainGenerator::runHydraulicErosion(const std::shared_ptr<VulkanRenderCom
 	glm::vec2 a{ t, r };
 	m_UniformBuffer->setDataCPU(&a, sizeof(glm::vec2));
 
-	VkCommandBuffer currentBuffer = commandBuffer->getCurrentCommandBuffer();
+	VkCommandBuffer currentBuffer = commandBuffer->getCommandBuffer(frameIndex);
 
 	MemoryBarrierSpecification barrierComputeComputeSpecification;
 	barrierComputeComputeSpecification.fromAccess = VK_ACCESS_SHADER_WRITE_BIT;
@@ -99,15 +93,15 @@ void TerrainGenerator::runHydraulicErosion(const std::shared_ptr<VulkanRenderCom
 	barrierComputeComputeSpecification.toStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 
 	MemoryBarrierSpecification barrierComputeFragmentSpecification;
-	barrierComputeComputeSpecification.fromAccess = VK_ACCESS_SHADER_WRITE_BIT;
-	barrierComputeComputeSpecification.fromStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-	barrierComputeComputeSpecification.toAccess = VK_ACCESS_SHADER_READ_BIT;
-	barrierComputeComputeSpecification.toStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	barrierComputeFragmentSpecification.fromAccess = VK_ACCESS_SHADER_WRITE_BIT;
+	barrierComputeFragmentSpecification.fromStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+	barrierComputeFragmentSpecification.toAccess = VK_ACCESS_SHADER_READ_BIT;
+	barrierComputeFragmentSpecification.toStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 
 	{
 		HydraulicSimulations += 1024;
-		VulkanRenderer::dispatchCompute(currentBuffer, m_HydraulicErosionPass, { 1, 1, 1 },
-			sizeof(HydraulicErosionParameters), &HydraulicErosion);
+		m_HydraulicErosionPass.Prepare(currentBuffer, frameIndex, sizeof(HydraulicErosionParameters), &HydraulicErosion);
+		m_HydraulicErosionPass.Dispatch(currentBuffer, { 1, 1, 1 });
 
 		VulkanUtils::imageMemoryBarrier(currentBuffer, m_Noise, barrierComputeComputeSpecification);
 		VulkanUtils::imageMemoryBarrier(currentBuffer, m_Noise, barrierComputeFragmentSpecification);
@@ -115,14 +109,16 @@ void TerrainGenerator::runHydraulicErosion(const std::shared_ptr<VulkanRenderCom
 
 	// compute normals
 	{
-		VulkanRenderer::dispatchCompute(currentBuffer, m_NormalComputePass, { m_Width / 8, m_Height / 8, 1 });
+		m_NormalComputePass.Prepare(currentBuffer, frameIndex);
+		m_NormalComputePass.Dispatch(currentBuffer, { m_Width / 8, m_Height / 8, 1 });
 
 		VulkanUtils::imageMemoryBarrier(currentBuffer, m_Normals, barrierComputeComputeSpecification);
 		VulkanUtils::imageMemoryBarrier(currentBuffer, m_Normals, barrierComputeFragmentSpecification);
 	}
 
 	{
-		VulkanRenderer::dispatchCompute(currentBuffer, m_CompositionPass, { m_Width / 8, m_Height / 8, 1 });
+		m_CompositionPass.Prepare(currentBuffer, frameIndex);
+		m_CompositionPass.Dispatch(currentBuffer, { m_Width / 8, m_Height / 8, 1 });
 
 		// prevernts terrain fragment shader read from composition image until its finished
 		VulkanUtils::imageMemoryBarrier(currentBuffer, m_Composition, barrierComputeFragmentSpecification);

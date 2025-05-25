@@ -39,10 +39,10 @@ class TerrainGenerator
 public:
 	TerrainGenerator(uint32_t width, uint32_t height);
 
-	void Generate(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer);
+	void Generate(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer, uint32_t frameIndex);
 	void Resize(uint32_t width, uint32_t height);
 
-	void runHydraulicErosion(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer);
+	void runHydraulicErosion(const std::shared_ptr<VulkanRenderCommandBuffer>& commandBuffer, uint32_t frameIndex);
 
 	std::shared_ptr<VulkanImage> getHeightMap() { return m_Noise; }
 	std::shared_ptr<VulkanImage> getNormalMap() { return m_Normals; }

@@ -44,9 +44,9 @@ class BruteForceTerrainRenderer
 public:
 	BruteForceTerrainRenderer(const BruteForceTerrainRendererSpecification& specification);
 
-	void Render(const Camera& camera);
+	void Render(const Camera& camera, uint32_t frameIndex);
 
-	void Refresh(const Camera& camera);
+	void Refresh(const Camera& camera, uint32_t frameIndex);
 
 	void setWireframe(bool wireframe);
 

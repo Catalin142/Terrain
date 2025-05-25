@@ -20,6 +20,8 @@ struct RenderPipelineSpecification
 
 	std::shared_ptr<VulkanShader> Shader;
 	std::shared_ptr<VulkanFramebuffer> Framebuffer;
+	VkRenderPass renderPass = nullptr;
+
 	std::vector<PushConstantSpecification> pushConstants;
 	
 	VulkanVertexBufferLayout vertexBufferLayout = VulkanVertexBufferLayout{};

@@ -1,14 +1,13 @@
 #include "VulkanImgui.h"
 
 #include "VulkanDevice.h"
-#include "VulkanRenderer.h"
 
 #include <vector>
 #include <imgui.h>
 #include <backends/imgui_impl_vulkan.h>
 #include <backends/imgui_impl_glfw.h>
 
-void VulkanImgui::Initialize(const std::shared_ptr<Window>& window)
+void VulkanImgui::Initialize(const std::shared_ptr<Window>& window, const std::shared_ptr<VulkanSwapchain>& swapchain)
 {
 	VkDescriptorPoolSize pool_sizes[] =
 	{
@@ -51,7 +50,7 @@ void VulkanImgui::Initialize(const std::shared_ptr<Window>& window)
 	init_info.ImageCount = 2;
 	init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 
-	ImGui_ImplVulkan_Init(&init_info, VulkanRenderer::getSwapchainRenderPass());
+	ImGui_ImplVulkan_Init(&init_info, swapchain->getRenderPass());
 
 	ImGui_ImplVulkan_CreateFontsTexture();
 }
@@ -70,9 +69,9 @@ void VulkanImgui::beginFrame()
 	ImGui::NewFrame();
 }
 
-void VulkanImgui::endFrame()
+void VulkanImgui::endFrame(VkCommandBuffer commandBuffer)
 {
 	ImGui::Render();
-	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), VulkanRenderer::getSwapchainCurrentCommandBuffer());
+	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
 	ImGui::EndFrame();
 }

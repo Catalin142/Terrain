@@ -446,12 +446,18 @@ void LODManagerGUI::renderTessellationGUI()
 	ImGui::SameLine();
 	ImGui::DragFloat("##lod5", &threshold[5], 0.01);
 
-	if (!CommandBuffer->pipelineStats.empty()) {
-		for (auto i = 0; i < CommandBuffer->pipelineStats.size(); i++) {
-			std::string caption = CommandBuffer->pipelineStatNames[i] + ": %d";
-			ImGui::Text(caption.c_str());
-			ImGui::SameLine();
-			ImGui::Text(std::to_string(CommandBuffer->pipelineStats[i]).c_str());
+	std::vector<uint64_t> tessPipelineQuery = CommandBuffer->getPipelineQuery("_TessellationTerrain");
+	std::vector<std::string> queryNames = {
+		"INPUT_ASSEMBLY_VERTICES",
+		"INPUT_ASSEMBLY_PRIMITIVES",
+		"TESSELLATION_CONTROL_SHADER_PATCHES",
+		"TESSELLATION_EVALUATION_SHADER_INVOCATIONS"
+	};
+
+	if (!tessPipelineQuery.empty()) {
+		for (auto i = 0; i < tessPipelineQuery.size(); i++) {
+			std::string label = queryNames[i] + ": " + std::to_string(tessPipelineQuery[i]);
+			ImGui::Text("%s", label.c_str());
 		}
 	}
 

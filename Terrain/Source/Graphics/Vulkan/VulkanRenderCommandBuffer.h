@@ -9,51 +9,44 @@ class VulkanRenderCommandBuffer
 {
 public:
 	VulkanRenderCommandBuffer(uint32_t count);
-	VulkanRenderCommandBuffer(bool swapchain);
 	~VulkanRenderCommandBuffer();
 
-	void Begin();
+	void Begin(uint32_t frameIndex);
 	void End();
 	void Submit();
 
-	VkCommandBuffer getCurrentCommandBuffer() { return m_CurrentCommandBuffer; }
 	VkCommandBuffer getCommandBuffer(uint32_t index) {
 		return m_CommandBuffers[index];
 	}
 
-	void beginQuery(const std::string& name);
-	void endQuery(const std::string& name);
+	void beginTimeQuery(const std::string& name);
+	void endTimeQuery(const std::string& name);
 	
-	void beginPipelineQuery();
-	void endPipelineQuery();
+	void beginPipelineQuery(const std::string& name, const std::vector<VkQueryPipelineStatisticFlagBits>& statsBits);
+	void removePipelineQuery(const std::string& name);
+	void endPipelineQuery(const std::string& name);
 
-	void getQueryResult();
-
-	void queryResults();
+	void fetchPipelineQueries();
+	void fetchTimeQueries();
 
 	float getCommandBufferTime();
 	float getTime(const std::string& name);
-	bool getCurrentBufferStatus();
 
-	void setupQueryPool();
-
-	std::vector<uint64_t> pipelineStats{};
-	std::vector<std::string> pipelineStatNames{};
+	std::vector<uint64_t> getPipelineQuery(const std::string& name);
 
 private:
 	VkCommandPool m_CommandPool = VK_NULL_HANDLE;
 	std::vector<VkCommandBuffer> m_CommandBuffers;
 	VkCommandBuffer m_CurrentCommandBuffer = VK_NULL_HANDLE;
 	std::vector<VkFence> m_inFlightFences;
+	uint32_t m_CurrentFrameIndex = 0;
 
-	std::vector<VkQueryPool> m_QueryPools;
+	VkQueryPool m_QueryPools;
 	std::vector<std::vector<uint64_t>> m_TimeStamps;
 	std::unordered_map<std::string, uint32_t> m_QueryStart;
 	std::vector<float> m_QueryResults;
 	uint32_t m_CurrentAvailableQuery = 0;
-	uint32_t m_QueryFrame = 0;
 
-	bool m_OwnedBySwapchain = false;
-
-	VkQueryPool m_QueryPoolsPipelineStats;
+	std::unordered_map<std::string, std::vector<uint64_t>> m_PipelineStats;
+	std::unordered_map<std::string, VkQueryPool> m_QueryPoolsPipelineStats;
 };

@@ -49,9 +49,9 @@ public:
 	~ClipmapTerrainRenderer() = default;
 
 	void refreshClipmaps(const Camera& camera);
-	void updateClipmaps(const Camera& camera);
+	void updateClipmaps(const Camera& camera, uint32_t frameIndex);
 
-	void Render(const Camera& camera);
+	void Render(const Camera& camera, uint32_t frameIndex);
 
 	void setWireframe(bool wireframe);
 

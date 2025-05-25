@@ -57,36 +57,36 @@ void LODManager::preprocessTerrain()
 	}
 }
 
-void LODManager::renderTerrain(const std::shared_ptr<VulkanRenderCommandBuffer>& cmdBuffer, Camera cam)
+void LODManager::renderTerrain(const std::shared_ptr<VulkanRenderCommandBuffer>& cmdBuffer, Camera cam, uint32_t frameIndex)
 {
 	switch (m_CurrentTechnique)
 	{
 	case LODTechnique::CLIPMAP:
 		ClipmapRenderer->CommandBuffer = cmdBuffer;
 
-		ClipmapRenderer->updateClipmaps(SceneCamera);
-		ClipmapRenderer->Render(cam);
+		ClipmapRenderer->updateClipmaps(SceneCamera, frameIndex);
+		ClipmapRenderer->Render(cam, frameIndex);
 		break;
 
 	case LODTechnique::QUADTREE:
 		QuadTreeRenderer->CommandBuffer = cmdBuffer;
 
-		QuadTreeRenderer->updateVirtualMap();
-		QuadTreeRenderer->Render(cam);
+		QuadTreeRenderer->updateVirtualMap(frameIndex);
+		QuadTreeRenderer->Render(cam, frameIndex);
 		break;
 
 	case LODTechnique::TESSELLATION:
 		TessellationRenderer->CommandBuffer = cmdBuffer;
 
-		TessellationRenderer->updateClipmaps();
-		TessellationRenderer->Render(cam);
+		TessellationRenderer->updateClipmaps(frameIndex);
+		TessellationRenderer->Render(cam, frameIndex);
 		break;
 
 	case LODTechnique::BRUTE_FORCE:
 		BruteForceRenderer->CommandBuffer = cmdBuffer;
 
-		BruteForceRenderer->Refresh(SceneCamera);
-		BruteForceRenderer->Render(cam);
+		BruteForceRenderer->Refresh(SceneCamera, frameIndex);
+		BruteForceRenderer->Render(cam, frameIndex);
 		break;
 	}
 }

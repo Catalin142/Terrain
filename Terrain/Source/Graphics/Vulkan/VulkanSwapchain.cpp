@@ -63,32 +63,8 @@ void VulkanSwapchain::Initialize()
 	if (vkCreateRenderPass(logicalDevice, &renderPassInfo, nullptr, &m_RenderPass) != VK_SUCCESS)
 		assert(false);
 
-	////////////////////////////////////////////////////////////////////////////////////////
-	// Command buffer
-	////////////////////////////////////////////////////////////////////////////////////////
+	framesInFlight = m_vSync ? 2 : 1;
 
-	m_FramesInFlight = m_vSync ? 2 : 1;
-
-	m_CommandBuffers.resize(m_FramesInFlight);
-
-	VkCommandPoolCreateInfo cmdPoolInfo = {};
-	cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-	cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-
-	VkCommandBufferAllocateInfo commandBufferAllocateInfo{};
-	commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	commandBufferAllocateInfo.commandBufferCount = 1;
-
-	for (SwapchainCommandBuffer& commandBuffer : m_CommandBuffers)
-	{
-		if (vkCreateCommandPool(logicalDevice, &cmdPoolInfo, nullptr, &commandBuffer.commandPool))
-			assert(false);
-
-		commandBufferAllocateInfo.commandPool = commandBuffer.commandPool;
-		if (vkAllocateCommandBuffers(logicalDevice, &commandBufferAllocateInfo, &commandBuffer.commandBuffer) != VK_SUCCESS)
-			assert(false);
-	}
 	////////////////////////////////////////////////////////////////////////////////////////
 	// Sync objects
 	////////////////////////////////////////////////////////////////////////////////////////
@@ -97,8 +73,8 @@ void VulkanSwapchain::Initialize()
 	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 	fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT; // l face in signaled state
 
-	m_inFlightFences.resize(m_FramesInFlight);
-	for (uint32_t i = 0; i < m_FramesInFlight; i++)
+	m_inFlightFences.resize(framesInFlight);
+	for (uint32_t i = 0; i < framesInFlight; i++)
 		if (vkCreateFence(logicalDevice, &fenceInfo, nullptr, &m_inFlightFences[i])) assert(false);
 }
 
@@ -124,7 +100,7 @@ void VulkanSwapchain::Create(uint32_t width, uint32_t height)
 	VkSurfaceFormatKHR surfaceFormat;
 	surfaceFormat.format = VK_FORMAT_B8G8R8A8_SRGB;
 	surfaceFormat.colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-	m_Extent = VkExtent2D{ m_Width, m_Height };
+	Extent = VkExtent2D{ m_Width, m_Height };
 
 	VkSwapchainCreateInfoKHR swapChainInfo{};
 	swapChainInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -132,7 +108,7 @@ void VulkanSwapchain::Create(uint32_t width, uint32_t height)
 	swapChainInfo.minImageCount = m_ImageCount;
 	swapChainInfo.imageFormat = surfaceFormat.format;
 	swapChainInfo.imageColorSpace = surfaceFormat.colorSpace;
-	swapChainInfo.imageExtent = m_Extent;
+	swapChainInfo.imageExtent = Extent;
 	swapChainInfo.imageArrayLayers = 1;
 	swapChainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
@@ -258,9 +234,6 @@ void VulkanSwapchain::Destroy()
 	for (auto framebuffer : m_Framebuffers)
 		vkDestroyFramebuffer(device, framebuffer, nullptr);
 
-	for (uint32_t i = 0; i < m_CommandBuffers.size(); i++)
-		vkDestroyCommandPool(device, m_CommandBuffers[i].commandPool, nullptr);
-
 	for (uint32_t i = 0; i < m_Semaphores.size(); i++)
 	{
 		vkDestroySemaphore(device, m_Semaphores[i].imageAvailableSemaphore, nullptr);
@@ -277,7 +250,7 @@ void VulkanSwapchain::beginFrame()
 {
 	VkDevice device = VulkanDevice::getVulkanDevice();
 
-	VkResult res = vkAcquireNextImageKHR(device, m_SwapChain, UINT64_MAX, getImageAvailableSemaphore(m_currentFrameIndex), VK_NULL_HANDLE, &m_ImageIndex);
+	VkResult res = vkAcquireNextImageKHR(device, m_SwapChain, UINT64_MAX, m_Semaphores[currentFrameIndex].imageAvailableSemaphore, VK_NULL_HANDLE, &m_ImageIndex);
 	
 	if (res == VK_ERROR_OUT_OF_DATE_KHR) {
 		onResize(m_Width, m_Height);
@@ -287,30 +260,28 @@ void VulkanSwapchain::beginFrame()
 		assert(false);
 }
 
-void VulkanSwapchain::endFrame()
+void VulkanSwapchain::endFrame(VkCommandBuffer commandBuffer)
 {
-	VkCommandBuffer commandBuffer = getCommandBuffer(m_currentFrameIndex);
-
 	VkDevice device = VulkanDevice::getVulkanDevice();
 
 	VkSubmitInfo submitInfo{};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	
-	VkSemaphore waitSemaphores[] = { getImageAvailableSemaphore(m_currentFrameIndex) };
+	VkSemaphore waitSemaphores[] = { m_Semaphores[currentFrameIndex].imageAvailableSemaphore };
 	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 	submitInfo.waitSemaphoreCount = 1;
 	submitInfo.pWaitSemaphores = waitSemaphores;
 	submitInfo.pWaitDstStageMask = waitStages;
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &commandBuffer;
-	VkSemaphore signalSemaphores[] = { getRenderFinishedSemaphore(m_currentFrameIndex) };
+	VkSemaphore signalSemaphores[] = { m_Semaphores[currentFrameIndex].renderFinishedSemaphore };
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores = signalSemaphores;
 
-	vkResetFences(device, 1, &m_inFlightFences[m_currentFrameIndex]);
+	vkResetFences(device, 1, &m_inFlightFences[currentFrameIndex]);
 
 	{
-		if (vkQueueSubmit(VulkanDevice::getVulkanContext()->getGraphicsQueue(), 1, &submitInfo, m_inFlightFences[m_currentFrameIndex]) != VK_SUCCESS)
+		if (vkQueueSubmit(VulkanDevice::getVulkanContext()->getGraphicsQueue(), 1, &submitInfo, m_inFlightFences[currentFrameIndex]) != VK_SUCCESS)
 			assert(false);
 	}
 }
@@ -322,7 +293,7 @@ void VulkanSwapchain::presentFrame()
 	VkPresentInfoKHR presentInfo{};
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 	presentInfo.waitSemaphoreCount = 1;
-	VkSemaphore signalSemaphores[] = { getRenderFinishedSemaphore(m_currentFrameIndex) };
+	VkSemaphore signalSemaphores[] = { m_Semaphores[currentFrameIndex].renderFinishedSemaphore };
 	presentInfo.pWaitSemaphores = signalSemaphores;
 	VkSwapchainKHR swapChains[] = { m_SwapChain };
 	presentInfo.swapchainCount = 1;
@@ -340,9 +311,9 @@ void VulkanSwapchain::presentFrame()
 		else if (res != VK_SUCCESS)
 			assert(false);
 
-		m_currentFrameIndex = (m_currentFrameIndex + 1) % m_FramesInFlight;
+		currentFrameIndex = (currentFrameIndex + 1) % framesInFlight;
 
-		vkWaitForFences(device, 1, &m_inFlightFences[m_currentFrameIndex], VK_TRUE, UINT64_MAX);
+		vkWaitForFences(device, 1, &m_inFlightFences[currentFrameIndex], VK_TRUE, UINT64_MAX);
 	}
 }
 

@@ -1,12 +1,11 @@
 #include "VulkanRenderPipeline.h"
 
-#include "VulkanRenderer.h"
 #include "VulkanDevice.h"
 
 #include <cassert>
 
 VulkanRenderPipeline::VulkanRenderPipeline(const RenderPipelineSpecification& spec) : m_Specification(spec)
-{// dynamic state
+{
 	std::vector<VkDynamicState> dynamicStates = {
 		VK_DYNAMIC_STATE_VIEWPORT,
 		VK_DYNAMIC_STATE_SCISSOR,
@@ -140,7 +139,7 @@ VulkanRenderPipeline::VulkanRenderPipeline(const RenderPipelineSpecification& sp
 	pipelineInfo.pDynamicState			= &dynamicState;
 
 	pipelineInfo.layout = m_PipelineLayout;
-	pipelineInfo.renderPass = VulkanRenderer::getSwapchainRenderPass();
+	pipelineInfo.renderPass = m_Specification.renderPass;
 	if (m_Specification.Framebuffer)
 		pipelineInfo.renderPass = m_Specification.Framebuffer->getRenderPass();
 

@@ -2,7 +2,6 @@
 
 #include "VulkanDevice.h"
 #include "VulkanUtils.h"
-#include "VulkanRenderer.h"
 
 #include "Core/VulkanMemoryTracker.h"
 
@@ -218,9 +217,3 @@ const std::shared_ptr<VulkanBuffer>& VulkanBufferSet::getBuffer(uint32_t index)
 	return m_Buffers[index];
 }
 
-const std::shared_ptr<VulkanBuffer>& VulkanBufferSet::getCurrentFrameBuffer()
-{
-	uint32_t index = VulkanRenderer::getCurrentFrame();
-	index %= (uint32_t)m_Buffers.size();
-	return m_Buffers[index];
-}

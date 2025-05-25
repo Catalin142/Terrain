@@ -1,7 +1,6 @@
 #include "VulkanShader.h"
 
 #include "VulkanDevice.h"
-#include "VulkanPipeline.h"
 
 #include <vector>
 #include <string>

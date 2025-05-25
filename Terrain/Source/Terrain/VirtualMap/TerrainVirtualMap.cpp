@@ -1,7 +1,6 @@
 #include "TerrainVirtualMap.h"
 #include "Graphics/Vulkan/VulkanDevice.h"
 #include "Graphics/Vulkan/VulkanUtils.h"
-#include "Graphics/Vulkan/VulkanRenderer.h"
 #include "Core/Hash.h"
 
 #include "DynamicVirtualTerrainDeserializer.h"
@@ -180,7 +179,7 @@ void TerrainVirtualMap::blitNodes(VkCommandBuffer cmdBuffer, const std::shared_p
     m_PhysicalTexture->batchCopyBuffer(cmdBuffer, *StagingBuffer, regions);
 }
 
-void TerrainVirtualMap::updateIndirectionTexture(VkCommandBuffer cmdBuffer)
+void TerrainVirtualMap::updateIndirectionTexture(VkCommandBuffer cmdBuffer, uint32_t frameIndex)
 {
     const std::vector<GPUIndirectionNode>& indirectionNodes = m_Deserializer->LastUpdate.IndirectionNodes;
     if (indirectionNodes.size() != 0)
@@ -192,14 +191,14 @@ void TerrainVirtualMap::updateIndirectionTexture(VkCommandBuffer cmdBuffer)
     if (m_IndirectionNodes.empty())
         return;
 
-    m_IndirectionNodesStorage->getCurrentFrameBuffer()->setDataCPU(m_IndirectionNodes.data(), m_IndirectionNodes.size() * sizeof(GPUIndirectionNode));
+    m_IndirectionNodesStorage->getBuffer(frameIndex)->setDataCPU(m_IndirectionNodes.data(), m_IndirectionNodes.size() * sizeof(GPUIndirectionNode));
 
     int32_t size = (uint32_t)m_IndirectionNodes.size();
     int32_t invokes = (int32_t)glm::ceil(float(size) / 32.0f);
 
     {
-        VulkanRenderer::dispatchCompute(cmdBuffer, m_UpdateIndirectionComputePass, { invokes, 1, 1 },
-            sizeof(GPUVirtualMapProperties), &size);
+        m_UpdateIndirectionComputePass.Prepare(cmdBuffer, frameIndex, sizeof(GPUVirtualMapProperties), &size);
+        m_UpdateIndirectionComputePass.Dispatch(cmdBuffer, { invokes, 1, 1 });
 
         VulkanUtils::imageMemoryBarrier(cmdBuffer, m_IndirectionTexture, { VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT });
@@ -208,7 +207,7 @@ void TerrainVirtualMap::updateIndirectionTexture(VkCommandBuffer cmdBuffer)
     m_IndirectionNodes.clear();
 }
 
-void TerrainVirtualMap::updateStatusTexture(VkCommandBuffer cmdBuffer)
+void TerrainVirtualMap::updateStatusTexture(VkCommandBuffer cmdBuffer, uint32_t frameIndex)
 {
     const std::vector<GPUStatusNode>& statusNodes = m_Deserializer->LastUpdate.StatusNodes;
     if (statusNodes.size() != 0)
@@ -228,14 +227,14 @@ void TerrainVirtualMap::updateStatusTexture(VkCommandBuffer cmdBuffer)
     if (m_StatusNodes.empty())
         return;
 
-    m_StatusNodesStorage->getCurrentFrameBuffer()->setDataCPU(m_StatusNodes.data(), m_StatusNodes.size() * sizeof(GPUStatusNode));
+    m_StatusNodesStorage->getBuffer(frameIndex)->setDataCPU(m_StatusNodes.data(), m_StatusNodes.size() * sizeof(GPUStatusNode));
 
     int32_t size = (int32_t)m_StatusNodes.size();
     int32_t invokes = (int32_t)glm::ceil(float(size) / 32.0f);
 
     {
-        VulkanRenderer::dispatchCompute(cmdBuffer, m_UpdateStatusComputePass, { invokes, 1, 1 },
-            sizeof(GPUVirtualMapProperties), &size);
+        m_UpdateStatusComputePass.Prepare(cmdBuffer, frameIndex, sizeof(GPUVirtualMapProperties), &size);
+        m_UpdateStatusComputePass.Dispatch(cmdBuffer, { invokes, 1, 1 });
 
         VulkanUtils::imageMemoryBarrier(cmdBuffer, m_StatusTexture, { VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT });

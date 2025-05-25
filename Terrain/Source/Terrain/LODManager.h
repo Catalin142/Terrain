@@ -26,7 +26,7 @@ public:
 	void refreshTechnique();
 
 	void preprocessTerrain();
-	void renderTerrain(const std::shared_ptr<VulkanRenderCommandBuffer>& cmdBuffer, Camera cam);
+	void renderTerrain(const std::shared_ptr<VulkanRenderCommandBuffer>& cmdBuffer, Camera cam, uint32_t frameIndex);
 
 	LODTechnique getCurrentTechnique() { return m_CurrentTechnique; }
 

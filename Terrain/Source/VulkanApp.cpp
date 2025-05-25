@@ -39,11 +39,18 @@ static Camera upCamera{ 45.0f, 1600.0f / 900.0f, 0.1f, 1024.0f * 32.0f };
 
 
 VulkanApp::VulkanApp(const std::string& title, uint32_t width, uint32_t height) : Application(title, width, height)
-{ }
+{
+	m_Swapchain = std::make_shared<VulkanSwapchain>();
+	m_Swapchain->Initialize();
+	m_Swapchain->Create(width, height);
+
+	m_ImguiLayer = std::make_shared<VulkanImgui>();
+	m_ImguiLayer->Initialize(m_Window, m_Swapchain);
+}
 
 void VulkanApp::onCreate()
 {
-	CommandBuffer = std::make_shared<VulkanRenderCommandBuffer>(true);
+	CommandBuffer = std::make_shared<VulkanRenderCommandBuffer>(2);
 
 	{
 		FramebufferSpecification framebufferSpecification;
@@ -138,15 +145,17 @@ void VulkanApp::onUpdate()
 	cam.updateMatrices();
 	m_LODManager->preprocessTerrain();
 
-	uint32_t m_CurrentFrame = VulkanRenderer::getCurrentFrame();
+	uint32_t m_CurrentFrame = m_Swapchain->currentFrameIndex;
+
+	VkCommandBuffer commandBuffer = CommandBuffer->getCommandBuffer(m_Swapchain->currentFrameIndex);
+	m_Swapchain->beginFrame();
 
 	{
-		CommandBuffer->Begin();
-		VkCommandBuffer commandBuffer = CommandBuffer->getCurrentCommandBuffer();
-		m_TerrainGenerator->Generate(CommandBuffer);
+		CommandBuffer->Begin(m_CurrentFrame);
+		m_TerrainGenerator->Generate(CommandBuffer, m_CurrentFrame);
 
 		if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_3))
-			m_TerrainGenerator->runHydraulicErosion(CommandBuffer);
+			m_TerrainGenerator->runHydraulicErosion(CommandBuffer, m_CurrentFrame);
 
 		if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_TAB))
 		{
@@ -156,23 +165,23 @@ void VulkanApp::onUpdate()
 			upCamera.setPosition(camPos - glm::vec3(orientation.x * 4000.0f, orientation.y * 4000.0f, orientation.z * 4000.0f));
 			upCamera.setFocalPoint(camPos);
 			upCamera.updateMatrices();
-			m_LODManager->renderTerrain(CommandBuffer, upCamera);
+			m_LODManager->renderTerrain(CommandBuffer, upCamera, m_CurrentFrame);
 		}
 		else
-			m_LODManager->renderTerrain(CommandBuffer, cam);
+			m_LODManager->renderTerrain(CommandBuffer, cam, m_CurrentFrame);
 
 
 		// Present, fullscreen quad
 		{
-			CommandBuffer->beginQuery("PresentPass");
+			CommandBuffer->beginTimeQuery("PresentPass");
 
-			VulkanRenderer::beginSwapchainRenderPass(commandBuffer);
-			VulkanRenderer::preparePipeline(commandBuffer, m_FinalPass);
+			m_FinalPass.Prepare(commandBuffer, m_CurrentFrame);
+			m_FinalPass.Begin(commandBuffer);
 
 			vkCmdDraw(commandBuffer, 6, 1, 0, 0);
 
-			CommandBuffer->beginQuery("Imgui");
-			beginImGuiFrame();
+			CommandBuffer->beginTimeQuery("Imgui");
+			m_ImguiLayer->beginFrame();
 
 			static ProfilerManager manager({ 480.0f, 10.0f }, 560.0f);
 			{
@@ -189,19 +198,27 @@ void VulkanApp::onUpdate()
 			m_ManagerGUI->CommandBuffer = CommandBuffer;
 			m_ManagerGUI->Render();
 
-			endImGuiFrame();
-			CommandBuffer->endQuery("Imgui");
+			m_ImguiLayer->endFrame(commandBuffer);
+			CommandBuffer->endTimeQuery("Imgui");
 
-			VulkanRenderer::endRenderPass(commandBuffer);
-			CommandBuffer->endQuery("PresentPass");
+			m_FinalPass.End(commandBuffer);
+
+			CommandBuffer->endTimeQuery("PresentPass");
 		}
 
 		VkClearColorValue colorQuad = { 0.0f, 0.0f, 0.0f, 1.0f };
 		VkImageSubresourceRange range{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
 
 		CommandBuffer->End();
-		CommandBuffer->Submit();
 	}
+
+	m_Swapchain->endFrame(commandBuffer);
+	
+	CommandBuffer->fetchTimeQueries();
+	CommandBuffer->fetchPipelineQueries();
+
+	m_Swapchain->presentFrame();
+
 	if (glfwGetKey(getWindow()->getHandle(), GLFW_KEY_O))
 		VirtualTerrainSerializer::Serialize(m_TerrainGenerator->getHeightMap(), "2kmterrain.tb",
 			"2kmterrain.tc", 128);
@@ -209,6 +226,7 @@ void VulkanApp::onUpdate()
 
 void VulkanApp::onResize()
 {
+	m_Swapchain->onResize(getWidth(), getHeight());
 	TerrainGUI->Position.x = getWidth() - 300.0f - 10.0f;
 
 	m_Output->Resize(getWidth(), getHeight());
@@ -226,16 +244,13 @@ void VulkanApp::onResize()
 void VulkanApp::onDestroy()
 {
 	m_TerrainGenerator.reset();
-}
-
-void VulkanApp::postFrame()
-{
-	CommandBuffer->queryResults();
-	CommandBuffer->getQueryResult();
+	CommandBuffer.reset();
+	m_ImguiLayer->Destroy();
 }
 
 void VulkanApp::createFinalPass()
 {
+	m_FinalPass.Swapchain = m_Swapchain;
 	{
 		std::shared_ptr<VulkanShader>& mainShader = ShaderManager::createShader("FinalShader");
 		mainShader->addShaderStage(ShaderStage::VERTEX, "FullscreenPass_vert.glsl");
@@ -253,6 +268,7 @@ void VulkanApp::createFinalPass()
 	{
 		RenderPipelineSpecification spec{};
 		spec.Framebuffer = nullptr;
+		spec.renderPass = m_Swapchain->getRenderPass();
 		spec.Shader = ShaderManager::getShader("FinalShader");
 		spec.vertexBufferLayout = VulkanVertexBufferLayout{};
 		m_FinalPass.Pipeline = std::make_shared<VulkanRenderPipeline>(spec);

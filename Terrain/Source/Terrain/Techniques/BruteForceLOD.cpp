@@ -2,7 +2,6 @@
 
 #include "Terrain/BruteForce/BruteForceData.h"
 
-#include "Graphics/Vulkan/VulkanRenderer.h"
 #include "Graphics/Vulkan/VulkanUtils.h"
 
 #define CONSTRUCT_TERRAIN_CHUNKS_BRUTE_FORCE_COMPUTE "Terrain/BruteForce/ConstructTerrainChunks_comp.glsl"
@@ -36,7 +35,8 @@ void BruteForceLOD::Generate(VkCommandBuffer commandBuffer, const Camera& cam, c
 
 	uint32_t dispatchCount = m_TerrainSpecification.Info.TerrainSize / 128 / 16;
 
-	VulkanRenderer::dispatchCompute(commandBuffer, m_ConstructTerrainChunksPass, m_NextBuffer, { dispatchCount, dispatchCount, 1 });
+	m_ConstructTerrainChunksPass.Prepare(commandBuffer, m_NextBuffer);
+	m_ConstructTerrainChunksPass.Dispatch(commandBuffer, { dispatchCount, dispatchCount, 1 });
 
 	VulkanUtils::bufferMemoryBarrier(commandBuffer, ChunksToRender, { VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 		VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT });
@@ -45,7 +45,7 @@ void BruteForceLOD::Generate(VkCommandBuffer commandBuffer, const Camera& cam, c
 		VK_ACCESS_MEMORY_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT });
 
 	m_CurrentlyUsedBuffer = m_NextBuffer;
-	(++m_NextBuffer) %= VulkanRenderer::getFramesInFlight();
+	(++m_NextBuffer) %= VulkanSwapchain::framesInFlight;
 }
 
 const std::shared_ptr<VulkanBuffer>& BruteForceLOD::getIndirectDrawCommand()
@@ -88,7 +88,7 @@ void BruteForceLOD::createComputePass(const std::shared_ptr<VulkanBuffer>& infoB
 		resultCountProperties.Type = BufferType::STORAGE_BUFFER | BufferType::TRANSFER_DST_BUFFER;
 		resultCountProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
 
-		ResultCount = std::make_shared<VulkanBufferSet>(VulkanRenderer::getFramesInFlight(), resultCountProperties);
+		ResultCount = std::make_shared<VulkanBufferSet>(VulkanSwapchain::framesInFlight, resultCountProperties);
 	}
 
 	{

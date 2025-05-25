@@ -1,6 +1,5 @@
 #include "ClipmapLOD.h"
 
-#include "Graphics/Vulkan/VulkanRenderer.h"
 #include "Terrain/Clipmap/ClipmapData.h"
 
 #include <memory>
@@ -19,7 +18,7 @@ ClipmapLOD::ClipmapLOD(const std::unique_ptr<TerrainData>& terrain, const std::s
 		LODMarginsProperties.Type = BufferType::STORAGE_BUFFER;
 		LODMarginsProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
 
-		LODMarginsBufferSet = std::make_shared<VulkanBufferSet>(VulkanRenderer::getFramesInFlight(), LODMarginsProperties);
+		LODMarginsBufferSet = std::make_shared<VulkanBufferSet>(VulkanSwapchain::framesInFlight, LODMarginsProperties);
 	}
 
 	createChunkComputePass(terrain->TerrainInfoBuffer);
@@ -72,7 +71,7 @@ void ClipmapLOD::computeMargins(const glm::ivec2& cameraPosition)
 	LODMarginsBufferSet->getBuffer(m_NextBuffer)->setDataCPU(margins.data(), margins.size() * sizeof(LODMargins));
 
 	m_CurrentlyUsedBuffer = m_NextBuffer;
-	(++m_NextBuffer) %= VulkanRenderer::getFramesInFlight();
+	(++m_NextBuffer) %= VulkanSwapchain::framesInFlight;
 }
 
 void ClipmapLOD::Generate(VkCommandBuffer commandBuffer, const Camera& cam)
@@ -82,7 +81,8 @@ void ClipmapLOD::Generate(VkCommandBuffer commandBuffer, const Camera& cam)
 
 	uint32_t dispatchCount = uint32_t(glm::ceil(float(m_RingSize) / 8.0f));
 
-	VulkanRenderer::dispatchCompute(commandBuffer, m_ConstructTerrainChunksPass, m_CurrentlyUsedBuffer, { dispatchCount, dispatchCount, m_TerrainSpecification.Info.LODCount });
+	m_ConstructTerrainChunksPass.Prepare(commandBuffer, m_CurrentlyUsedBuffer);
+	m_ConstructTerrainChunksPass.Dispatch(commandBuffer, { dispatchCount, dispatchCount, m_TerrainSpecification.Info.LODCount });
 }
 
 void ClipmapLOD::createChunkComputePass(const std::shared_ptr<VulkanBuffer>& infoBuffer)

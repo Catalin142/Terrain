@@ -1,7 +1,6 @@
 #include "BruteForceTerrainRenderer.h"
 
 #include "Graphics/Vulkan/VulkanDevice.h"
-#include "Graphics/Vulkan/VulkanRenderer.h"
 
 #include "Core/VulkanMemoryTracker.h"
 
@@ -29,18 +28,14 @@ BruteForceTerrainRenderer::BruteForceTerrainRenderer(const BruteForceTerrainRend
 	BruteForceRendererMetrics::MEMORY_USED = SimpleVulkanMemoryTracker::Get()->getAllocatedMemory(BruteForceRendererMetrics::NAME);
 }
 
-void BruteForceTerrainRenderer::Render(const Camera& camera)
+void BruteForceTerrainRenderer::Render(const Camera& camera, uint32_t frameIndex)
 {
-	CommandBuffer->beginPipelineQuery();
-	CommandBuffer->beginQuery(BruteForceRendererMetrics::RENDER_TERRAIN);
-
-	VkCommandBuffer cmdBuffer = CommandBuffer->getCurrentCommandBuffer();
-	VulkanRenderer::beginRenderPass(cmdBuffer, m_TerrainRenderPass);
-	VulkanRenderer::preparePipeline(cmdBuffer, m_TerrainRenderPass, m_BruteForceLOD->getMostRecentIndex());
+	VkCommandBuffer cmdBuffer = CommandBuffer->getCommandBuffer(frameIndex);
 
 	CameraRenderMatrices matrices = camera.getRenderMatrices();
-	vkCmdPushConstants(cmdBuffer, m_TerrainRenderPass.Pipeline->getVkPipelineLayout(), VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, 0,
-		sizeof(CameraRenderMatrices), &matrices);
+
+	m_TerrainRenderPass.Begin(cmdBuffer);
+	m_TerrainRenderPass.Prepare(cmdBuffer, m_BruteForceLOD->getMostRecentIndex(), sizeof(CameraRenderMatrices), &matrices, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT);
 
 	VkBuffer vertexBuffers[] = { m_VertexBuffer->getBuffer() };
 	VkDeviceSize offsets[] = { 0 };
@@ -48,17 +43,16 @@ void BruteForceTerrainRenderer::Render(const Camera& camera)
 
 	vkCmdDrawIndirect(cmdBuffer, m_BruteForceLOD->getIndirectDrawCommand()->getBuffer(), 0, 1, sizeof(VkDrawIndirectCommand));
 
-	VulkanRenderer::endRenderPass(cmdBuffer);
+	m_TerrainRenderPass.End(cmdBuffer);
 
-	CommandBuffer->endQuery(BruteForceRendererMetrics::RENDER_TERRAIN);
-	CommandBuffer->endPipelineQuery();
+	CommandBuffer->endTimeQuery(BruteForceRendererMetrics::RENDER_TERRAIN);
 }
 
-void BruteForceTerrainRenderer::Refresh(const Camera& camera)
+void BruteForceTerrainRenderer::Refresh(const Camera& camera, uint32_t frameIndex)
 {
-	CommandBuffer->beginQuery(BruteForceRendererMetrics::GPU_CREATE_CHUNK_BUFFER);
-	m_BruteForceLOD->Generate(CommandBuffer->getCurrentCommandBuffer(), camera, DistanceThreshold);
-	CommandBuffer->endQuery(BruteForceRendererMetrics::GPU_CREATE_CHUNK_BUFFER);
+	CommandBuffer->beginTimeQuery(BruteForceRendererMetrics::GPU_CREATE_CHUNK_BUFFER);
+	m_BruteForceLOD->Generate(CommandBuffer->getCommandBuffer(frameIndex), camera, DistanceThreshold);
+	CommandBuffer->endTimeQuery(BruteForceRendererMetrics::GPU_CREATE_CHUNK_BUFFER);
 }
 
 void BruteForceTerrainRenderer::setWireframe(bool wireframe)

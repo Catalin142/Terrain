@@ -48,8 +48,8 @@ public:
 	const std::shared_ptr<VulkanImage>& getIndirectionTexture() { return m_IndirectionTexture; }
 	const std::shared_ptr<VulkanImage>& getLoadStatusTexture() { return m_StatusTexture; }
 
-	void updateIndirectionTexture(VkCommandBuffer cmdBuffer);
-	void updateStatusTexture(VkCommandBuffer cmdBuffer);
+	void updateIndirectionTexture(VkCommandBuffer cmdBuffer, uint32_t frameIndex);
+	void updateStatusTexture(VkCommandBuffer cmdBuffer, uint32_t frameIndex);
 
 	void prepareForDeserialization(VkCommandBuffer cmdBuffer);
 	void prepareForRendering(VkCommandBuffer cmdBuffer);

@@ -54,9 +54,9 @@ public:
 	~TessellationTerrainRenderer() = default;
 
 	void refreshClipmaps();
-	void updateClipmaps();
+	void updateClipmaps(uint32_t frameIndex);
 
-	void Render(const Camera& camera);
+	void Render(const Camera& camera, uint32_t frameIndex);
 
 	void setWireframe(bool wireframe);
 

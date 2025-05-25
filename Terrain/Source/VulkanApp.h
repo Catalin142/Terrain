@@ -9,7 +9,6 @@
 #include "Graphics/Vulkan/VulkanVertexBufferLayout.h"
 #include "Graphics/Vulkan/VulkanRenderCommandBuffer.h"
 #include "Graphics/Vulkan/VulkanComputePipeline.h"
-#include "Graphics/Vulkan/VulkanRenderer.h"
 #include "Graphics/Vulkan/VulkanImgui.h"
 
 #include "Renderer/QuadTreeTerrainRenderer.h"
@@ -47,14 +46,14 @@ public:
 	void onUpdate() override;
 	void onResize() override;
 	void onDestroy() override;
-	void postFrame() override;
 
 private:
 	void createFinalPass();
 
 private:
+	std::shared_ptr<VulkanSwapchain> m_Swapchain;
 	std::shared_ptr<VulkanRenderCommandBuffer> CommandBuffer;
-	VulkanRenderPass m_FinalPass;
+	VulkanSwapchainPass m_FinalPass;
 
 	std::shared_ptr<VulkanFramebuffer> m_Output;
 
@@ -69,5 +68,6 @@ private:
 	Camera cam{ 45.0f, 1600.0f / 900.0f, 0.1f, 1024.0f * 32.0f };
 
 	std::unique_ptr<LODManager> m_LODManager;
+	std::shared_ptr<VulkanImgui> m_ImguiLayer;
 	std::shared_ptr<LODManagerGUI> m_ManagerGUI;
 };

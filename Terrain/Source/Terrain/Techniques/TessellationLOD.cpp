@@ -1,7 +1,5 @@
 #include "TessellationLOD.h"
 
-#include "Graphics/Vulkan/VulkanRenderer.h"
-
 #define TESSSELLATION_CONSTRUCT_TERRAIN_CHUNKS_COMPUTE "Terrain/ClipmapTessellation/ConstructTerrainChunks_comp.glsl"
 
 enum STITCH_DIRECTION
@@ -24,7 +22,7 @@ TessellationLOD::TessellationLOD(const TerrainSpecification& spec, const std::sh
 		LODMarginsProperties.Type = BufferType::STORAGE_BUFFER;
 		LODMarginsProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
 
-		LODMarginsBufferSet = std::make_shared<VulkanBufferSet>(VulkanRenderer::getFramesInFlight(), LODMarginsProperties);
+		LODMarginsBufferSet = std::make_shared<VulkanBufferSet>(VulkanSwapchain::framesInFlight, LODMarginsProperties);
 	}
 
 }
@@ -79,7 +77,7 @@ void TessellationLOD::computeMargins(const glm::ivec2& cameraPosition, uint32_t 
 	LODMarginsBufferSet->getBuffer(m_NextBuffer)->setDataCPU(margins.data(), margins.size() * sizeof(LODMargins));
 
 	m_CurrentlyUsedBuffer = m_NextBuffer;
-	(++m_NextBuffer) %= VulkanRenderer::getFramesInFlight();
+	(++m_NextBuffer) %= VulkanSwapchain::framesInFlight;
 }
 
 void TessellationLOD::Generate(VkCommandBuffer commandBuffer, const Camera& cam, uint32_t patchSize)
@@ -92,7 +90,8 @@ void TessellationLOD::Generate(VkCommandBuffer commandBuffer, const Camera& cam,
 
 	uint32_t dispatchCount = uint32_t(glm::ceil(float(m_RingSize * multiplier) / 8.0f));
 
-	VulkanRenderer::dispatchCompute(commandBuffer, m_ConstructTerrainChunksPass, m_CurrentlyUsedBuffer, { dispatchCount, dispatchCount, m_TerrainSpecification.Info.LODCount });
+	m_ConstructTerrainChunksPass.Prepare(commandBuffer, m_CurrentlyUsedBuffer);
+	m_ConstructTerrainChunksPass.Dispatch(commandBuffer, { dispatchCount, dispatchCount, m_TerrainSpecification.Info.LODCount });
 }
 
 void TessellationLOD::createResources(const std::unique_ptr<TerrainData>& terrain, const std::shared_ptr<VulkanBuffer>& tessSettings)

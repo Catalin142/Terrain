@@ -1,7 +1,6 @@
 #include "TessellationTerrainRenderer.h"
 
 #include "Graphics/Vulkan/VulkanDevice.h"
-#include "Graphics/Vulkan/VulkanRenderer.h"
 #include "Graphics/Vulkan/VulkanUtils.h"
 
 #include "Graphics/Vulkan/VulkanInitializers.h"
@@ -82,13 +81,13 @@ void TessellationTerrainRenderer::refreshClipmaps()
 	Instrumentor::Get().endTimer(TessellationRendererMetrics::CPU_LOAD_NEEDED_NODES);
 }
 
-void TessellationTerrainRenderer::updateClipmaps()
+void TessellationTerrainRenderer::updateClipmaps(uint32_t frameIndex)
 {
-	VkCommandBuffer cmdBuffer = CommandBuffer->getCurrentCommandBuffer();
+	VkCommandBuffer cmdBuffer = CommandBuffer->getCommandBuffer(frameIndex);
 
-	CommandBuffer->beginQuery(TessellationRendererMetrics::GPU_UPDATE_CLIPMAP);
+	CommandBuffer->beginTimeQuery(TessellationRendererMetrics::GPU_UPDATE_CLIPMAP);
 	uint32_t chunksLoaded = m_Clipmap->updateClipmaps(cmdBuffer);
-	CommandBuffer->endQuery(TessellationRendererMetrics::GPU_UPDATE_CLIPMAP);
+	CommandBuffer->endTimeQuery(TessellationRendererMetrics::GPU_UPDATE_CLIPMAP);
 
 	uint32_t patchSize = m_ControlPointsPerRow * m_ControlPointSize;
 
@@ -101,48 +100,52 @@ void TessellationTerrainRenderer::updateClipmaps()
 	}
 	Instrumentor::Get().endTimer(TessellationRendererMetrics::CPU_CREATE_CHUNK_BUFFER);
 
-	CommandBuffer->beginQuery(TessellationRendererMetrics::GPU_CREATE_VERTICAL_ERROR_MAP);
+	CommandBuffer->beginTimeQuery(TessellationRendererMetrics::GPU_CREATE_VERTICAL_ERROR_MAP);
 	if (!m_VericalErrorMapGenerated)
 	{
-		VulkanRenderer::dispatchCompute(cmdBuffer, m_VerticalErrorPass, { 64, 64, m_Terrain->getInfo().LODCount});
+		m_VerticalErrorPass.Prepare(cmdBuffer, frameIndex);
+		m_VerticalErrorPass.Dispatch(cmdBuffer, { 64, 64, m_Terrain->getInfo().LODCount });
 
 		VulkanUtils::imageMemoryBarrier(cmdBuffer, m_VerticalErrorMap, { VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT });
 
 		m_VericalErrorMapGenerated = true;
 	}
-	CommandBuffer->endQuery(TessellationRendererMetrics::GPU_CREATE_VERTICAL_ERROR_MAP);
+	CommandBuffer->endTimeQuery(TessellationRendererMetrics::GPU_CREATE_VERTICAL_ERROR_MAP);
 
-	CommandBuffer->beginQuery(TessellationRendererMetrics::GPU_GENERATE_AND_FRUSTUM_CULL);
+	CommandBuffer->beginTimeQuery(TessellationRendererMetrics::GPU_GENERATE_AND_FRUSTUM_CULL);
 	m_TessellationLOD->Generate(cmdBuffer, SceneCamera, patchSize);
 
 	VulkanUtils::bufferMemoryBarrier(cmdBuffer, m_TessellationLOD->ChunksToRender, { VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 		VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT });
 
-	CommandBuffer->endQuery(TessellationRendererMetrics::GPU_GENERATE_AND_FRUSTUM_CULL);
+	CommandBuffer->endTimeQuery(TessellationRendererMetrics::GPU_GENERATE_AND_FRUSTUM_CULL);
 }
 
-void TessellationTerrainRenderer::Render(const Camera& camera)
+void TessellationTerrainRenderer::Render(const Camera& camera, uint32_t frameIndex)
 {
-	CommandBuffer->beginPipelineQuery();
+	CommandBuffer->beginPipelineQuery("_TessellationTerrain", {
+		VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_VERTICES_BIT,
+		VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_PRIMITIVES_BIT,
+		VK_QUERY_PIPELINE_STATISTIC_TESSELLATION_CONTROL_SHADER_PATCHES_BIT,
+		VK_QUERY_PIPELINE_STATISTIC_TESSELLATION_EVALUATION_SHADER_INVOCATIONS_BIT
+		});
 
 	int32_t tessSettings[4] = {m_ControlPointSize, m_ControlPointsPerRow};
 	m_TessellationSettings->setDataCPU(&tessSettings, 4 * sizeof(int32_t));
 
-	CommandBuffer->beginQuery(TessellationRendererMetrics::RENDER_TERRAIN);
+	CommandBuffer->beginTimeQuery(TessellationRendererMetrics::RENDER_TERRAIN);
 
 	m_ThresholdBuffer->setDataCPU(&Threshold, sizeof(float) * 6);
 
 	std::array<glm::vec4, 6> frustumPlanes = SceneCamera.getFrustum();
 	m_FrustumBuffer->setDataCPU(&frustumPlanes, 6 * sizeof(glm::vec4));
 
-	VkCommandBuffer cmdBuffer = CommandBuffer->getCurrentCommandBuffer();
-	VulkanRenderer::beginRenderPass(cmdBuffer, m_TerrainRenderPass);
-	VulkanRenderer::preparePipeline(cmdBuffer, m_TerrainRenderPass, m_TessellationLOD->getMostRecentIndex());
-
 	CameraRenderMatrices matrices = camera.getRenderMatrices();
-	vkCmdPushConstants(cmdBuffer, m_TerrainRenderPass.Pipeline->getVkPipelineLayout(), VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, 0,
-		sizeof(CameraRenderMatrices), &matrices);
+
+	VkCommandBuffer cmdBuffer = CommandBuffer->getCommandBuffer(frameIndex);
+	m_TerrainRenderPass.Begin(cmdBuffer);
+	m_TerrainRenderPass.Prepare(cmdBuffer, m_TessellationLOD->getMostRecentIndex(), sizeof(CameraRenderMatrices), &matrices, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT);
 
 	VkBuffer vertexBuffers[] = { m_VertexBuffer->getBuffer() };
 	VkDeviceSize offsets[] = { 0 };
@@ -150,11 +153,11 @@ void TessellationTerrainRenderer::Render(const Camera& camera)
 
 	vkCmdDrawIndirect(cmdBuffer, m_TessellationLOD->RenderCommand->getBuffer(), 0, 1, sizeof(VkDrawIndirectCommand));
 
-	VulkanRenderer::endRenderPass(cmdBuffer);
+	m_TerrainRenderPass.End(cmdBuffer);
 
-	CommandBuffer->endQuery(TessellationRendererMetrics::RENDER_TERRAIN);
+	CommandBuffer->endTimeQuery(TessellationRendererMetrics::RENDER_TERRAIN);
 
-	CommandBuffer->endPipelineQuery();
+	CommandBuffer->endPipelineQuery("_TessellationTerrain");
 }
 
 void TessellationTerrainRenderer::setWireframe(bool wireframe)

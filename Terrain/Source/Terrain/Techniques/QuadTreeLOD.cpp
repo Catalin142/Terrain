@@ -1,6 +1,5 @@
 #include "QuadTreeLOD.h"
 
-#include "Graphics/Vulkan/VulkanRenderer.h"
 #include "Graphics/Vulkan/VulkanUtils.h"
 
 #include <cmath>
@@ -35,7 +34,8 @@ void QuadTreeLOD::Generate(VkCommandBuffer commandBuffer, std::vector<TerrainChu
 	for (uint32_t lod = 0; lod < m_TerrainSpecification.Info.LODCount; lod++)
 	{
 		computePass.DescriptorSet = m_DescriptorSets[lod % 2];
-		VulkanRenderer::dispatchCompute(commandBuffer, computePass, bufferIndex, { 1, 1, 1 }, sizeof(uint32_t), &sizefp);
+		computePass.Prepare(commandBuffer, bufferIndex, sizeof(uint32_t), &sizefp);
+		computePass.Dispatch(commandBuffer, { 1, 1, 1 });
 
 		VkMemoryBarrier barrier1 = {};
 		barrier1.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
@@ -107,7 +107,7 @@ void QuadTreeLOD::createQuadTreePass(const std::shared_ptr<TerrainVirtualMap>& v
 		tempAProperties.Type = BufferType::STORAGE_BUFFER | BufferType::TRANSFER_DST_BUFFER;
 		tempAProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
 
-		m_TempA = std::make_shared<VulkanBufferSet>(VulkanRenderer::getFramesInFlight(), tempAProperties);
+		m_TempA = std::make_shared<VulkanBufferSet>(VulkanSwapchain::framesInFlight, tempAProperties);
 	}
 	{
 		VulkanBufferProperties tempBProperties;
@@ -115,7 +115,7 @@ void QuadTreeLOD::createQuadTreePass(const std::shared_ptr<TerrainVirtualMap>& v
 		tempBProperties.Type = BufferType::STORAGE_BUFFER | BufferType::TRANSFER_SRC_BUFFER;
 		tempBProperties.Usage = BufferMemoryUsage::BUFFER_ONLY_GPU;
 
-		m_TempB = std::make_shared<VulkanBufferSet>(VulkanRenderer::getFramesInFlight(), tempBProperties);
+		m_TempB = std::make_shared<VulkanBufferSet>(VulkanSwapchain::framesInFlight, tempBProperties);
 	}
 	{
 		VulkanBufferProperties resultProperties;
@@ -131,7 +131,7 @@ void QuadTreeLOD::createQuadTreePass(const std::shared_ptr<TerrainVirtualMap>& v
 		passMetadataProperties.Type = BufferType::STORAGE_BUFFER | BufferType::TRANSFER_DST_BUFFER;
 		passMetadataProperties.Usage = BufferMemoryUsage::BUFFER_CPU_VISIBLE | BufferMemoryUsage::BUFFER_CPU_COHERENT;
 
-		PassMetadata = std::make_shared<VulkanBufferSet>(VulkanRenderer::getFramesInFlight(), passMetadataProperties);
+		PassMetadata = std::make_shared<VulkanBufferSet>(VulkanSwapchain::framesInFlight, passMetadataProperties);
 	}
 	{
 		VulkanBufferProperties dispatchProperties;
