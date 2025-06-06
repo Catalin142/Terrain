@@ -12,7 +12,7 @@ This repository explores multiple terrain rendering techniques implemented in Vu
    Uses concentric LOD rings centered around the camera. 
 
 3. **Vertical error-based clipmap rendering**  
-   Based on the GDC talk [*Landscape Creation and Rendering in REDengine 3*]([https://gdcvault.com/play/1020394/Landscape-Creation-and-Rendering-in](https://archive.org/details/GDC2014Gollent/mode/2up).  
+   Based on the GDC talk [*Landscape Creation and Rendering in REDengine 3*](https://gdcvault.com/play/1020394/Landscape-Creation-and-Rendering-in).  
    Improves clipmap LOD selection by incorporating vertical geometric error metrics for better visual fidelity.
 
 ![QuadTree LOD Example](media/ve.png)
