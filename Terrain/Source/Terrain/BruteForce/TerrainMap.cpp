@@ -25,5 +25,4 @@ TerrainMap::TerrainMap(const std::string& filepath, uint32_t width, uint32_t hei
 	m_HeightMap = std::make_shared<VulkanImage>(heightmapSpec);
 	m_HeightMap->Create();
 	m_HeightMap->loadFromFile({ filepath });
-
 }

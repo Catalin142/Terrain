@@ -75,7 +75,7 @@ void BruteForceLOD::createComputePass(const std::shared_ptr<VulkanBuffer>& infoB
 
 	{
 		VulkanBufferProperties chunksToRenderProperties;
-		chunksToRenderProperties.Size = 1024 * (uint32_t)sizeof(GPUBruteForceRenderChunk);
+		chunksToRenderProperties.Size = 16384 * (uint32_t)sizeof(GPUBruteForceRenderChunk);
 		chunksToRenderProperties.Type = BufferType::STORAGE_BUFFER | BufferType::TRANSFER_DST_BUFFER;
 		chunksToRenderProperties.Usage = BufferMemoryUsage::BUFFER_ONLY_GPU;
 

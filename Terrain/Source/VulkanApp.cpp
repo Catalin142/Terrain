@@ -53,12 +53,24 @@ void VulkanApp::onCreate()
 	CommandBuffer = std::make_shared<VulkanRenderCommandBuffer>(2);
 
 	{
+		SerializeChunkedSettings serializeSettings;
+		serializeSettings.MetadataFilepath = "path/to/metadatafile.metadata";
+		serializeSettings.RawdataFilepath = "path/to/rawdata.rawdata";
+		serializeSettings.ChunkSize = 128;
+		serializeSettings.LODs = 5;
+
+		HeightMapDiskProcessor diskProcessor("path/to/heightmap.png", 5);
+		diskProcessor.serializeChunked(serializeSettings);
+	}
+
+
+	{
 		FramebufferSpecification framebufferSpecification;
 		framebufferSpecification.Width = 1600;
 		framebufferSpecification.Height = 900;
 		framebufferSpecification.Samples = 1;
 		framebufferSpecification.Clear = true;
-		framebufferSpecification.colorClear = { 1.0, 1.0, 1.0, 1.0 };
+		framebufferSpecification.colorClear = { 0.0, 0.0, 0.0, 1.0 };
 
 		framebufferSpecification.DepthAttachment.Format = VK_FORMAT_D32_SFLOAT;
 		framebufferSpecification.DepthAttachment.Blend = false;

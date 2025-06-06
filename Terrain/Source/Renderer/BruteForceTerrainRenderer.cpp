@@ -34,6 +34,8 @@ void BruteForceTerrainRenderer::Render(const Camera& camera, uint32_t frameIndex
 
 	CameraRenderMatrices matrices = camera.getRenderMatrices();
 
+	CommandBuffer->beginTimeQuery(BruteForceRendererMetrics::RENDER_TERRAIN);
+
 	m_TerrainRenderPass.Begin(cmdBuffer);
 	m_TerrainRenderPass.Prepare(cmdBuffer, m_BruteForceLOD->getMostRecentIndex(), sizeof(CameraRenderMatrices), &matrices, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT);
 

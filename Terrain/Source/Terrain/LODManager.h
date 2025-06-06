@@ -48,7 +48,7 @@ public:
 	std::shared_ptr<BruteForceTerrainRenderer> BruteForceRenderer = nullptr;
 
 	ClipmapTerrainSpecification ClipmapSpecification{ 1024 };
-	VirtualTerrainMapSpecification VirtualMapSpecification{ 1024 * 4,  std::array<uint32_t, MAX_LOD>{8, 8, 8, 8, 8, 8} };
+	VirtualTerrainMapSpecification VirtualMapSpecification{ 1024 * 3,  std::array<uint32_t, MAX_LOD>{8, 8, 8, 8, 8, 8} };
 
 	const std::unique_ptr<TerrainData>& Terrain;
 
