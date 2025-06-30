@@ -19,7 +19,7 @@ This repository explores multiple terrain rendering techniques implemented in Vu
 
 4. **Brute-force tessellation-based rendering**  
    Uses hardware tessellation shaders to render terrain without LOD optimizations.  
-   Simple but GPU-intensive — useful as a baseline or for prototyping.
+   Simple but GPU-intensive, useful as a baseline or for prototyping.
 
 Before rendering, the heightmap data must be serialized into a chunked format. This step converts a raw heightmap image into a set of LOD-aware terrain chunks.
 
